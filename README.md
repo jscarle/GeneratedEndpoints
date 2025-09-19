@@ -20,14 +20,6 @@ Add the package to the Minimal API project that will host your endpoints. You ca
 dotnet add package GeneratedEndpoints
 ```
 
-Or add a `<PackageReference>` to your project file:
-
-```xml
-<ItemGroup>
-  <PackageReference Include="GeneratedEndpoints" Version="$(GeneratedEndpointsVersion)" />
-</ItemGroup>
-```
-
 Once the package is referenced, the source generator will contribute its attributes and extension methods to the consuming project at build time.
 
 ### 1. Define a request handler
