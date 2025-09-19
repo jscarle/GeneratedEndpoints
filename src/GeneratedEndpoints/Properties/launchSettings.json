@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "DebugSourceGenerator": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\..\\tests\\GeneratedEndpoints.Tests.Lab\\GeneratedEndpoints.Tests.Lab.csproj"
+    }
+  }
+}
