@@ -26,6 +26,13 @@ Once the package is referenced, the source generator will contribute its attribu
 
 Create a feature class that encapsulates the logic for a single endpoint and decorate its handler method with one of the generated HTTP verb attributes. The attributes live in the `Microsoft.AspNetCore.Generated.Attributes` namespace and map directly to Minimal API routing methods.
 
+Handler classes can be expressed in whichever style best fits the feature:
+
+* **Instance classes** (non-static) allow constructor injection and can expose either instance or static handler methods. When an annotated method is not static the generator will call it on a resolved instance from dependency injection.
+* **Static classes** make it easy to group stateless functionality. Every annotated method inside must also be static, mirroring standard C# rules.
+
+#### Instance handler example
+
 ```csharp
 using Microsoft.AspNetCore.Generated.Attributes;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -54,8 +61,27 @@ Key points:
 * Use `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, or `[MapConnect]` to describe the HTTP verb and route pattern.
 * Optional `Name`, `Summary`, and `Description` named parameters populate the generated `.WithName`, `.WithSummary`, and `.WithDescription` metadata calls. When omitted, the generator derives the endpoint name from the method name (stripping a trailing `Async`).
 * Apply standard ASP.NET Core parameter binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromServices]`, `[AsParameters]`, etc.). The generator mirrors them onto the produced delegate so binding behaves exactly as declared.
-* Annotate the class or method with `[Tags]`, `[RequireAuthorization]`, or `[DisableAntiforgery]` to flow the corresponding Minimal API configuration.
-* Non-static handler classes are automatically registered with dependency injection (as transient services), allowing you to use constructor injection for collaborators.
+* Annotate the **class**, an individual **method**, or both with `[Tags]`, `[RequireAuthorization]`, or `[DisableAntiforgery]`. Class-level metadata is merged onto every generated endpoint, while method-level attributes can refine or augment the settings for a specific handler.
+* Non-static handler classes are automatically registered with dependency injection (as transient services). Their instance methods receive a scoped instance resolved from DI, while static methods continue to behave like any other static helper.
+
+#### Static handler example
+
+The same attribute-driven approach works for static handler types when no dependencies are needed:
+
+```csharp
+using Microsoft.AspNetCore.Generated.Attributes;
+using Microsoft.AspNetCore.Http.HttpResults;
+
+namespace Todos.Features;
+
+public static class ListTodos
+{
+    [MapGet("/todos")]
+    [Tags("Todos")]
+    public static Ok<IReadOnlyList<Todo>> Handle()
+        => TypedResults.Ok(TodoStore.All);
+}
+```
 
 ### 2. Wire up the application
 
@@ -81,7 +107,7 @@ app.Run();
 
 ### 3. Compose additional endpoints
 
-Add as many handler classes as needed—each annotated method becomes an endpoint. You can mix synchronous and asynchronous methods, return `IResult` or typed `Results<>`, and share common metadata through attributes placed on either the class or individual methods. For example:
+Add as many handler classes as needed—each annotated method becomes an endpoint. You can mix synchronous and asynchronous methods, return `IResult` or typed `Results<>`, and combine static and instance handlers in the same project. Metadata from attributes composes naturally: class-level attributes are applied to every endpoint, while method-level attributes add to (or override, when relevant) the defaults.
 
 ```csharp
 using Microsoft.AspNetCore.Generated.Attributes;
@@ -89,22 +115,44 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Todos.Features;
 
-public static class CreateTodo
+[Tags("Todos")]
+[RequireAuthorization("Todos.Read")]
+public sealed class TodoEndpoints
 {
-    [MapPost("/todos", Name = "CreateTodo")]
-    [DisableAntiforgery]
-    public static async Task<Results<Created<Todo>, ValidationProblem>> HandleAsync(
-        [FromBody] CreateTodoRequest request,
-        [FromServices] TodoService service,
+    private readonly TodoDbContext _db;
+
+    public TodoEndpoints(TodoDbContext db) => _db = db;
+
+    [MapGet("/todos/{id}", Summary = "Retrieve a todo")]
+    public async Task<Results<Ok<Todo>, NotFound>> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await _db.Todos.FindAsync(new object?[] { id }, cancellationToken);
+        return entity is null ? TypedResults.NotFound() : TypedResults.Ok(entity);
+    }
+
+    [MapDelete("/todos/{id}")]
+    [RequireAuthorization("Todos.Write")]
+    public static async Task<Results<NoContent, NotFound>> DeleteAsync(
+        Guid id,
+        [FromServices] TodoDbContext db,
         CancellationToken cancellationToken)
     {
-        var result = await service.CreateAsync(request, cancellationToken);
-        return result.IsValid
-            ? TypedResults.Created($"/todos/{result.Value.Id}", result.Value)
-            : TypedResults.ValidationProblem(result.Errors);
+        var entity = await db.Todos.FindAsync(new object?[] { id }, cancellationToken);
+        if (entity is null)
+            return TypedResults.NotFound();
+
+        db.Todos.Remove(entity);
+        await db.SaveChangesAsync(cancellationToken);
+        return TypedResults.NoContent();
     }
 }
 ```
+
+In this example:
+
+* The class-level `[Tags]` and `[RequireAuthorization]` attributes apply to both endpoints, while the method-level `[RequireAuthorization]` adds an additional policy for the delete handler.
+* `GetAsync` is an instance method that uses the injected `TodoDbContext` field, illustrating how non-static handlers can maintain state.
+* `DeleteAsync` is a static method in the same class and explicitly receives its dependencies via `[FromServices]`, demonstrating that you can mix static and instance methods in a single handler type.
 
 Every new handler will automatically appear in the generated routing table the next time the project builds—no manual `MapGet`, `MapPost`, or registration code is required.
 
