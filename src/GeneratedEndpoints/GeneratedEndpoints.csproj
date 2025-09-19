@@ -1,0 +1,88 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- Compilation -->
+    <PropertyGroup>
+        <RootNamespace>GeneratedEndpoints</RootNamespace>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+
+    <!-- Analysis -->
+    <PropertyGroup>
+        <AnalysisLevel>latest-All</AnalysisLevel>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <NoWarn>$(NoWarn);NU5128</NoWarn>
+    </PropertyGroup>
+
+    <!-- References -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.1" PrivateAssets="all"/>
+        <PackageReference Include="PolySharp" Version="1.15.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Bcl.HashCode" Version="6.0.0" PrivateAssets="all" GeneratePathProperty="true" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all"/>
+        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <!-- Output -->
+    <PropertyGroup>
+        <AssemblyName>GeneratedEndpoints</AssemblyName>
+        <Version>9.0.0-preview.1</Version>
+        <AssemblyVersion>9.0.0.0</AssemblyVersion>
+        <FileVersion>9.0.0.0</FileVersion>
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+    </PropertyGroup>
+
+    <!-- Package -->
+    <PropertyGroup>
+        <IsPackable>true</IsPackable>
+        <PackageId>GeneratedEndpoints</PackageId>
+        <Title>GeneratedEndpoints</Title>
+        <Description>Attribute-driven, source-generated minimal API endpoints for feature-based development.</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/jscarle/GeneratedEndpoints</PackageProjectUrl>
+        <PackageTags>minimal-api minimal-apis aspnetcore endpoints source-generator vertical-slice-architecture clean-architecture</PackageTags>
+        <RepositoryUrl>https://github.com/jscarle/GeneratedEndpoints</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <Authors>Jean-Sebastien Carle</Authors>
+        <Copyright>Copyright © Jean-Sebastien Carle 2025</Copyright>
+        <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+        <PackageIcon>Icon.png</PackageIcon>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false"/>
+        <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" Visible="false"/>
+        <None Include="..\..\Icon.png" Pack="true" PackagePath="\" Visible="false"/>
+        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+        <None Include="$(PKGMicrosoft_Bcl_HashCode)\lib\netstandard2.0\Microsoft.Bcl.HashCode.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+    </ItemGroup>
+
+    <!-- Development -->
+    <PropertyGroup>
+        <IsRoslynComponent>true</IsRoslynComponent>
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+    </PropertyGroup>
+
+    <Target Name="GetDependencyTargetPaths">
+        <ItemGroup>
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGMicrosoft_Bcl_HashCode)\lib\netstandard2.0\Microsoft.Bcl.HashCode.dll" IncludeRuntimeDependency="false"/>
+        </ItemGroup>
+    </Target>
+
+    <!-- Testing -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="GeneratedEndpoints.Tests"/>
+    </ItemGroup>
+
+</Project>

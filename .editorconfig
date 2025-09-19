@@ -1,0 +1,21 @@
+root = true
+
+[*]
+charset = utf-8
+trim_trailing_whitespace = true
+end_of_line = lf
+insert_final_newline = true
+max_line_length = 160
+
+[*.cs]
+indent_style = space
+indent_size = 4
+
+[*.{received,verified}.{txt,xml,json}]
+charset = utf-8-bom
+end_of_line = lf
+indent_size = unset
+indent_style = unset
+insert_final_newline = false
+tab_width = unset
+trim_trailing_whitespace = false
