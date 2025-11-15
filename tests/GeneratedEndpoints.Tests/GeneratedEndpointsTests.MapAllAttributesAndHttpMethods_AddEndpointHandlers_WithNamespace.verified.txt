@@ -19,6 +19,6 @@ internal static class EndpointServicesExtensions
 {
     internal static void AddEndpointHandlers(this IServiceCollection services)
     {
-        services.TryAddTransient<global::GeneratedEndpointsTests.ComplexEndpoints>();
+        services.TryAddScoped<global::GeneratedEndpointsTests.ComplexEndpoints>();
     }
 }

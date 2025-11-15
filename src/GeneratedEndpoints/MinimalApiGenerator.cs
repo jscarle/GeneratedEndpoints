@@ -1305,7 +1305,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      .Select(x => x.Class.Name)
                      .Distinct())
         {
-            source.Append("        services.TryAddTransient<");
+            source.Append("        services.TryAddScoped<");
             source.Append(className);
             source.Append(">();");
             source.AppendLine();
