@@ -512,20 +512,35 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var isStatic = classSymbol.IsStatic;
         var endpointConventionBuilderSymbol = compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
-        var hasConfigureMethod = ContainsConfigureMethod(classSymbol, endpointConventionBuilderSymbol, cancellationToken);
+        var serviceProviderSymbol = compilation.GetTypeByMetadataName("System.IServiceProvider");
+        var configureMethodDetails = GetConfigureMethodDetails(
+            classSymbol,
+            endpointConventionBuilderSymbol,
+            serviceProviderSymbol,
+            cancellationToken
+        );
 
-        var requestHandlerClass = new RequestHandlerClass(name, isStatic, hasConfigureMethod);
+        var requestHandlerClass = new RequestHandlerClass(
+            name,
+            isStatic,
+            configureMethodDetails.HasConfigureMethod,
+            configureMethodDetails.ConfigureMethodAcceptsServiceProvider
+        );
 
         return (classSymbol, requestHandlerClass);
     }
 
-    private static bool ContainsConfigureMethod(
+    private static ConfigureMethodDetails GetConfigureMethodDetails(
         INamedTypeSymbol classSymbol,
         INamedTypeSymbol? endpointConventionBuilderSymbol,
+        INamedTypeSymbol? serviceProviderSymbol,
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        var hasConfigureMethod = false;
+        var acceptsServiceProvider = false;
 
         foreach (var member in classSymbol.GetMembers("Configure"))
         {
@@ -534,22 +549,36 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (member is not IMethodSymbol methodSymbol)
                 continue;
 
-            if (IsConfigureMethod(methodSymbol, endpointConventionBuilderSymbol))
-                return true;
+            if (IsConfigureMethod(methodSymbol, endpointConventionBuilderSymbol, serviceProviderSymbol, out var methodAcceptsServiceProvider))
+            {
+                hasConfigureMethod = true;
+                if (methodAcceptsServiceProvider)
+                {
+                    acceptsServiceProvider = true;
+                    break;
+                }
+            }
         }
 
-        return false;
+        return new ConfigureMethodDetails(hasConfigureMethod, acceptsServiceProvider);
     }
 
-    private static bool IsConfigureMethod(IMethodSymbol methodSymbol, INamedTypeSymbol? endpointConventionBuilderSymbol)
+    private static bool IsConfigureMethod(
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol? endpointConventionBuilderSymbol,
+        INamedTypeSymbol? serviceProviderSymbol,
+        out bool acceptsServiceProvider
+    )
     {
+        acceptsServiceProvider = false;
+
         if (!methodSymbol.IsStatic)
             return false;
 
         if (methodSymbol.TypeParameters.Length != 1)
             return false;
 
-        if (methodSymbol.Parameters.Length != 1)
+        if (methodSymbol.Parameters.Length is < 1 or > 2)
             return false;
 
         var builderTypeParameter = methodSymbol.TypeParameters[0];
@@ -558,6 +587,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (!SymbolEqualityComparer.Default.Equals(builderParameter.Type, builderTypeParameter))
             return false;
 
+        if (methodSymbol.Parameters.Length == 2)
+        {
+            var serviceProviderParameter = methodSymbol.Parameters[1];
+            if (!IsServiceProviderParameter(serviceProviderParameter.Type, serviceProviderSymbol))
+                return false;
+
+            acceptsServiceProvider = true;
+        }
+
         if (!methodSymbol.ReturnsVoid)
             return false;
 
@@ -565,6 +603,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return false;
 
         return true;
+    }
+
+    private static bool IsServiceProviderParameter(ITypeSymbol typeSymbol, INamedTypeSymbol? serviceProviderSymbol)
+    {
+        if (serviceProviderSymbol is not null)
+            return SymbolEqualityComparer.Default.Equals(typeSymbol, serviceProviderSymbol);
+
+        return MatchesServiceProvider(typeSymbol);
     }
 
     private static bool HasEndpointConventionBuilderConstraint(
@@ -612,6 +658,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
         return string.Equals(containingNamespace, "Microsoft.AspNetCore.Builder", StringComparison.Ordinal);
+    }
+
+    private static bool MatchesServiceProvider(ITypeSymbol typeSymbol)
+    {
+        if (typeSymbol is not INamedTypeSymbol namedType)
+            return false;
+
+        if (!string.Equals(namedType.Name, "IServiceProvider", StringComparison.Ordinal))
+            return false;
+
+        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+        return string.Equals(containingNamespace, "System", StringComparison.Ordinal);
     }
 
     private static EquatableImmutableArray<Parameter> GetRequestHandlerParameters(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
@@ -800,6 +858,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static void GenerateMapRequestHandler(StringBuilder source, RequestHandler requestHandler)
     {
         var wrapWithConfigure = requestHandler.Class.HasConfigureMethod;
+        var configureAcceptsServiceProvider = requestHandler.Class.ConfigureMethodAcceptsServiceProvider;
         var indent = wrapWithConfigure ? "            " : "        ";
         var continuationIndent = indent + "    ";
 
@@ -921,6 +980,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(".DisableAntiforgery()");
         }
 
+        if (wrapWithConfigure && configureAcceptsServiceProvider)
+        {
+            source.AppendLine(",");
+            source.Append(indent);
+            source.Append("builder.ServiceProvider");
+        }
+
         if (wrapWithConfigure)
         {
             source.AppendLine();
@@ -983,7 +1049,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (rh.DisableAntiforgery)
                 cost += 24;
             if (rh.Class.HasConfigureMethod)
+            {
                 cost += 32 + rh.Class.Name.Length;
+                if (rh.Class.ConfigureMethodAcceptsServiceProvider)
+                    cost += 32;
+            }
 
             estimate += cost;
         }
@@ -1128,13 +1198,20 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool DisableAntiforgery
     );
 
-    private readonly record struct RequestHandlerClass(string Name, bool IsStatic, bool HasConfigureMethod);
+    private readonly record struct RequestHandlerClass(
+        string Name,
+        bool IsStatic,
+        bool HasConfigureMethod,
+        bool ConfigureMethodAcceptsServiceProvider
+    );
 
     private readonly record struct RequestHandlerMethod(string Name, bool IsStatic, bool IsAwaitable, EquatableImmutableArray<Parameter> Parameters);
 
     private readonly record struct RequestHandlerMetadata(string? Name, string? Summary, string? Description, EquatableImmutableArray<string>? Tags);
 
     private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key);
+
+    private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
     private enum BindingSource
     {
