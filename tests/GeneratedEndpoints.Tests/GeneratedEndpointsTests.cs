@@ -307,6 +307,36 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task WithOrderAttribute(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             internal sealed class OrderedEndpoints
+                                             {
+                                                 [MapGet("/ordered/low")]
+                                                 [WithOrder(-1)]
+                                                 public static Ok Low()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/ordered/high")]
+                                                 [WithOrder(5)]
+                                                 public static Ok High()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(WithOrderAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(WithOrderAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task ConfigureRegistersEndpointFilters(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
