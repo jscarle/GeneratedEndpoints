@@ -67,6 +67,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
     private const string DisableAntiforgeryAttributeHint = $"{DisableAntiforgeryAttributeFullyQualifiedName}.gs.cs";
 
+    private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
+    private const string AllowAnonymousAttributeFullyQualifiedName = $"{AttributesNamespace}.{AllowAnonymousAttributeName}";
+    private const string AllowAnonymousAttributeHint = $"{AllowAnonymousAttributeFullyQualifiedName}.gs.cs";
+
     private const string RoutingNamespace = $"{BaseNamespace}.Routing";
 
     private const string AddEndpointHandlersClassName = "EndpointServicesExtensions";
@@ -245,6 +249,23 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                                          """;
         context.AddSource(DisableAntiforgeryAttributeHint, SourceText.From(disableAntiforgerySource, Encoding.UTF8));
+
+        // AllowAnonymous
+        var allowAnonymousSource = $$"""
+                                     {{FileHeader}}
+
+                                     namespace {{AttributesNamespace}};
+
+                                     /// <summary>
+                                     /// Allows the annotated endpoint or class to bypass authorization requirements.
+                                     /// </summary>
+                                     [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                     internal sealed class {{AllowAnonymousAttributeName}} : global::System.Attribute
+                                     {
+                                     }
+
+                                     """;
+        context.AddSource(AllowAnonymousAttributeHint, SourceText.From(allowAnonymousSource, Encoding.UTF8));
     }
 
     private static string GenerateHttpAttributeSource(string fileHeader, string attributesNamespace, string attributeName, string summaryVerb)
@@ -317,7 +338,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (httpMethod, pattern, name, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
-        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery) =
+        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous) =
             GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -325,7 +346,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var metadata = new RequestHandlerMetadata(name, summary, description, tags);
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
-            authorizationPolicies, disableAntiforgery
+            authorizationPolicies, disableAntiforgery, allowAnonymous
         );
 
         return requestHandler;
@@ -397,7 +418,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     }
 
     private static (EquatableImmutableArray<string>? tags, bool requireAuthorization, EquatableImmutableArray<string>? authorizationPolicies, bool
-        disableAntiforgery) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+        disableAntiforgery, bool allowAnonymous) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -405,14 +426,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var requireAuthorization = false;
         EquatableImmutableArray<string>? authorizationPolicies = null;
         var disableAntiforgery = false;
+        var allowAnonymous = false;
 
         var classAttributes = classSymbol.GetAttributes();
-        GetAdditionalRequestHandlerAttributeValues(classAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery);
+        GetAdditionalRequestHandlerAttributeValues(classAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery, ref allowAnonymous);
 
         var methodAttributes = methodSymbol.GetAttributes();
-        GetAdditionalRequestHandlerAttributeValues(methodAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery);
+        GetAdditionalRequestHandlerAttributeValues(methodAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery, ref allowAnonymous);
 
-        return (tags, requireAuthorization, authorizationPolicies, disableAntiforgery);
+        return (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous);
     }
 
     private static void GetAdditionalRequestHandlerAttributeValues(
@@ -420,7 +442,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref EquatableImmutableArray<string>? tags,
         ref bool requireAuthorization,
         ref EquatableImmutableArray<string>? authorizationPolicies,
-        ref bool disableAntiforgery
+        ref bool disableAntiforgery,
+        ref bool allowAnonymous
     )
     {
         foreach (var attribute in attributes)
@@ -466,6 +489,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     break;
                 case $"global::{DisableAntiforgeryAttributeFullyQualifiedName}":
                     disableAntiforgery = true;
+                    break;
+                case $"global::{AllowAnonymousAttributeFullyQualifiedName}":
+                    allowAnonymous = true;
                     break;
             }
         }
@@ -993,6 +1019,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(".DisableAntiforgery()");
         }
 
+        if (requestHandler.AllowAnonymous)
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".AllowAnonymous()");
+        }
+
         if (wrapWithConfigure && configureAcceptsServiceProvider)
         {
             source.AppendLine(",");
@@ -1060,6 +1093,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (rh.AuthorizationPolicies is { Count: > 0 })
                 cost += rh.AuthorizationPolicies.Value.Sum(p => 6 + p.Length);
             if (rh.DisableAntiforgery)
+                cost += 24;
+            if (rh.AllowAnonymous)
                 cost += 24;
             if (rh.Class.HasConfigureMethod)
             {
@@ -1208,7 +1243,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         RequestHandlerMetadata Metadata,
         bool RequireAuthorization,
         EquatableImmutableArray<string>? AuthorizationPolicies,
-        bool DisableAntiforgery
+        bool DisableAntiforgery,
+        bool AllowAnonymous
     );
 
     private readonly record struct RequestHandlerClass(

@@ -61,7 +61,7 @@ Key points:
 * Use `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapQuery]`, `[MapTrace]`, or `[MapConnect]` to describe the HTTP verb and route pattern.
 * Optional `Name`, `Summary`, and `Description` named parameters populate the generated `.WithName`, `.WithSummary`, and `.WithDescription` metadata calls. When omitted, the generator derives the endpoint name from the method name (stripping a trailing `Async`).
 * Apply standard ASP.NET Core parameter binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromServices]`, `[AsParameters]`, etc.). The generator mirrors them onto the produced delegate so binding behaves exactly as declared.
-* Annotate the **class**, an individual **method**, or both with `[Tags]`, `[RequireAuthorization]`, or `[DisableAntiforgery]`. Class-level metadata is merged onto every generated endpoint, while method-level attributes can refine or augment the settings for a specific handler.
+* Annotate the **class**, an individual **method**, or both with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, or `[AllowAnonymous]`. Class-level metadata is merged onto every generated endpoint, while method-level attributes can refine or augment the settings for a specific handler. `[AllowAnonymous]` lets a method opt out of authorization even if the enclosing class (or other conventions) require authenticated access.
 * Non-static handler classes are automatically registered with dependency injection (as transient services). Their instance methods receive a scoped instance resolved from DI, while static methods continue to behave like any other static helper.
 
 #### Static handler example
