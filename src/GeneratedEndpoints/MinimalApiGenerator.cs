@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -295,7 +296,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
         var attribute = context.Attributes[0];
 
-        var requestHandlerClassResult = GetRequestHandlerClass(requestHandlerMethodSymbol, cancellationToken);
+        var requestHandlerClassResult = GetRequestHandlerClass(
+            requestHandlerMethodSymbol,
+            context.SemanticModel.Compilation,
+            cancellationToken
+        );
         if (requestHandlerClassResult is null)
             return null;
 
@@ -499,6 +504,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static (INamedTypeSymbol RequestHandlerClassSymbol, RequestHandlerClass RequestHandlerClass)? GetRequestHandlerClass(
         IMethodSymbol methodSymbol,
+        Compilation compilation,
         CancellationToken cancellationToken
     )
     {
@@ -510,10 +516,112 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var isStatic = classSymbol.IsStatic;
+        var endpointConventionBuilderSymbol =
+            compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
+        var hasConfigureMethod = ContainsConfigureMethod(classSymbol, endpointConventionBuilderSymbol, cancellationToken);
 
-        var requestHandlerClass = new RequestHandlerClass(name, isStatic);
+        var requestHandlerClass = new RequestHandlerClass(name, isStatic, hasConfigureMethod);
 
         return (classSymbol, requestHandlerClass);
+    }
+
+    private static bool ContainsConfigureMethod(
+        INamedTypeSymbol classSymbol,
+        INamedTypeSymbol? endpointConventionBuilderSymbol,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        foreach (var member in classSymbol.GetMembers("Configure"))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (member is not IMethodSymbol methodSymbol)
+                continue;
+
+            if (IsConfigureMethod(methodSymbol, endpointConventionBuilderSymbol))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsConfigureMethod(IMethodSymbol methodSymbol, INamedTypeSymbol? endpointConventionBuilderSymbol)
+    {
+        if (!methodSymbol.IsStatic || !methodSymbol.IsExtensionMethod)
+            return false;
+
+        if (methodSymbol.TypeParameters.Length != 1)
+            return false;
+
+        if (methodSymbol.Parameters.Length != 1)
+            return false;
+
+        var builderTypeParameter = methodSymbol.TypeParameters[0];
+        var builderParameter = methodSymbol.Parameters[0];
+
+        if (!SymbolEqualityComparer.Default.Equals(builderParameter.Type, builderTypeParameter))
+            return false;
+
+        if (!SymbolEqualityComparer.Default.Equals(methodSymbol.ReturnType, builderTypeParameter))
+            return false;
+
+        if (!HasEndpointConventionBuilderConstraint(builderTypeParameter, methodSymbol, endpointConventionBuilderSymbol))
+            return false;
+
+        return true;
+    }
+
+    private static bool HasEndpointConventionBuilderConstraint(
+        ITypeParameterSymbol builderTypeParameter,
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol? endpointConventionBuilderSymbol
+    )
+    {
+        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(
+            constraint => endpointConventionBuilderSymbol is not null
+                ? SymbolEqualityComparer.Default.Equals(constraint, endpointConventionBuilderSymbol)
+                : MatchesEndpointConventionBuilder(constraint)
+        );
+
+        if (symbolMatches)
+            return true;
+
+        return methodSymbol.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax())
+            .OfType<MethodDeclarationSyntax>()
+            .SelectMany(methodSyntax => methodSyntax.ConstraintClauses)
+            .Where(clause => string.Equals(clause.Name.Identifier.ValueText, builderTypeParameter.Name, StringComparison.Ordinal))
+            .SelectMany(clause => clause.Constraints.OfType<TypeConstraintSyntax>())
+            .Any(constraint => IsEndpointConventionBuilderIdentifier(constraint.Type));
+    }
+
+    private static bool IsEndpointConventionBuilderIdentifier(TypeSyntax typeSyntax)
+    {
+        switch (typeSyntax)
+        {
+            case QualifiedNameSyntax qualified:
+                return IsEndpointConventionBuilderIdentifier(qualified.Right);
+            case AliasQualifiedNameSyntax alias:
+                return IsEndpointConventionBuilderIdentifier(alias.Name);
+            case SimpleNameSyntax simple:
+                return string.Equals(simple.Identifier.ValueText, "IEndpointConventionBuilder", StringComparison.Ordinal);
+            default:
+                return false;
+        }
+    }
+
+    private static bool MatchesEndpointConventionBuilder(ITypeSymbol typeSymbol)
+    {
+        if (typeSymbol is not INamedTypeSymbol namedType)
+            return false;
+
+        if (!string.Equals(namedType.Name, "IEndpointConventionBuilder", StringComparison.Ordinal))
+            return false;
+
+        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+        return string.Equals(containingNamespace, "Microsoft.AspNetCore.Builder", StringComparison.Ordinal);
     }
 
     private static EquatableImmutableArray<Parameter> GetRequestHandlerParameters(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
@@ -700,7 +808,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GenerateMapRequestHandler(StringBuilder source, RequestHandler requestHandler)
     {
-        source.Append("        ");
+        var wrapWithConfigure = requestHandler.Class.HasConfigureMethod;
+        var indent = wrapWithConfigure ? "            " : "        ";
+        var continuationIndent = indent + "    ";
+
+        if (wrapWithConfigure)
+        {
+            source.Append("        ");
+            source.Append(requestHandler.Class.Name);
+            source.AppendLine(".Configure(");
+        }
+
+        source.Append(indent);
         source.Append("builder.Map");
         source.Append(requestHandler.HttpMethod is "Get" or "Post" or "Put" or "Delete" or "Patch" ? requestHandler.HttpMethod : "Methods");
         source.Append('(');
@@ -754,7 +873,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (!string.IsNullOrEmpty(requestHandler.Metadata.Name))
         {
             source.AppendLine();
-            source.Append("            .WithName(");
+            source.Append(continuationIndent);
+            source.Append(".WithName(");
             source.Append(StringLiteral(requestHandler.Metadata.Name));
             source.Append(')');
         }
@@ -762,7 +882,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (!string.IsNullOrEmpty(requestHandler.Metadata.Summary))
         {
             source.AppendLine();
-            source.Append("            .WithSummary(");
+            source.Append(continuationIndent);
+            source.Append(".WithSummary(");
             source.Append(StringLiteral(requestHandler.Metadata.Summary));
             source.Append(')');
         }
@@ -770,7 +891,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (!string.IsNullOrEmpty(requestHandler.Metadata.Description))
         {
             source.AppendLine();
-            source.Append("            .WithDescription(");
+            source.Append(continuationIndent);
+            source.Append(".WithDescription(");
             source.Append(StringLiteral(requestHandler.Metadata.Description));
             source.Append(')');
         }
@@ -778,7 +900,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (requestHandler.Metadata.Tags is { Count: > 0 })
         {
             source.AppendLine();
-            source.Append("            .WithTags(");
+            source.Append(continuationIndent);
+            source.Append(".WithTags(");
             source.Append(string.Join(", ", requestHandler.Metadata.Tags.Value.Select(StringLiteral)));
             source.Append(')');
         }
@@ -788,23 +911,35 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             if (requestHandler.AuthorizationPolicies is { Count: > 0 })
             {
-                source.Append("            .RequireAuthorization(");
+                source.Append(continuationIndent);
+                source.Append(".RequireAuthorization(");
                 source.Append(string.Join(", ", requestHandler.AuthorizationPolicies.Value.Select(StringLiteral)));
                 source.Append(')');
             }
             else
             {
-                source.Append("            .RequireAuthorization()");
+                source.Append(continuationIndent);
+                source.Append(".RequireAuthorization()");
             }
         }
 
         if (requestHandler.DisableAntiforgery)
         {
             source.AppendLine();
-            source.Append("            .DisableAntiforgery()");
+            source.Append(continuationIndent);
+            source.Append(".DisableAntiforgery()");
         }
 
-        source.AppendLine(";");
+        if (wrapWithConfigure)
+        {
+            source.AppendLine();
+            source.Append("        );");
+            source.AppendLine();
+        }
+        else
+        {
+            source.AppendLine(";");
+        }
     }
 
     private static string GetBindingSourceAttribute(BindingSource source, string? key)
@@ -856,6 +991,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 cost += rh.AuthorizationPolicies.Value.Sum(p => 6 + p.Length);
             if (rh.DisableAntiforgery)
                 cost += 24;
+            if (rh.Class.HasConfigureMethod)
+                cost += 32 + rh.Class.Name.Length;
 
             estimate += cost;
         }
@@ -1000,7 +1137,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool DisableAntiforgery
     );
 
-    private readonly record struct RequestHandlerClass(string Name, bool IsStatic);
+    private readonly record struct RequestHandlerClass(string Name, bool IsStatic, bool HasConfigureMethod);
 
     private readonly record struct RequestHandlerMethod(string Name, bool IsStatic, bool IsAwaitable, EquatableImmutableArray<Parameter> Parameters);
 
