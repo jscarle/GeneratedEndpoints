@@ -51,6 +51,7 @@ internal static class EndpointRouteBuilderExtensions
 
         builder.MapGet("/complex/{id:int}", static async ([FromServices] global::ComplexEndpoints handler, [FromRoute] int id, [FromQuery] string filter, [FromHeader(Name = "x-trace-id")] string traceId, [FromBody] global::GetRequest request, [FromForm] string formValue, [FromServices] IServiceProvider services, [FromKeyedServices("special")] object keyed, [AsParameters] global::AdditionalParameters parameters, global::System.Threading.CancellationToken cancellationToken) => await handler.GetComplex(id, filter, traceId, request, formValue, services, keyed, parameters, cancellationToken))
             .WithName("GetComplex")
+            .WithDisplayName("Complex data endpoint")
             .WithSummary("Gets complex data.")
             .WithDescription("Uses every supported attribute.")
             .ExcludeFromDescription()
