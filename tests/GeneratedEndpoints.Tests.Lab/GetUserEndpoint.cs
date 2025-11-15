@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Generated.Attributes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace GeneratedEndpoints.Tests.Lab;
 
@@ -15,13 +16,13 @@ internal static class GetUserEndpoint
     [Tags("Featured")]
     [AllowAnonymous]
     [Accepts("application/json", "application/xml", RequestType = typeof(GetUserRequest))]
-    [Accepts<GetUserMetadata>("application/json", "application/xml")]
+    [Accepts<GetUserMetadata>("application/json", "application/xml", IsOptional = true)]
     [ProducesResponse( StatusCodes.Status200OK, "application/json", ResponseType = typeof(UserProfile))]
     [ProducesResponse<UserProfile>(StatusCodes.Status202Accepted, "application/json")]
     [ProducesProblem(StatusCodes.Status500InternalServerError, "application/problem+json")]
     [ProducesValidationProblem(StatusCodes.Status400BadRequest, "application/problem+json")]
     [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.", Description = "Gets a user by ID when the ID is greater than zero.")]
-    public static Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser(int id)
+    public static Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser([FromQuery] int id)
     {
         if (id <= 0)
         {

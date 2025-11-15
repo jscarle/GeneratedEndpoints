@@ -99,6 +99,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string UseEndpointHandlersMethodName = "MapEndpointHandlers";
     private const string UseEndpointHandlersMethodHint = $"{RoutingNamespace}.{UseEndpointHandlersMethodName}.g.cs";
 
+    private const string ConfigureMethodName = "Configure";
     private const string AsyncSuffix = "Async";
 
     private static readonly string FileHeader = $"""
@@ -852,7 +853,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                         ? GetStringArrayValues(attribute.ConstructorArguments[2])
                         : null;
 
-                    var producesProblemList = producesProblem ??= new List<ProducesProblemMetadata>();
+                    var producesProblemList = producesProblem ??= [];
                     producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
                     break;
                 }
@@ -868,7 +869,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                         ? GetStringArrayValues(attribute.ConstructorArguments[2])
                         : null;
 
-                    var producesValidationProblemList = producesValidationProblem ??= new List<ProducesValidationProblemMetadata>();
+                    var producesValidationProblemList = producesValidationProblem ??= [];
                     producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
                     break;
                 }
@@ -923,12 +924,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         INamedTypeSymbol attributeClass,
         ref List<AcceptsMetadata>? accepts)
     {
-        string? requestType = null;
+        string? requestType;
         string contentType;
         EquatableImmutableArray<string>? additionalContentTypes;
         var isOptional = GetNamedBoolValue(attribute, IsOptionalAttributeNamedParameter);
 
-        if (attributeClass.IsGenericType && attributeClass.TypeArguments.Length == 1)
+        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
             requestType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             contentType = attribute.ConstructorArguments.Length > 0
@@ -953,7 +954,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return;
         }
 
-        var acceptsList = accepts ??= new List<AcceptsMetadata>();
+        var acceptsList = accepts ??= [];
         acceptsList.Add(new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional));
     }
 
@@ -962,12 +963,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         INamedTypeSymbol attributeClass,
         ref List<ProducesMetadata>? produces)
     {
-        string? responseType = null;
+        string? responseType;
         int statusCode;
         string? contentType;
         EquatableImmutableArray<string>? additionalContentTypes;
 
-        if (attributeClass.IsGenericType && attributeClass.TypeArguments.Length == 1)
+        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
             responseType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
@@ -998,7 +999,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return;
         }
 
-        var producesList = produces ??= new List<ProducesMetadata>();
+        var producesList = produces ??= [];
         producesList.Add(new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes));
     }
 
@@ -1102,7 +1103,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var hasConfigureMethod = false;
         var acceptsServiceProvider = false;
 
-        foreach (var member in classSymbol.GetMembers("Configure"))
+        foreach (var member in classSymbol.GetMembers(ConfigureMethodName))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -1426,7 +1427,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         {
             source.Append("        ");
             source.Append(requestHandler.Class.Name);
-            source.AppendLine(".Configure(");
+            source.Append('.');
+            source.Append(ConfigureMethodName);
+            source.AppendLine("(");
         }
 
         source.Append(indent);
