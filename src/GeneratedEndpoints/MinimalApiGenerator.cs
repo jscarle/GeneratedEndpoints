@@ -593,17 +593,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static bool IsEndpointConventionBuilderIdentifier(TypeSyntax typeSyntax)
     {
-        switch (typeSyntax)
+        return typeSyntax switch
         {
-            case QualifiedNameSyntax qualified:
-                return IsEndpointConventionBuilderIdentifier(qualified.Right);
-            case AliasQualifiedNameSyntax alias:
-                return IsEndpointConventionBuilderIdentifier(alias.Name);
-            case SimpleNameSyntax simple:
-                return string.Equals(simple.Identifier.ValueText, "IEndpointConventionBuilder", StringComparison.Ordinal);
-            default:
-                return false;
-        }
+            QualifiedNameSyntax qualified => IsEndpointConventionBuilderIdentifier(qualified.Right),
+            AliasQualifiedNameSyntax alias => IsEndpointConventionBuilderIdentifier(alias.Name),
+            SimpleNameSyntax simple => string.Equals(simple.Identifier.ValueText, "IEndpointConventionBuilder", StringComparison.Ordinal),
+            _ => false,
+        };
     }
 
     private static bool MatchesEndpointConventionBuilder(ITypeSymbol typeSymbol)
