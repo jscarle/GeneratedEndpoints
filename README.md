@@ -1,52 +1,54 @@
 [![Banner](https://raw.githubusercontent.com/jscarle/GeneratedEndpoints/develop/Banner.png)](https://github.com/jscarle/GeneratedEndpoints)
 
-# GeneratedEndpoints - Attribute-driven, source-generated minimal API endpoints for feature-based development
+# GeneratedEndpoints
 
-GeneratedEndpoints is a .NET source generator that automatically wires up Minimal API endpoints from attribute-annotated
-methods. This simplifies integration of HTTP handlers within Clean Architecture (CA) or Vertical Slice Architecture (VSA)
-by keeping endpoint definitions inside their features while generating the boilerplate mapping code.
+Attribute-driven, source-generated Minimal API endpoints for feature-based development.
 
-## Capabilities at a glance
+GeneratedEndpoints is a .NET source generator that automatically wires Minimal API endpoints from attribute-decorated methods. You describe the intent of each endpoint through attributes, and the generator produces all the routing and boilerplate needed to expose it. The result is a clean, feature-centric project structure that fits Clean Architecture (CA), Vertical Slice Architecture (VSA), or any other modular approach.
 
-* **Attribute-driven routing** – decorate a method with `[MapGet]`, `[MapPost]`, etc. (including OPTIONS, HEAD, TRACE, CONNECT,
-  and the Minimal API-specific `QUERY` verb) and the generator maps it automatically.
-* **Static or instance handlers** – declare handlers in static classes or as transient services that participate in dependency
-  injection.
-* **Metadata composition** – mix class-level and method-level attributes for tags, authorization requirements, content
-  negotiation, and antiforgery/anonymous settings. The generator merges everything into the produced endpoint builder.
-* **Rich request/response contracts** – describe the shape of your API surface with `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`,
-  and `[ProducesValidationProblem]` so OpenAPI and client tooling stay accurate.
-* **Minimal boilerplate** – `AddEndpointHandlers` auto-registers instance handlers with DI, and `MapEndpointHandlers`
-  registers every attribute-decorated method.
-* **Optional per-feature customization** – provide a `Configure` method in your feature to add filters, OpenAPI metadata, or any
-  other conventions using the generated `IEndpointConventionBuilder`.
+---
 
-[![develop](https://img.shields.io/github/actions/workflow/status/jscarle/GeneratedEndpoints/develop.yml?logo=github)](https://github.com/jscarle/GeneratedEndpoints)
-[![nuget](https://img.shields.io/nuget/v/GeneratedEndpoints)](https://www.nuget.org/packages/GeneratedEndpoints)
-[![downloads](https://img.shields.io/nuget/dt/GeneratedEndpoints)](https://www.nuget.org/packages/GeneratedEndpoints)
+## Table of contents
 
-## Getting Started
+1. [Why GeneratedEndpoints?](#why-generatedendpoints)
+2. [Quick start](#quick-start)
+3. [Handler styles and routing](#handler-styles-and-routing)
+4. [Configuring endpoints](#configuring-endpoints)
+5. [Describing requests and responses](#describing-requests-and-responses)
+6. [Attribute reference](#attribute-reference)
+7. [Tips, patterns, and extra examples](#tips-patterns-and-extra-examples)
 
-### Installation
+---
 
-Add the package to the Minimal API project that will host your endpoints. You can install it with the .NET CLI:
+## Why GeneratedEndpoints?
+
+GeneratedEndpoints focuses on three goals:
+
+* **Attribute-driven routing** – use `[MapGet]`, `[MapPost]`, `[MapDelete]`, `[MapOptions]`, `[MapHead]`, `[MapPatch]`, `[MapTrace]`, `[MapConnect]`, and even `[MapQuery]` to describe the verb and route pattern. The generator creates the matching `Map*` call and wires up metadata like `.WithName`, `.WithSummary`, and `.WithDescription`.
+* **Feature-first organization** – keep handlers close to the code they execute (for example, alongside your `Todos` feature). Non-static handler classes are automatically registered with dependency injection so you can inject EF Core DbContexts, services, etc.
+* **Metadata composition** – decorate classes and methods with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, `[AllowAnonymous]`, `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]`. Class-level metadata is merged into every method, while method-level metadata can refine or override.
+
+The generator also emits the `AddEndpointHandlers` and `MapEndpointHandlers` extension methods that do all the registration work for you.
+
+---
+
+## Quick start
+
+The fastest way to understand GeneratedEndpoints is to build a minimal feature end-to-end.
+
+### 1. Install the package
+
+Add the package to the Minimal API project that will host your endpoints:
 
 ```bash
 dotnet add package GeneratedEndpoints
 ```
 
-Once the package is referenced, the source generator will contribute its attributes and extension methods to the consuming project at build time.
+After the reference is added, the source generator contributes its attributes and routing extensions to the consuming project at build time.
 
-### 1. Define a request handler
+### 2. Create a handler class
 
-Create a feature class that encapsulates the logic for a single endpoint and decorate its handler method with one of the generated HTTP verb attributes. The attributes live in the `Microsoft.AspNetCore.Generated.Attributes` namespace and map directly to Minimal API routing methods.
-
-Handler classes can be expressed in whichever style best fits the feature:
-
-* **Instance classes** (non-static) allow constructor injection and can expose either instance or static handler methods. When an annotated method is not static the generator will call it on a resolved instance from dependency injection.
-* **Static classes** make it easy to group stateless functionality. Every annotated method inside must also be static, mirroring standard C# rules.
-
-#### Instance handler example
+Handlers can be static or instance classes. The following example uses a scoped handler so that EF Core can be injected through the constructor:
 
 ```csharp
 using Microsoft.AspNetCore.Generated.Attributes;
@@ -71,36 +73,16 @@ public sealed class GetTodo
 }
 ```
 
-Key points:
+Key ideas:
 
-* Use `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapQuery]`, `[MapTrace]`, or `[MapConnect]` to describe the HTTP verb and route pattern.
-* Optional `Name`, `Summary`, and `Description` named parameters populate the generated `.WithName`, `.WithSummary`, and `.WithDescription` metadata calls. When omitted, the generator derives the endpoint name from the method name (stripping a trailing `Async`).
-* Apply standard ASP.NET Core parameter binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromServices]`, `[FromKeyedServices]`, `[AsParameters]`, etc.). The generator mirrors them onto the produced delegate so binding behaves exactly as declared.
-* Annotate the **class**, an individual **method**, or both with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, or `[AllowAnonymous]`. Class-level metadata is merged onto every generated endpoint, while method-level attributes can refine or augment the settings for a specific handler. `[AllowAnonymous]` lets a method opt out of authorization even if the enclosing class (or other conventions) require authenticated access.
-* Non-static handler classes are automatically registered with dependency injection (as scoped services). Their instance methods receive a scoped instance resolved from DI, while static methods continue to behave like any other static helper.
+* Choose the attribute that matches the verb (`[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]`).
+* Named arguments like `Summary`, `Description`, and `Name` are translated into `.WithSummary`, `.WithDescription`, and `.WithName` calls.
+* Use existing ASP.NET Core binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]`, `[FromServices]`, `[FromKeyedServices]`, `[AsParameters]`, etc.). The generator preserves them in the produced delegate.
+* Metadata attributes (`[Tags]`, `[RequireAuthorization]`, `[AllowAnonymous]`, `[DisableAntiforgery]`) can be placed on the class, on a method, or on both. Class-level metadata is merged with method-level metadata.
 
-#### Static handler example
+### 3. Register handlers and map endpoints
 
-The same attribute-driven approach works for static handler types when no dependencies are needed:
-
-```csharp
-using Microsoft.AspNetCore.Generated.Attributes;
-using Microsoft.AspNetCore.Http.HttpResults;
-
-namespace Todos.Features;
-
-public static class ListTodos
-{
-    [MapGet("/todos")]
-    [Tags("Todos")]
-    public static Ok<IReadOnlyList<Todo>> Handle()
-        => TypedResults.Ok(TodoStore.All);
-}
-```
-
-### 2. Wire up the application
-
-The generator emits extension methods in the `Microsoft.AspNetCore.Generated.Routing` namespace. Call them during startup to register handler types and map the generated endpoints.
+The generator emits two extension methods in `Microsoft.AspNetCore.Generated.Routing`. Call them during startup:
 
 ```csharp
 using Microsoft.AspNetCore.Builder;
@@ -108,40 +90,41 @@ using Microsoft.AspNetCore.Generated.Routing;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Registers every non-static handler class as a scoped service.
-builder.Services.AddEndpointHandlers();
+builder.Services.AddEndpointHandlers(); // registers every non-static handler as scoped
 
 var app = builder.Build();
 
-// Maps every method decorated with a Map* attribute.
-app.MapEndpointHandlers();
+app.MapEndpointHandlers(); // emits MapGet/MapPost/etc. calls for every decorated method
 
 app.Run();
 ```
 
-`AddEndpointHandlers` is intentionally minimal: it calls `TryAddScoped<THandler>()` once per **non-static** handler type so constructor-injected dependencies are available whenever an instance method executes. Static handler classes are skipped because they never require dependency injection.
+`AddEndpointHandlers` calls `TryAddScoped<THandler>()` for every non-static handler class. Static handler classes are skipped because they never need DI. `MapEndpointHandlers` iterates over those handler types, maps each annotated method, and returns the `IEndpointRouteBuilder` for further chaining.
 
-`MapEndpointHandlers` iterates over the same set of handler types, emits the correct `MapGet`/`MapPost`/etc. call for every annotated method, and returns the `IEndpointRouteBuilder` so you can keep chaining configuration. Instance methods are invoked through a generated delegate that pulls the handler instance from `[FromServices]`, ensuring the same scoped object handles the entire request.
+### 4. Add more endpoints
 
-### 3. Compose additional endpoints
+Every attribute-decorated method becomes an endpoint the next time the project builds. Mix synchronous and asynchronous methods, return `IResult` or typed `Results<>`, and combine static and instance handlers in the same class. Metadata from attributes composes naturally.
 
-Add as many handler classes as needed—each annotated method becomes an endpoint. You can mix synchronous and asynchronous methods, return `IResult` or typed `Results<>`, and combine static and instance handlers in the same project. Metadata from attributes composes naturally: class-level attributes are applied to every endpoint, while method-level attributes add to (or override, when relevant) the defaults.
+### 5. Run and verify
+
+Build the project (`dotnet build`) or run the app (`dotnet run`)—the generator will emit all routing code, DI registrations, and metadata without writing any manual `app.MapGet` or `app.MapPost` calls.
+
+---
+
+## Handler styles and routing
+
+GeneratedEndpoints supports multiple handler styles so you can pick the one that matches the feature you're building.
+
+### Instance handlers (constructor injection)
 
 ```csharp
-using Microsoft.AspNetCore.Generated.Attributes;
-using Microsoft.AspNetCore.Http.HttpResults;
-
-namespace Todos.Features;
-
-[Tags("Todos")]
-[RequireAuthorization("Todos.Read")]
 public sealed class TodoEndpoints
 {
     private readonly TodoDbContext _db;
 
     public TodoEndpoints(TodoDbContext db) => _db = db;
 
-    [MapGet("/todos/{id}", Summary = "Retrieve a todo")]
+    [MapGet("/todos/{id}")]
     public async Task<Results<Ok<Todo>, NotFound>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var entity = await _db.Todos.FindAsync(new object?[] { id }, cancellationToken);
@@ -166,39 +149,45 @@ public sealed class TodoEndpoints
 }
 ```
 
-In this example:
+* Non-static handler classes are registered as scoped services when you call `AddEndpointHandlers`.
+* Instance methods are invoked on an injected instance.
+* Static methods in the same class still work—they simply receive dependencies via `[FromServices]`.
 
-* The class-level `[Tags]` and `[RequireAuthorization]` attributes apply to both endpoints, while the method-level `[RequireAuthorization]` adds an additional policy for the delete handler.
-* `GetAsync` is an instance method that uses the injected `TodoDbContext` field, illustrating how non-static handlers can maintain state.
-* `DeleteAsync` is a static method in the same class and explicitly receives its dependencies via `[FromServices]`, demonstrating that you can mix static and instance methods in a single handler type.
-
-Every new handler will automatically appear in the generated routing table the next time the project builds—no manual `MapGet`, `MapPost`, or registration code is required.
-
-### 4. Customize generated endpoints with `Configure`
-
-Some scenarios require direct access to the `IEndpointConventionBuilder` that Minimal APIs use when configuring an endpoint—for example, adding endpoint filters, OpenAPI metadata, or other advanced conventions. Handler classes can now opt-in to that level of control by providing a static `Configure` method with the following signature:
+### Static handlers (stateless logic)
 
 ```csharp
-public static void Configure<TBuilder>(TBuilder builder)
-    where TBuilder : IEndpointConventionBuilder
-
-// or, when you need to resolve services while configuring
-public static void Configure<TBuilder>(TBuilder builder, IServiceProvider serviceProvider)
-    where TBuilder : IEndpointConventionBuilder
+public static class ListTodos
+{
+    [MapGet("/todos")]
+    [Tags("Todos")]
+    public static Ok<IReadOnlyList<Todo>> Handle()
+        => TypedResults.Ok(TodoStore.All);
+}
 ```
 
-When the generator detects this method on a handler class it will automatically wrap every mapped endpoint from the class in a `.Configure(...)` call that invokes your method. You can use the provided builder to apply conventions that are difficult or impossible to express via attributes alone.
+Static handlers excel when no services are required. Every annotated method inside the class must also be static, just like regular C# rules.
 
-If you include the optional `IServiceProvider` parameter, the generator passes the `IEndpointRouteBuilder.ServiceProvider` from the `MapEndpointHandlers` call. This makes it easy to resolve scoped services or other helpers needed to configure filters, OpenAPI metadata, or custom conventions without manually re-wiring the app's service provider.
+### Feature layout example
+
+A feature folder might look like this:
+
+```
+Todos/
+  Features/
+    GetTodo.cs
+    ListTodos.cs
+    CreateTodo.cs
+```
+
+Each file contains exactly one handler class with attribute-decorated methods. `MapEndpointHandlers` discovers them automatically. Because everything lives next to the feature, developers can reason about behavior without scanning `Program.cs` or `Startup.cs`.
+
+---
+
+## Configuring endpoints
+
+Some scenarios require more control over each endpoint's `IEndpointConventionBuilder`. The generator supports per-feature configuration through an optional static `Configure` method.
 
 ```csharp
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Generated.Attributes;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-
-namespace Todos.Features;
-
 public sealed class CreateTodo
 {
     [MapPost("/todos")]
@@ -217,20 +206,26 @@ public sealed class CreateTodo
 }
 ```
 
-The method is only generated once per handler class, so any conventions you add will automatically flow to all endpoints defined within that class.
-
-### 5. Describe contracts with `Accepts` and `ProducesResponse`
-
-GeneratedEndpoints ships with helper attributes for request and response metadata. Apply them to either a handler class or
-individual methods to keep your OpenAPI description in sync with the implementation. Attributes on the class are merged into
-each method, while method-level attributes can augment or override the defaults.
+You can also request an `IServiceProvider` when configuration depends on registered services:
 
 ```csharp
-using Microsoft.AspNetCore.Generated.Attributes;
-using Microsoft.AspNetCore.Http.HttpResults;
+public static void Configure<TBuilder>(TBuilder builder, IServiceProvider services)
+    where TBuilder : IEndpointConventionBuilder
+{
+    var conventions = services.GetRequiredService<TodoOpenApiConventions>();
+    conventions.Apply(builder);
+}
+```
 
-namespace Todos.Features;
+The `Configure` method is emitted once per handler class, so every endpoint in the class receives the same conventions.
 
+---
+
+## Describing requests and responses
+
+GeneratedEndpoints ships with attribute helpers for request/response metadata. They keep your OpenAPI description in sync with the implementation.
+
+```csharp
 [Accepts<CreateTodoRequest>("application/json", "application/xml")]
 [ProducesResponse<Todo>(StatusCodes.Status201Created)]
 [ProducesProblem(StatusCodes.Status500InternalServerError)]
@@ -243,46 +238,124 @@ public sealed class CreateTodo
 }
 ```
 
-When you can't use the generic form (for example, the request type is only known at runtime), set the `RequestType` named argument instead:
+* Use the generic form when the request/response type is known at compile time. For runtime types, set `RequestType` on `[Accepts]` and `ResponseType` on `[ProducesResponse]`.
+* Mark `IsOptional = true` on `[Accepts]` to call `.Accepts(..., isOptional: true)`.
+* Multiple `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]` attributes can be applied to the same method or class. The generator creates every corresponding `.Accepts` or `.Produces` call.
 
-```csharp
-[Accepts("application/xml", RequestType = typeof(CreateTodoRequest))]
-```
+---
 
-If the request body is optional, set `IsOptional = true` on the `[Accepts]` attribute to generate `.Accepts(..., isOptional: true)` in the resulting endpoint metadata.
-
-The generator translates these attributes into `.Accepts`, `.Produces`, `.ProducesProblem`, and `.ProducesValidationProblem`
-calls on the endpoint builder.
-
-### Attribute reference
+## Attribute reference
 
 | Attribute | Scope | Purpose |
 | --- | --- | --- |
-| `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]` | Method | Declares an endpoint and its route pattern. Named arguments (`Name`, `Summary`, `Description`) fill the generated `.WithName`, `.WithSummary`, and `.WithDescription` calls. |
+| `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]` | Method | Declares an endpoint and its route pattern. Named arguments fill the generated `.WithName`, `.WithSummary`, and `.WithDescription` calls. |
 | `[Tags]` | Class or method | Adds tags to one or more endpoints. Multiple attributes merge without duplication. |
-| `[RequireAuthorization]` | Class or method | Requires authorization for the endpoint. Pass an array of policy names to enforce specific policies; when omitted the standard authorization middleware is applied. |
-| `[AllowAnonymous]` | Class or method | Explicitly opts a method (or all methods in a class) into anonymous access, overriding `[RequireAuthorization]`. |
-| `[DisableAntiforgery]` | Class or method | Calls `.DisableAntiforgery()` on the generated endpoint, matching the ASP.NET Core extension. |
+| `[RequireAuthorization]` | Class or method | Requires authorization for the endpoint. Passing policies (`[RequireAuthorization("Todos.Read", "Todos.Write")]`) emits `.RequireAuthorization("Todos.Read", "Todos.Write")`. |
+| `[AllowAnonymous]` | Class or method | Explicitly opts an endpoint into anonymous access, overriding `[RequireAuthorization]`. |
+| `[DisableAntiforgery]` | Class or method | Calls `.DisableAntiforgery()` on the generated endpoint. |
 | `[ExcludeFromDescription]` | Class or method | Generates `.ExcludeFromDescription()` so the endpoint is hidden from OpenAPI/metadata. |
-| `[Accepts]` / `[Accepts<TRequest>]` | Class or method | Emits `.Accepts<TRequest>(contentType, additionalContentTypes..., isOptional: true|false)` to document supported request bodies. Multiple attributes are allowed per endpoint. |
-| `[ProducesResponse]` / `[ProducesResponse<TResponse>]` | Class or method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. Multiple attributes are allowed. |
+| `[Accepts]` / `[Accepts<TRequest>]` | Class or method | Emits `.Accepts<TRequest>(contentTypes..., isOptional: true|false)` to document supported request bodies. Multiple attributes allowed. |
+| `[ProducesResponse]` / `[ProducesResponse<TResponse>]` | Class or method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. |
 | `[ProducesProblem]` | Class or method | Emits `.ProducesProblem(statusCode, contentTypes...)` for endpoints that return RFC 7807 problem details. |
-| `[ProducesValidationProblem]` | Class or method | Emits `.ProducesValidationProblem(statusCode, contentTypes...)` when validation failures are returned. |
+| `[ProducesValidationProblem]` | Class or method | Emits `.ProducesValidationProblem(statusCode, contentTypes...)`. |
 
-> ℹ️ All metadata attributes defined on a class are applied to every annotated method inside the class. Method-level attributes
-> can add additional entries (for tags, accepts, produces, etc.) or override booleans such as `[AllowAnonymous]` and
-> `[DisableAntiforgery]`.
+> ℹ️ Metadata defined on a class is applied to every annotated method inside the class. Method-level attributes can add entries (tags, accepts, produces, etc.) or override boolean flags like `[AllowAnonymous]`.
 
-### Authorization and security conventions
+---
 
-* **Default authorization** – `[RequireAuthorization]` adds `.RequireAuthorization()` to every endpoint. Supplying policies
-  (`[RequireAuthorization("Todos.Read", "Todos.Write")]`) generates `.RequireAuthorization("Todos.Read", "Todos.Write")`.
-* **Allow anonymous** – `[AllowAnonymous]` on a class or method maps to `.AllowAnonymous()`, even when authorization is required elsewhere.
-* **Antiforgery** – `[DisableAntiforgery]` wires through `.DisableAntiforgery()`.
+## Tips, patterns, and extra examples
 
-### Tips for handler classes
+### Authorization and security
 
-* Non-static handler classes are automatically registered as **scoped** services when you call `builder.Services.AddEndpointHandlers();`.
-* You can mix static and instance methods within the same class. Instance methods receive the injected handler instance; static methods work like regular static helpers and can continue to rely on `[FromServices]` for dependencies.
-* Use the optional `Configure` method for per-feature conventions. Its optional `IServiceProvider` parameter lets you resolve scoped services when adding endpoint filters or other runtime configuration.
+* `[RequireAuthorization]` adds `.RequireAuthorization()` or `.RequireAuthorization("policy")`.
+* `[AllowAnonymous]` opt-in overrides class or global authorization requirements.
+* `[DisableAntiforgery]` wires `.DisableAntiforgery()` for CSRF-sensitive endpoints.
 
+### Handling query objects with `[AsParameters]`
+
+```csharp
+public sealed record ListTodosQuery([FromQuery] int? Page, [FromQuery] string? Owner);
+
+public static class SearchTodos
+{
+    [MapGet("/todos/search")]
+    public static Ok<IReadOnlyList<Todo>> Handle([AsParameters] ListTodosQuery query)
+    {
+        var todos = TodoStore.Query(query.Page ?? 1, query.Owner);
+        return TypedResults.Ok(todos);
+    }
+}
+```
+
+`[AsParameters]` lets you bundle multiple inputs into a record or class without writing manual binding logic.
+
+### Combining filters with `Configure`
+
+```csharp
+public sealed class UpdateTodo
+{
+    [MapPut("/todos/{id}")]
+    [RequireAuthorization("Todos.Write")]
+    public async Task<Results<Ok<Todo>, NotFound>> HandleAsync(Guid id, [FromBody] UpdateTodoRequest request)
+    {
+        // ...
+    }
+
+    public static void Configure<TBuilder>(TBuilder builder, IServiceProvider services)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        builder.AddEndpointFilter(new ValidationFilter());
+        builder.AddEndpointFilterFactory((context, next) => new LoggingFilter(next, services.GetRequiredService<ILoggerFactory>()));
+    }
+}
+```
+
+### Feature testing helper
+
+When testing, register handlers in a WebApplicationFactory or the new `MinimalApiApplicationBuilder`:
+
+```csharp
+var app = MinimalApiApplication.CreateBuilder().Build();
+app.MapEndpointHandlers();
+```
+
+All annotated methods become endpoints even in test hosts, so integration tests hit the same generated routing table as production.
+
+### Putting it all together
+
+```csharp
+[Tags("Todos")]
+[RequireAuthorization("Todos.Read")]
+public sealed class TodoFeature
+{
+    private readonly TodoDbContext _db;
+
+    public TodoFeature(TodoDbContext db) => _db = db;
+
+    [MapGet("/todos/{id}", Summary = "Retrieve a todo")]
+    public async Task<Results<Ok<Todo>, NotFound>> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await _db.Todos.FindAsync(new object?[] { id }, cancellationToken);
+        return entity is null ? TypedResults.NotFound() : TypedResults.Ok(entity);
+    }
+
+    [MapPost("/todos", Summary = "Create a todo")]
+    [ProducesResponse<Todo>(StatusCodes.Status201Created)]
+    public async Task<Created<Todo>> CreateAsync([FromBody] CreateTodoRequest request, CancellationToken cancellationToken)
+    {
+        var todo = request.ToTodo();
+        _db.Todos.Add(todo);
+        await _db.SaveChangesAsync(cancellationToken);
+        return TypedResults.Created($"/todos/{todo.Id}", todo);
+    }
+
+    public static void Configure<TBuilder>(TBuilder builder, IServiceProvider services)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        var conventions = services.GetRequiredService<TodoOpenApiConventions>();
+        conventions.Apply(builder);
+    }
+}
+```
+
+With these patterns you can grow a feature-based API without ever touching the routing layer manually. Drop a new handler class into your feature folder, decorate methods with the correct attributes, and let GeneratedEndpoints handle the plumbing.
