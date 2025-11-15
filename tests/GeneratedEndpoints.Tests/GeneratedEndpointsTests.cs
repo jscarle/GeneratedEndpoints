@@ -65,6 +65,9 @@ public class GeneratedEndpointsTests
 
         var result = TestHelpers.RunGenerator(sources);
 
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(MapGetWithConfigure)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(MapGetWithConfigure)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
@@ -95,6 +98,9 @@ public class GeneratedEndpointsTests
 
         var result = TestHelpers.RunGenerator(sources);
 
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(MapGetWithConfigureServiceProvider)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(MapGetWithConfigureServiceProvider)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
@@ -117,6 +123,9 @@ public class GeneratedEndpointsTests
         );
 
         var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(ClassAllowAnonymousMethodRequireAuthorization)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(ClassAllowAnonymousMethodRequireAuthorization)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
@@ -145,6 +154,9 @@ public class GeneratedEndpointsTests
 
         var result = TestHelpers.RunGenerator(sources);
 
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(RequireCorsAttributes)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(RequireCorsAttributes)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
@@ -167,8 +179,52 @@ public class GeneratedEndpointsTests
 
         var result = TestHelpers.RunGenerator(sources);
 
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(RequireRateLimitingAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(RequireRateLimitingAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ConfigureRegistersEndpointFilters(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             using System.Threading.Tasks;
+                                             using Microsoft.AspNetCore.Http;
+
+                                             [EndpointFilter(typeof(TimingFilter))]
+                                             internal sealed class FilteredEndpoints
+                                             {
+                                                 [MapGet("/filters")]
+                                                 [EndpointFilter<ValidationFilter>]
+                                                 public static Ok Handle()
+                                                     => TypedResults.Ok();
+                                             }
+
+                                             internal sealed class TimingFilter : IEndpointFilter
+                                             {
+                                                 public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+                                                     => next(context);
+                                             }
+
+                                             internal sealed class ValidationFilter : IEndpointFilter
+                                             {
+                                                 public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+                                                     => next(context);
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(ConfigureRegistersEndpointFilters)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(ConfigureRegistersEndpointFilters)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
 
     [Theory]
@@ -192,6 +248,9 @@ public class GeneratedEndpointsTests
         );
 
         var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(BindingAttributeNamesArePreserved)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(BindingAttributeNamesArePreserved)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");

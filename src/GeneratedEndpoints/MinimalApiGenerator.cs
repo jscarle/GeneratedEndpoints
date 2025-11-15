@@ -61,6 +61,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
 
+    private const string EndpointFilterAttributeName = "EndpointFilterAttribute";
+    private const string EndpointFilterAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointFilterAttributeName}";
+    private const string EndpointFilterAttributeHint = $"{EndpointFilterAttributeFullyQualifiedName}.gs.cs";
+
     private const string AcceptsAttributeName = "AcceptsAttribute";
     private const string AcceptsAttributeFullyQualifiedName = $"{AttributesNamespace}.{AcceptsAttributeName}";
     private const string AcceptsAttributeHint = $"{AcceptsAttributeFullyQualifiedName}.gs.cs";
@@ -360,6 +364,49 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                """;
         context.AddSource(AcceptsAttributeHint, SourceText.From(acceptsSource, Encoding.UTF8));
 
+        // EndpointFilter
+        var endpointFilterSource = $$"""
+                                     {{FileHeader}}
+
+                                     namespace {{AttributesNamespace}};
+
+                                     /// <summary>
+                                     /// Specifies an endpoint filter type to apply to the annotated endpoint or class.
+                                     /// </summary>
+                                     [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                     internal sealed class {{EndpointFilterAttributeName}} : global::System.Attribute
+                                     {
+                                         /// <summary>
+                                         /// Gets the CLR type of the endpoint filter.
+                                         /// </summary>
+                                         public global::System.Type FilterType { get; }
+
+                                         /// <summary>
+                                         /// Initializes a new instance of the <see cref="{{EndpointFilterAttributeName}}"/> class.
+                                         /// </summary>
+                                         /// <param name="filterType">The CLR type of the endpoint filter.</param>
+                                         public {{EndpointFilterAttributeName}}(global::System.Type filterType)
+                                         {
+                                             FilterType = filterType ?? throw new global::System.ArgumentNullException(nameof(filterType));
+                                         }
+                                     }
+
+                                     /// <summary>
+                                     /// Specifies an endpoint filter type using a generic argument.
+                                     /// </summary>
+                                     /// <typeparam name="TFilter">The CLR type of the endpoint filter.</typeparam>
+                                     [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                     internal sealed class {{EndpointFilterAttributeName}}<TFilter> : global::System.Attribute
+                                     {
+                                         /// <summary>
+                                         /// Gets the CLR type of the endpoint filter.
+                                         /// </summary>
+                                         public global::System.Type FilterType => typeof(TFilter);
+                                     }
+
+                                     """;
+        context.AddSource(EndpointFilterAttributeHint, SourceText.From(endpointFilterSource, Encoding.UTF8));
+
         // Produces
         var producesSource = $$"""
                                 {{FileHeader}}
@@ -611,7 +658,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requireRateLimiting,
-                rateLimitingPolicyName)
+                rateLimitingPolicyName, endpointFilterTypes)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -630,7 +677,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
             authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requireRateLimiting,
-            rateLimitingPolicyName
+            rateLimitingPolicyName, endpointFilterTypes
         );
 
         return requestHandler;
@@ -704,7 +751,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool requireCors,
         string? corsPolicyName,
         bool requireRateLimiting,
-        string? rateLimitingPolicyName
+        string? rateLimitingPolicyName,
+        EquatableImmutableArray<string>? endpointFilterTypes
     ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -719,6 +767,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string? corsPolicyName = null;
         bool? requireRateLimiting = null;
         string? rateLimitingPolicyName = null;
+        List<string>? endpointFilters = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -744,6 +793,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref corsPolicyName,
             ref requireRateLimiting,
             ref rateLimitingPolicyName,
+            ref endpointFilters,
             ref classHasAllowAnonymousAttribute,
             ref classHasRequireAuthorizationAttribute
         );
@@ -767,6 +817,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref corsPolicyName,
             ref requireRateLimiting,
             ref rateLimitingPolicyName,
+            ref endpointFilters,
             ref methodHasAllowAnonymousAttribute,
             ref methodHasRequireAuthorizationAttribute
         );
@@ -788,7 +839,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             requireCors ?? false,
             corsPolicyName,
             requireRateLimiting ?? false,
-            rateLimitingPolicyName
+            rateLimitingPolicyName,
+            ToEquatableOrNull(endpointFilters)
         );
     }
 
@@ -808,6 +860,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref string? corsPolicyName,
         ref bool? requireRateLimiting,
         ref string? rateLimitingPolicyName,
+        ref List<string>? endpointFilters,
         ref bool hasAllowAnonymousAttribute,
         ref bool hasRequireAuthorizationAttribute
     )
@@ -891,6 +944,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     rateLimitingPolicyName = policyName;
                 }
 
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, EndpointFilterAttributeName))
+            {
+                TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters);
                 continue;
             }
 
@@ -1098,6 +1157,38 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         producesList.Add(new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes));
     }
 
+    private static void TryAddEndpointFilter(
+        AttributeData attribute,
+        INamedTypeSymbol attributeClass,
+        ref List<string>? endpointFilters)
+    {
+        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
+        {
+            TryAddEndpointFilterType(attributeClass.TypeArguments[0], ref endpointFilters);
+            return;
+        }
+
+        if (attribute.ConstructorArguments.Length == 0)
+            return;
+
+        if (attribute.ConstructorArguments[0].Value is ITypeSymbol filterTypeSymbol)
+            TryAddEndpointFilterType(filterTypeSymbol, ref endpointFilters);
+    }
+
+    private static void TryAddEndpointFilterType(ITypeSymbol? typeSymbol, ref List<string>? endpointFilters)
+    {
+        if (typeSymbol is null or ITypeParameterSymbol or IErrorTypeSymbol)
+            return;
+
+        var displayString = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (string.IsNullOrWhiteSpace(displayString))
+            return;
+
+        var filters = endpointFilters ??= [];
+        if (!filters.Contains(displayString))
+            filters.Add(displayString);
+    }
+
     private static ITypeSymbol? GetNamedTypeSymbol(AttributeData attribute, string namedParameter)
     {
         foreach (var namedArg in attribute.NamedArguments)
@@ -1197,7 +1288,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var hasConfigureMethod = false;
         var acceptsServiceProvider = false;
-
         foreach (var member in classSymbol.GetMembers(ConfigureMethodName))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1784,6 +1874,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(".AllowAnonymous()");
         }
 
+        if (requestHandler.EndpointFilterTypes is { Count: > 0 })
+        {
+            foreach (var filterType in requestHandler.EndpointFilterTypes.Value)
+            {
+                source.AppendLine();
+                source.Append(continuationIndent);
+                source.Append(".AddEndpointFilter<");
+                source.Append(filterType);
+                source.Append(">()");
+            }
+        }
+
         if (wrapWithConfigure && configureAcceptsServiceProvider)
         {
             source.AppendLine(",");
@@ -2007,7 +2109,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool RequireCors,
         string? CorsPolicyName,
         bool RequireRateLimiting,
-        string? RateLimitingPolicyName
+        string? RateLimitingPolicyName,
+        EquatableImmutableArray<string>? EndpointFilterTypes
     );
 
     private readonly record struct RequestHandlerClass(
@@ -2050,7 +2153,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key, string? BindingName);
 
-    private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
+    private readonly record struct ConfigureMethodDetails(
+        bool HasConfigureMethod,
+        bool ConfigureMethodAcceptsServiceProvider
+    );
 
     private enum BindingSource
     {
