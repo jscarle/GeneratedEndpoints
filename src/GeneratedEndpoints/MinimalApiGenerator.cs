@@ -41,6 +41,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
     private const string NameAttributeNamedParameter = "Name";
+    private const string DisplayNameAttributeNamedParameter = "DisplayName";
     private const string SummaryAttributeNamedParameter = "Summary";
     private const string DescriptionAttributeNamedParameter = "Description";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
@@ -83,6 +84,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string WithOrderAttributeName = "WithOrderAttribute";
     private const string WithOrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithOrderAttributeName}";
     private const string WithOrderAttributeHint = $"{WithOrderAttributeFullyQualifiedName}.gs.cs";
+
+    private const string WithGroupNameAttributeName = "WithGroupNameAttribute";
+    private const string WithGroupNameAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithGroupNameAttributeName}";
+    private const string WithGroupNameAttributeHint = $"{WithGroupNameAttributeFullyQualifiedName}.gs.cs";
 
     private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
 
@@ -435,6 +440,36 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                """;
         context.AddSource(WithOrderAttributeHint, SourceText.From(withOrderSource, Encoding.UTF8));
 
+        // WithGroupName
+        var withGroupNameSource = $$"""
+                                   {{FileHeader}}
+
+                                   namespace {{AttributesNamespace}};
+
+                                   /// <summary>
+                                   /// Specifies the endpoint group name for the annotated class.
+                                   /// </summary>
+                                   [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+                                   internal sealed class {{WithGroupNameAttributeName}} : global::System.Attribute
+                                   {
+                                       /// <summary>
+                                       /// Gets the endpoint group name.
+                                       /// </summary>
+                                       public string EndpointGroupName { get; }
+
+                                       /// <summary>
+                                       /// Initializes a new instance of the <see cref="{{WithGroupNameAttributeName}}"/> class.
+                                       /// </summary>
+                                       /// <param name="endpointGroupName">The endpoint group name to apply.</param>
+                                       public {{WithGroupNameAttributeName}}(string endpointGroupName)
+                                       {
+                                           EndpointGroupName = endpointGroupName;
+                                       }
+                                   }
+
+                                   """;
+        context.AddSource(WithGroupNameAttributeHint, SourceText.From(withGroupNameSource, Encoding.UTF8));
+
         // Accepts
         var acceptsSource = $$"""
                                 {{FileHeader}}
@@ -773,6 +808,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      public string Name { get; set; } = "";
 
                      /// <summary>
+                     /// Gets or sets the endpoint display name.
+                     /// </summary>
+                     public string DisplayName { get; set; } = "";
+
+                     /// <summary>
                      /// Gets or sets the endpoint summary.
                      /// </summary>
                      public string Summary { get; set; } = "";
@@ -817,18 +857,19 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
-        var (httpMethod, pattern, name, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
+        var (httpMethod, pattern, name, displayName, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
-                accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requiredHosts,
-                requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-                requestTimeoutPolicyName, order)
+                accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
+                rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
+                requestTimeoutPolicyName, order, endpointGroupName)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
 
         var metadata = new RequestHandlerMetadata(
             name,
+            displayName,
             summary,
             description,
             tags,
@@ -842,7 +883,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
             authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
             rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-            requestTimeoutPolicyName, order
+            requestTimeoutPolicyName, order, endpointGroupName
         );
 
         return requestHandler;
@@ -856,7 +897,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return methodName;
     }
 
-    private static (string HttpMethod, string Pattern, string? Name, string? Summary, string? Description) GetRequestHandlerAttribute(
+    private static (
+        string HttpMethod,
+        string Pattern,
+        string? Name,
+        string? DisplayName,
+        string? Summary,
+        string? Description
+    ) GetRequestHandlerAttribute(
         AttributeData attribute,
         CancellationToken cancellationToken
     )
@@ -872,6 +920,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
         string? name = null;
+        string? displayName = null;
         string? summary = null;
         string? description = null;
         foreach (var namedArg in attribute.NamedArguments)
@@ -882,6 +931,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 {
                     var value = namedArg.Value.Value as string;
                     name = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+                    break;
+                }
+                case DisplayNameAttributeNamedParameter:
+                {
+                    var value = namedArg.Value.Value as string;
+                    displayName = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
                     break;
                 }
                 case SummaryAttributeNamedParameter:
@@ -899,7 +954,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             }
         }
 
-        return (httpMethod, pattern, name, summary, description);
+        return (httpMethod, pattern, name, displayName, summary, description);
     }
 
     private static (
@@ -923,7 +978,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool disableRequestTimeout,
         bool withRequestTimeout,
         string? requestTimeoutPolicyName,
-        int? order
+        int? order,
+        string? endpointGroupName
     ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -945,6 +1001,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool? withRequestTimeout = null;
         string? requestTimeoutPolicyName = null;
         int? order = null;
+        string? endpointGroupName = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -978,7 +1035,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref disableRequestTimeout,
             ref withRequestTimeout,
             ref requestTimeoutPolicyName,
-            ref order
+            ref order,
+            ref endpointGroupName
         );
 
         var methodAttributes = methodSymbol.GetAttributes();
@@ -1008,7 +1066,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref disableRequestTimeout,
             ref withRequestTimeout,
             ref requestTimeoutPolicyName,
-            ref order
+            ref order,
+            ref endpointGroupName
         );
 
         if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
@@ -1035,7 +1094,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             disableRequestTimeout ?? false,
             withRequestTimeout ?? false,
             (withRequestTimeout ?? false) ? requestTimeoutPolicyName : null,
-            order
+            order,
+            endpointGroupName
         );
     }
 
@@ -1063,7 +1123,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref bool? disableRequestTimeout,
         ref bool? withRequestTimeout,
         ref string? requestTimeoutPolicyName,
-        ref int? order
+        ref int? order,
+        ref string? endpointGroupName
     )
     {
         foreach (var attribute in attributes)
@@ -1105,6 +1166,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             {
                 if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
                     order = orderValue;
+
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, WithGroupNameAttributeName))
+            {
+                if (attribute.ConstructorArguments.Length > 0)
+                {
+                    var groupName = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
+                    if (!string.IsNullOrEmpty(groupName))
+                        endpointGroupName = groupName;
+                }
 
                 continue;
             }
@@ -2067,6 +2140,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
+        if (!string.IsNullOrEmpty(requestHandler.Metadata.DisplayName))
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".WithDisplayName(");
+            source.Append(StringLiteral(requestHandler.Metadata.DisplayName));
+            source.Append(')');
+        }
+
         if (!string.IsNullOrEmpty(requestHandler.Metadata.Summary))
         {
             source.AppendLine();
@@ -2082,6 +2164,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(continuationIndent);
             source.Append(".WithDescription(");
             source.Append(StringLiteral(requestHandler.Metadata.Description));
+            source.Append(')');
+        }
+
+        if (!string.IsNullOrEmpty(requestHandler.EndpointGroupName))
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".WithGroupName(");
+            source.Append(StringLiteral(requestHandler.EndpointGroupName));
             source.Append(')');
         }
 
@@ -2513,7 +2604,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool DisableRequestTimeout,
         bool WithRequestTimeout,
         string? RequestTimeoutPolicyName,
-        int? Order
+        int? Order,
+        string? EndpointGroupName
     );
 
     private readonly record struct RequestHandlerClass(
@@ -2527,6 +2619,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private readonly record struct RequestHandlerMetadata(
         string? Name,
+        string? DisplayName,
         string? Summary,
         string? Description,
         EquatableImmutableArray<string>? Tags,

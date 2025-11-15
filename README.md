@@ -24,7 +24,7 @@ GeneratedEndpoints is a .NET source generator that automatically wires Minimal A
 
 GeneratedEndpoints focuses on three goals:
 
-* **Attribute-driven routing** – use `[MapGet]`, `[MapPost]`, `[MapDelete]`, `[MapOptions]`, `[MapHead]`, `[MapPatch]`, `[MapTrace]`, `[MapConnect]`, and even `[MapQuery]` to describe the verb and route pattern. The generator creates the matching `Map*` call and wires up metadata like `.WithName`, `.WithSummary`, and `.WithDescription`.
+* **Attribute-driven routing** – use `[MapGet]`, `[MapPost]`, `[MapDelete]`, `[MapOptions]`, `[MapHead]`, `[MapPatch]`, `[MapTrace]`, `[MapConnect]`, and even `[MapQuery]` to describe the verb and route pattern. The generator creates the matching `Map*` call and wires up metadata like `.WithName`, `.WithDisplayName`, `.WithSummary`, and `.WithDescription`.
 * **Feature-first organization** – keep handlers close to the code they execute (for example, alongside your `Todos` feature). Non-static handler classes are automatically registered with dependency injection so you can inject EF Core DbContexts, services, etc.
 * **Metadata composition** – decorate classes and methods with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, `[AllowAnonymous]`, and `[ExcludeFromDescription]`. Apply `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]` directly to the methods they describe. Class-level metadata is merged into every method, while method-level metadata can refine or override.
 
@@ -76,7 +76,7 @@ public sealed class GetTodo
 Key ideas:
 
 * Choose the attribute that matches the verb (`[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]`).
-* Named arguments like `Summary`, `Description`, and `Name` are translated into `.WithSummary`, `.WithDescription`, and `.WithName` calls.
+* Named arguments like `DisplayName`, `Summary`, `Description`, and `Name` are translated into `.WithDisplayName`, `.WithSummary`, `.WithDescription`, and `.WithName` calls.
 * Use existing ASP.NET Core binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]`, `[FromServices]`, `[FromKeyedServices]`, `[AsParameters]`, etc.). The generator preserves them in the produced delegate.
 * Metadata attributes (`[Tags]`, `[RequireAuthorization]`, `[AllowAnonymous]`, `[DisableAntiforgery]`, `[ExcludeFromDescription]`) can be placed on the class, on a method, or on both. Class-level metadata is merged with method-level metadata. Request/response attributes (`[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, `[ProducesValidationProblem]`) must be applied directly to the method they describe.
 
@@ -248,7 +248,7 @@ public sealed class CreateTodo
 
 | Attribute | Scope | Purpose |
 | --- | --- | --- |
-| `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]` | Method | Declares an endpoint and its route pattern. Named arguments fill the generated `.WithName`, `.WithSummary`, and `.WithDescription` calls. |
+| `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]` | Method | Declares an endpoint and its route pattern. Named arguments fill the generated `.WithName`, `.WithDisplayName`, `.WithSummary`, and `.WithDescription` calls. |
 | `[Tags]` | Class or method | Adds tags to one or more endpoints. Multiple attributes merge without duplication. |
 | `[RequireAuthorization]` | Class or method | Requires authorization for the endpoint. Passing policies (`[RequireAuthorization("Todos.Read", "Todos.Write")]`) emits `.RequireAuthorization("Todos.Read", "Todos.Write")`. |
 | `[AllowAnonymous]` | Class or method | Explicitly opts an endpoint into anonymous access, overriding `[RequireAuthorization]`. |

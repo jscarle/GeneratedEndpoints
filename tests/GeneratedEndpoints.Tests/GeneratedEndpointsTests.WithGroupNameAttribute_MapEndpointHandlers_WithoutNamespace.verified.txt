@@ -22,12 +22,13 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        builder.MapGet("/users/{id:int}", global::GetUserEndpoint.GetUser2)
-            .WithName("GetUser")
-            .WithDisplayName("User lookup endpoint")
-            .WithSummary("Gets a user by ID.")
-            .WithDescription("Gets a user by ID when the ID is greater than zero.")
-            .WithTags("Users");
+        builder.MapGet("/grouped/first", global::GroupedEndpoints.First)
+            .WithName("First")
+            .WithGroupName("SampleGroup");
+
+        builder.MapPost("/grouped/second", global::GroupedEndpoints.Second)
+            .WithName("Second")
+            .WithGroupName("SampleGroup");
 
         return builder;
     }
