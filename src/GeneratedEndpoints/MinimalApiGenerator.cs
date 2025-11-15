@@ -61,6 +61,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string RequireRateLimitingAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireRateLimitingAttributeName}";
     private const string RequireRateLimitingAttributeHint = $"{RequireRateLimitingAttributeFullyQualifiedName}.gs.cs";
 
+    private const string RequireHostAttributeName = "RequireHostAttribute";
+    private const string RequireHostAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireHostAttributeName}";
+    private const string RequireHostAttributeHint = $"{RequireHostAttributeFullyQualifiedName}.gs.cs";
+
     private const string DisableAntiforgeryAttributeName = "DisableAntiforgeryAttribute";
     private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
     private const string DisableAntiforgeryAttributeHint = $"{DisableAntiforgeryAttributeFullyQualifiedName}.gs.cs";
@@ -288,6 +292,35 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                         }
                                         """;
         context.AddSource(RequireRateLimitingAttributeHint, SourceText.From(requireRateLimitingSource, Encoding.UTF8));
+
+        // RequireHost
+        var requireHostSource = $$"""
+                                {{FileHeader}}
+
+                                namespace {{AttributesNamespace}};
+
+                                /// <summary>
+                                /// Specifies the allowed hosts for the annotated endpoint or class.
+                                /// </summary>
+                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                internal sealed class {{RequireHostAttributeName}} : global::System.Attribute
+                                {
+                                    /// <summary>
+                                    /// Initializes a new instance of the <see cref="{{RequireHostAttributeName}}"/> class.
+                                    /// </summary>
+                                    /// <param name="hosts">The hosts that are allowed to access the endpoint.</param>
+                                    public {{RequireHostAttributeName}}(params string[] hosts)
+                                    {
+                                        Hosts = hosts ?? [];
+                                    }
+
+                                    /// <summary>
+                                    /// Gets the allowed hosts.
+                                    /// </summary>
+                                    public string[] Hosts { get; }
+                                }
+                                """;
+        context.AddSource(RequireHostAttributeHint, SourceText.From(requireHostSource, Encoding.UTF8));
 
         // DisableAntiforgery
         var disableAntiforgerySource = $$"""
@@ -827,7 +860,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var (httpMethod, pattern, name, displayName, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
-                accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requireRateLimiting,
+                accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
                 rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
                 requestTimeoutPolicyName, order, endpointGroupName)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
@@ -848,7 +881,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         );
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
-            authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requireRateLimiting,
+            authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
             rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
             requestTimeoutPolicyName, order, endpointGroupName
         );
@@ -937,6 +970,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem,
         bool requireCors,
         string? corsPolicyName,
+        EquatableImmutableArray<string>? requiredHosts,
         bool requireRateLimiting,
         string? rateLimitingPolicyName,
         EquatableImmutableArray<string>? endpointFilterTypes,
@@ -958,6 +992,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool? excludeFromDescription = null;
         bool? requireCors = null;
         string? corsPolicyName = null;
+        EquatableImmutableArray<string>? requiredHosts = null;
         bool? requireRateLimiting = null;
         string? rateLimitingPolicyName = null;
         List<string>? endpointFilters = null;
@@ -990,6 +1025,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref producesValidationProblem,
             ref requireCors,
             ref corsPolicyName,
+            ref requiredHosts,
             ref requireRateLimiting,
             ref rateLimitingPolicyName,
             ref endpointFilters,
@@ -1020,6 +1056,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref producesValidationProblem,
             ref requireCors,
             ref corsPolicyName,
+            ref requiredHosts,
             ref requireRateLimiting,
             ref rateLimitingPolicyName,
             ref endpointFilters,
@@ -1049,6 +1086,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ToEquatableOrNull(producesValidationProblem),
             requireCors ?? false,
             corsPolicyName,
+            requiredHosts,
             requireRateLimiting ?? false,
             rateLimitingPolicyName,
             ToEquatableOrNull(endpointFilters),
@@ -1075,6 +1113,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref List<ProducesValidationProblemMetadata>? producesValidationProblem,
         ref bool? requireCors,
         ref string? corsPolicyName,
+        ref EquatableImmutableArray<string>? requiredHosts,
         ref bool? requireRateLimiting,
         ref string? rateLimitingPolicyName,
         ref List<string>? endpointFilters,
@@ -1201,6 +1240,29 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 corsPolicyName = attribute.ConstructorArguments.Length > 0
                     ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
                     : null;
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, RequireHostAttributeName))
+            {
+                if (attribute.ConstructorArguments.Length == 1)
+                {
+                    var arg = attribute.ConstructorArguments[0];
+                    if (arg.Kind == TypedConstantKind.Array && arg.Values.Length > 0)
+                    {
+                        var values = arg.Values
+                            .Select(v => v.Value as string)
+                            .Where(s => !string.IsNullOrWhiteSpace(s))
+                            .Select(s => s!.Trim());
+
+                        MergeInto(ref requiredHosts, values);
+                    }
+                    else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
+                    {
+                        MergeInto(ref requiredHosts, new[] { singleHost });
+                    }
+                }
+
                 continue;
             }
 
@@ -2234,6 +2296,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             }
         }
 
+        if (requestHandler.RequiredHosts is { Count: > 0 })
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".RequireHost(");
+            source.Append(string.Join(", ", requestHandler.RequiredHosts.Value.Select(StringLiteral)));
+            source.Append(')');
+        }
+
         if (requestHandler.RequireRateLimiting && !string.IsNullOrEmpty(requestHandler.RateLimitingPolicyName))
         {
             source.AppendLine();
@@ -2525,6 +2596,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool AllowAnonymous,
         bool RequireCors,
         string? CorsPolicyName,
+        EquatableImmutableArray<string>? RequiredHosts,
         bool RequireRateLimiting,
         string? RateLimitingPolicyName,
         EquatableImmutableArray<string>? EndpointFilterTypes,
