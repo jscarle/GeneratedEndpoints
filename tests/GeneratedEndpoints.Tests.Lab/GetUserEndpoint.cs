@@ -16,7 +16,7 @@ internal static class GetUserEndpoint
     [AllowAnonymous]
     [Accepts(typeof(GetUserRequest), "application/json", "application/xml")]
     [Accepts<GetUserMetadata>("application/json", "application/xml")]
-    [ProducesResponse(typeof(UserProfile), StatusCodes.Status200OK, "application/json")]
+    [ProducesResponse( StatusCodes.Status200OK, "application/json", ResponseType = typeof(UserProfile))]
     [ProducesResponse<UserProfile>(StatusCodes.Status202Accepted, "application/json")]
     [ProducesProblem(StatusCodes.Status500InternalServerError, "application/problem+json")]
     [ProducesValidationProblem(StatusCodes.Status400BadRequest, "application/problem+json")]

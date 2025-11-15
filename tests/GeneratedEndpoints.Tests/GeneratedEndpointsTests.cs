@@ -116,7 +116,7 @@ public class GeneratedEndpointsTests
                                              [RequireAuthorization("PolicyA", "PolicyB")]
                                              [DisableAntiforgery]
                                              [Accepts(typeof(ClassLevelRequest), "application/xml", "text/xml")]
-                                               [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse(typeof(ClassLevelResponse), 201, "application/json", "text/json")]
+                                             [ProducesResponse(201, "application/json", "text/json", ResponseType = typeof(ClassLevelResponse))]
                                              [ProducesProblem(503, "application/problem+json")]
                                              [ProducesValidationProblem(409, "application/problem+json", "text/plain")]
                                              [ExcludeFromDescription]
