@@ -18,6 +18,7 @@ public static class TestHelpers
     public static IEnumerable<string> GetSources(string source, bool withNamespace)
     {
         const string usingStatements = """
+                                       using Microsoft.AspNetCore.Authorization;
                                        using Microsoft.AspNetCore.Generated.Attributes;
                                        using Microsoft.AspNetCore.Http;
                                        using Microsoft.AspNetCore.Http.HttpResults;
