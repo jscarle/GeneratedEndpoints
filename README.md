@@ -254,6 +254,7 @@ public sealed class CreateTodo
 | `[AllowAnonymous]` | Class or method | Explicitly opts an endpoint into anonymous access, overriding `[RequireAuthorization]`. |
 | `[RequireCors]` | Class or method | Adds `.RequireCors()` or `.RequireCors("PolicyName")` when a specific policy is provided. |
 | `[RequireRateLimiting]` | Class or method | Adds `.RequireRateLimiting("PolicyName")` to enforce a named rate limiting policy. |
+| `[RequireHost]` | Class or method | Adds `.RequireHost("example.com", "*.example.com")` so endpoints only match allowed hosts. |
 | `[DisableAntiforgery]` | Class or method | Calls `.DisableAntiforgery()` on the generated endpoint. |
 | `[ExcludeFromDescription]` | Class or method | Generates `.ExcludeFromDescription()` so the endpoint is hidden from OpenAPI/metadata. |
 | `[Accepts]` / `[Accepts<TRequest>]` | Method | Emits `.Accepts<TRequest>(contentTypes..., isOptional: true|false)` to document supported request bodies. Multiple attributes allowed. |
@@ -273,6 +274,7 @@ public sealed class CreateTodo
 * `[AllowAnonymous]` opt-in overrides class or global authorization requirements.
 * `[RequireCors]` emits `.RequireCors()` or `.RequireCors("policy")` so endpoints participate in a configured CORS policy.
 * `[RequireRateLimiting]` emits `.RequireRateLimiting("policy")` to enforce ASP.NET Core rate limiting middleware.
+* `[RequireHost]` emits `.RequireHost("host")` so endpoints only match specific hosts.
 * `[DisableAntiforgery]` wires `.DisableAntiforgery()` for CSRF-sensitive endpoints.
 
 ### Handling query objects with `[AsParameters]`

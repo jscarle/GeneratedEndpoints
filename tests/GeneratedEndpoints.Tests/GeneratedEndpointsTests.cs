@@ -245,6 +245,36 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task RequireHostAttributes(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             [RequireHost("*.contoso.com")]
+                                             internal sealed class HostRestrictedEndpoints
+                                             {
+                                                 [MapGet("/hosts/class-only")]
+                                                 public static Ok ClassOnly()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/hosts/method-override")]
+                                                 [RequireHost("api.contoso.com", "contoso.com")]
+                                                 public static Ok MethodOverride()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(RequireHostAttributes)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(RequireHostAttributes)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task ShortCircuitAndRequestTimeoutAttributes(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
