@@ -43,6 +43,34 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task MethodsWithSameNameAreFullyQualifiedWhenNamesCollide(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             internal sealed class FirstEndpoint
+                                             {
+                                                 [MapGet("/first")]
+                                                 public static Ok Handle()
+                                                     => TypedResults.Ok();
+                                             }
+
+                                             internal sealed class SecondEndpoint
+                                             {
+                                                 [MapGet("/second")]
+                                                 public static Ok Handle()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(MethodsWithSameNameAreFullyQualifiedWhenNamesCollide)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task MapGetWithConfigure(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""

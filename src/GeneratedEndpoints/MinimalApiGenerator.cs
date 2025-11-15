@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -1299,8 +1300,68 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             .ThenBy(r => r.Pattern, StringComparer.Ordinal)
             .ToImmutableArray();
 
+        sorted = EnsureUniqueEndpointNames(sorted);
+
         GenerateAddEndpointHandlersClass(context, sorted);
         GenerateUseEndpointHandlersClass(context, sorted);
+    }
+
+    private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(ImmutableArray<RequestHandler> requestHandlers)
+    {
+        var collidingHandlers = GetRequestHandlersWithNameCollisions(requestHandlers);
+        if (collidingHandlers.IsEmpty)
+            return requestHandlers;
+
+        var builder = requestHandlers.ToBuilder();
+        foreach (var index in collidingHandlers)
+        {
+            var handler = builder[index];
+            var metadata = handler.Metadata with { Name = GetFullyQualifiedMethodDisplayName(handler) };
+            builder[index] = handler with { Metadata = metadata };
+        }
+
+        return builder.MoveToImmutable();
+    }
+
+    private static ImmutableHashSet<int> GetRequestHandlersWithNameCollisions(ImmutableArray<RequestHandler> requestHandlers)
+    {
+        var collidingIndices = ImmutableHashSet.CreateBuilder<int>();
+
+        var groups = requestHandlers
+            .Select((handler, index) => (handler, index))
+            .Where(static tuple => !string.IsNullOrEmpty(tuple.handler.Metadata.Name))
+            .GroupBy(static tuple => tuple.handler.Metadata.Name!, StringComparer.Ordinal);
+
+        foreach (var group in groups)
+        {
+            if (group.Count() <= 1)
+                continue;
+
+            var collidingMethodGroups = group
+                .GroupBy(static tuple => tuple.handler.Method.Name, StringComparer.Ordinal)
+                .Where(static methodGroup => methodGroup.Skip(1).Any());
+
+            foreach (var methodGroup in collidingMethodGroups)
+            {
+                foreach (var entry in methodGroup)
+                    collidingIndices.Add(entry.index);
+            }
+        }
+
+        return collidingIndices.ToImmutable();
+    }
+
+    private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
+    {
+        var className = requestHandler.Class.Name;
+        const string GlobalPrefix = "global::";
+        if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
+            className = className.Substring(GlobalPrefix.Length);
+
+        if (className.IndexOf('+') >= 0)
+            className = className.Replace('+', '.');
+
+        return string.Concat(className, ".", requestHandler.Method.Name);
     }
 
     private static void GenerateAddEndpointHandlersClass(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
