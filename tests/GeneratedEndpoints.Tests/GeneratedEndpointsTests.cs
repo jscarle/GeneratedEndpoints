@@ -164,10 +164,6 @@ public class GeneratedEndpointsTests
                                              [Tags("Shared", "ClassLevel")]
                                              [RequireAuthorization("PolicyA", "PolicyB")]
                                              [DisableAntiforgery]
-                                             [Accepts("application/xml", "text/xml", RequestType = typeof(ClassLevelRequest))]
-                                             [ProducesResponse(201, "application/json", "text/json", ResponseType = typeof(ClassLevelResponse))]
-                                             [ProducesProblem(503, "application/problem+json")]
-                                             [ProducesValidationProblem(409, "application/problem+json", "text/plain")]
                                              [ExcludeFromDescription]
                                              internal sealed class ComplexEndpoints
                                              {
@@ -187,9 +183,13 @@ public class GeneratedEndpointsTests
                                                  [AllowAnonymous]
                                                  [Tags("MethodLevel")]
                                                  [RequireAuthorization("MethodPolicy")]
-                                                [Accepts<GetRequest>("application/custom", "text/custom")]
-                                                  [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse<GetResponse>(200, "application/json", "text/json")]
+                                                 [Accepts("application/xml", "text/xml", RequestType = typeof(ClassLevelRequest))]
+                                                  [Accepts<GetRequest>("application/custom", "text/custom")]
+                                                 [ProducesResponse(201, "application/json", "text/json", ResponseType = typeof(ClassLevelResponse))]
+                                                 [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse<GetResponse>(200, "application/json", "text/json")]
+                                                 [ProducesProblem(503, "application/problem+json")]
                                                  [ProducesProblem(400, "application/problem+json", "text/plain")]
+                                                 [ProducesValidationProblem(409, "application/problem+json", "text/plain")]
                                                  [ProducesValidationProblem(422, "application/problem+json", "text/plain")]
                                                  [ExcludeFromDescription]
                                                  public async Task<Results<Ok<GetResponse>, NotFound>> GetComplex(
