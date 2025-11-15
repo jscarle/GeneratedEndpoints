@@ -5,7 +5,7 @@ namespace GeneratedEndpoints.Tests.Common;
 
 public static class ModuleInitializer
 {
-    private static readonly object Lock = new();
+    private static readonly Lock Lock = new();
     private static bool _isInitialized;
 
     public static void Initialize()
