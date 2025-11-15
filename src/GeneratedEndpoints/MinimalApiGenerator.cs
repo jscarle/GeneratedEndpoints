@@ -43,6 +43,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string MapPatchAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapPatchAttributeName}";
     private const string MapPatchAttributeHint = $"{MapPatchAttributeFullyQualifiedName}.gs.cs";
 
+    private const string MapQueryAttributeName = "MapQueryAttribute";
+    private const string MapQueryAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapQueryAttributeName}";
+    private const string MapQueryAttributeHint = $"{MapQueryAttributeFullyQualifiedName}.gs.cs";
+
     private const string MapTraceAttributeName = "MapTraceAttribute";
     private const string MapTraceAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapTraceAttributeName}";
     private const string MapTraceAttributeHint = $"{MapTraceAttributeFullyQualifiedName}.gs.cs";
@@ -128,6 +132,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             .WhereNotNull()
             .Collect();
 
+        var queryRequestHandlers = context.SyntaxProvider
+            .ForAttributeWithMetadataName(MapQueryAttributeFullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
+            .WhereNotNull()
+            .Collect();
+
         var traceRequestHandlers = context.SyntaxProvider
             .ForAttributeWithMetadataName(MapTraceAttributeFullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
             .WhereNotNull()
@@ -150,6 +159,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             .Select(static (x, _) => x.Left.AddRange(x.Right))
             .Combine(headRequestHandlers)
             .Select(static (x, _) => x.Left.AddRange(x.Right))
+            .Combine(queryRequestHandlers)
+            .Select(static (x, _) => x.Left.AddRange(x.Right))
             .Combine(traceRequestHandlers)
             .Select(static (x, _) => x.Left.AddRange(x.Right))
             .Combine(connectRequestHandlers)
@@ -170,6 +181,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             (Name: MapOptionsAttributeName, FullyQualified: MapOptionsAttributeFullyQualifiedName, Hint: MapOptionsAttributeHint, Verb: "OPTIONS"),
             (Name: MapHeadAttributeName, FullyQualified: MapHeadAttributeFullyQualifiedName, Hint: MapHeadAttributeHint, Verb: "HEAD"),
             (Name: MapPatchAttributeName, FullyQualified: MapPatchAttributeFullyQualifiedName, Hint: MapPatchAttributeHint, Verb: "PATCH"),
+            (Name: MapQueryAttributeName, FullyQualified: MapQueryAttributeFullyQualifiedName, Hint: MapQueryAttributeHint, Verb: "QUERY"),
             (Name: MapTraceAttributeName, FullyQualified: MapTraceAttributeFullyQualifiedName, Hint: MapTraceAttributeHint, Verb: "TRACE"),
             (Name: MapConnectAttributeName, FullyQualified: MapConnectAttributeFullyQualifiedName, Hint: MapConnectAttributeHint, Verb: "CONNECT"),
         };
@@ -345,6 +357,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             MapOptionsAttributeName => "OPTIONS",
             MapHeadAttributeName => "HEAD",
             MapPatchAttributeName => "Patch",
+            MapQueryAttributeName => "QUERY",
             MapTraceAttributeName => "TRACE",
             MapConnectAttributeName => "CONNECT",
             _ => "",
@@ -875,7 +888,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.Append('(');
         source.Append(StringLiteral(requestHandler.Pattern));
         source.Append(", ");
-        if (requestHandler.HttpMethod is "OPTIONS" or "HEAD" or "TRACE" or "CONNECT")
+        if (requestHandler.HttpMethod is "OPTIONS" or "HEAD" or "TRACE" or "CONNECT" or "QUERY")
         {
             source.Append("new[] { \"");
             source.Append(requestHandler.HttpMethod);

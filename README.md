@@ -58,7 +58,7 @@ public sealed class GetTodo
 
 Key points:
 
-* Use `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, or `[MapConnect]` to describe the HTTP verb and route pattern.
+* Use `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapQuery]`, `[MapTrace]`, or `[MapConnect]` to describe the HTTP verb and route pattern.
 * Optional `Name`, `Summary`, and `Description` named parameters populate the generated `.WithName`, `.WithSummary`, and `.WithDescription` metadata calls. When omitted, the generator derives the endpoint name from the method name (stripping a trailing `Async`).
 * Apply standard ASP.NET Core parameter binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromServices]`, `[AsParameters]`, etc.). The generator mirrors them onto the produced delegate so binding behaves exactly as declared.
 * Annotate the **class**, an individual **method**, or both with `[Tags]`, `[RequireAuthorization]`, or `[DisableAntiforgery]`. Class-level metadata is merged onto every generated endpoint, while method-level attributes can refine or augment the settings for a specific handler.
