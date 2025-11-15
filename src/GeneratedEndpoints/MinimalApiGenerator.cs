@@ -59,6 +59,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string SummaryAttributeNamedParameter = "Summary";
     private const string DescriptionAttributeNamedParameter = "Description";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
+    private const string RequestTypeAttributeNamedParameter = "RequestType";
 
     private const string RequireAuthorizationAttributeName = "RequireAuthorizationAttribute";
     private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";
@@ -281,7 +282,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    /// <summary>
                                    /// Gets the request type accepted by the endpoint.
                                    /// </summary>
-                                   public global::System.Type RequestType { get; }
+                                   public global::System.Type RequestType { get; init; } = default!;
 
                                    /// <summary>
                                    /// Gets the primary content type accepted by the endpoint.
@@ -296,12 +297,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    /// <summary>
                                    /// Initializes a new instance of the <see cref="{{AcceptsAttributeName}}"/> class.
                                    /// </summary>
-                                   /// <param name="requestType">The CLR type of the request body.</param>
                                    /// <param name="contentType">The primary content type accepted by the endpoint.</param>
                                    /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
-                                   public {{AcceptsAttributeName}}(global::System.Type requestType, string contentType = "application/json", params string[] additionalContentTypes)
+                                   public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
                                    {
-                                       RequestType = requestType ?? throw new global::System.ArgumentNullException(nameof(requestType));
                                        ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
                                        AdditionalContentTypes = additionalContentTypes ?? [];
                                    }
@@ -927,15 +926,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 ? GetStringArrayValues(attribute.ConstructorArguments[1])
                 : null;
         }
-        else if (attribute.ConstructorArguments.Length >= 1 &&
-                 attribute.ConstructorArguments[0].Value is ITypeSymbol requestTypeSymbol)
+        else if (GetNamedTypeSymbol(attribute, RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
         {
             requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            contentType = attribute.ConstructorArguments.Length > 1
-                ? NormalizeRequiredContentType(attribute.ConstructorArguments[1].Value as string, "application/json")
+            contentType = attribute.ConstructorArguments.Length > 0
+                ? NormalizeRequiredContentType(attribute.ConstructorArguments[0].Value as string, "application/json")
                 : "application/json";
-            additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                ? GetStringArrayValues(attribute.ConstructorArguments[2])
+            additionalContentTypes = attribute.ConstructorArguments.Length > 1
+                ? GetStringArrayValues(attribute.ConstructorArguments[1])
                 : null;
         }
         else
