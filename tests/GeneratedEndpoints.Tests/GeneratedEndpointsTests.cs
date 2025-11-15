@@ -14,6 +14,34 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task MapFallback(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             internal static class FallbackEndpoints
+                                             {
+                                                 [MapFallback]
+                                                 public static Ok Default()
+                                                     => TypedResults.Ok();
+
+                                                 [MapFallback("/custom-fallback")]
+                                                 public static Ok Custom()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(MapFallback)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(MapFallback)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task MapGet(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
