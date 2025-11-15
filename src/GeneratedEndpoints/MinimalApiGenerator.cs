@@ -594,8 +594,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (httpMethod, pattern, name, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
-        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, accepts, produces,
-                producesProblem, producesValidationProblem)
+        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
+                accepts, produces, producesProblem, producesValidationProblem)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -608,7 +608,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             accepts,
             produces,
             producesProblem,
-            producesValidationProblem
+            producesValidationProblem,
+            excludeFromDescription
         );
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
@@ -689,6 +690,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         EquatableImmutableArray<string>? authorizationPolicies,
         bool disableAntiforgery,
         bool allowAnonymous,
+        bool excludeFromDescription,
         EquatableImmutableArray<AcceptsMetadata>? accepts,
         EquatableImmutableArray<ProducesMetadata>? produces,
         EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
@@ -702,6 +704,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         EquatableImmutableArray<string>? authorizationPolicies = null;
         var disableAntiforgery = false;
         var allowAnonymous = false;
+        var excludeFromDescription = false;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -716,6 +719,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref authorizationPolicies,
             ref disableAntiforgery,
             ref allowAnonymous,
+            ref excludeFromDescription,
             ref accepts,
             ref produces,
             ref producesProblem,
@@ -730,6 +734,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref authorizationPolicies,
             ref disableAntiforgery,
             ref allowAnonymous,
+            ref excludeFromDescription,
             ref accepts,
             ref produces,
             ref producesProblem,
@@ -742,6 +747,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             authorizationPolicies,
             disableAntiforgery,
             allowAnonymous,
+            excludeFromDescription,
             ToEquatableOrNull(accepts),
             ToEquatableOrNull(produces),
             ToEquatableOrNull(producesProblem),
@@ -756,6 +762,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref EquatableImmutableArray<string>? authorizationPolicies,
         ref bool disableAntiforgery,
         ref bool allowAnonymous,
+        ref bool excludeFromDescription,
         ref List<AcceptsMetadata>? accepts,
         ref List<ProducesMetadata>? produces,
         ref List<ProducesProblemMetadata>? producesProblem,
@@ -820,6 +827,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     break;
                 case $"global::{AllowAnonymousAttributeFullyQualifiedName}":
                     allowAnonymous = true;
+                    break;
+                case "global::Microsoft.AspNetCore.Routing.ExcludeFromDescriptionAttribute":
+                    excludeFromDescription = true;
                     break;
                 case $"global::{ProducesProblemAttributeFullyQualifiedName}":
                 {
@@ -1467,6 +1477,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
+        if (requestHandler.Metadata.ExcludeFromDescription)
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".ExcludeFromDescription()");
+        }
+
         if (requestHandler.Metadata.Tags is { Count: > 0 })
         {
             source.AppendLine();
@@ -1623,6 +1640,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 cost += 24 + metadata.Summary.Length;
             if (metadata.Description is { Length: > 0 })
                 cost += 28 + metadata.Description.Length;
+            if (metadata.ExcludeFromDescription)
+                cost += 32;
 
             if (metadata.Tags is { Count: > 0 })
                 cost += metadata.Tags.Value.Sum(tag => 6 + tag.Length);
@@ -1872,7 +1891,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         EquatableImmutableArray<AcceptsMetadata>? Accepts,
         EquatableImmutableArray<ProducesMetadata>? Produces,
         EquatableImmutableArray<ProducesProblemMetadata>? ProducesProblem,
-        EquatableImmutableArray<ProducesValidationProblemMetadata>? ProducesValidationProblem
+        EquatableImmutableArray<ProducesValidationProblemMetadata>? ProducesValidationProblem,
+        bool ExcludeFromDescription
     );
 
     private readonly record struct AcceptsMetadata(string RequestType, string ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
