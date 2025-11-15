@@ -5,43 +5,43 @@ using Microsoft.AspNetCore.Generated.Attributes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GeneratedEndpoints.Tests.Lab;
 
 [Tags("Users", "Profiles")]
 [RequireAuthorization("Users.Read", "Administrators")]
 [DisableAntiforgery]
-internal static class GetUserEndpoint
+internal sealed class GetUserEndpoint(IServiceCollection services)
 {
     [Tags("Featured")]
     [AllowAnonymous]
     [Accepts("application/json", "application/xml", RequestType = typeof(GetUserRequest))]
     [Accepts<GetUserMetadata>("application/json", "application/xml", IsOptional = true)]
-    [ProducesResponse( StatusCodes.Status200OK, "application/json", ResponseType = typeof(UserProfile))]
+    [ProducesResponse(StatusCodes.Status200OK, "application/json", ResponseType = typeof(UserProfile))]
     [ProducesResponse<UserProfile>(StatusCodes.Status202Accepted, "application/json")]
     [ProducesProblem(StatusCodes.Status500InternalServerError, "application/problem+json")]
     [ProducesValidationProblem(StatusCodes.Status400BadRequest, "application/problem+json")]
     [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.", Description = "Gets a user by ID when the ID is greater than zero.")]
-    public static Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser([FromQuery] int id)
+    public Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser(
+        [FromQuery] int id,
+        [FromKeyedServices(ServiceLifetime.Scoped)] IServiceCollection services
+    )
     {
         if (id <= 0)
         {
             var errors = new Dictionary<string, string[]>
             {
-                [nameof(id)] = ["The ID must be greater than zero."]
+                [nameof(id)] = ["The ID must be greater than zero."],
             };
             return TypedResults.ValidationProblem(errors);
         }
 
         if (id == 13)
-        {
             return TypedResults.Problem("User data is temporarily unavailable.");
-        }
 
         if (id == 404)
-        {
             return TypedResults.NotFound();
-        }
 
         var profile = new UserProfile(id, $"User {id}", $"user{id}@example.com");
         return TypedResults.Ok(profile);

@@ -138,10 +138,10 @@ internal static class TypeSymbolExtensions
             MetadataName: "FromKeyedServicesAttribute",
             ContainingNamespace:
             {
-                Name: "Mvc",
+                Name: "DependencyInjection",
                 ContainingNamespace:
                 {
-                    Name: "AspNetCore",
+                    Name: "Extensions",
                     ContainingNamespace:
                     {
                         Name: "Microsoft",
