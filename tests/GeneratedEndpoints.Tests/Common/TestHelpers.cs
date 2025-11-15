@@ -22,6 +22,7 @@ public static class TestHelpers
                                        using Microsoft.AspNetCore.Generated.Attributes;
                                        using Microsoft.AspNetCore.Http;
                                        using Microsoft.AspNetCore.Http.HttpResults;
+                                       using Microsoft.AspNetCore.Routing;
                                        """;
 
         if (withNamespace)

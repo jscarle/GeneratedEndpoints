@@ -119,7 +119,7 @@ public class GeneratedEndpointsTests
                                                [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse(typeof(ClassLevelResponse), 201, "application/json", "text/json")]
                                              [ProducesProblem(503, "application/problem+json")]
                                              [ProducesValidationProblem(409, "application/problem+json", "text/plain")]
-                                             [Microsoft.AspNetCore.Routing.ExcludeFromDescription]
+                                             [ExcludeFromDescription]
                                              internal sealed class ComplexEndpoints
                                              {
                                                  private readonly IServiceProvider _serviceProvider;
@@ -142,7 +142,7 @@ public class GeneratedEndpointsTests
                                                    [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse<GetResponse>(200, "application/json", "text/json")]
                                                  [ProducesProblem(400, "application/problem+json", "text/plain")]
                                                  [ProducesValidationProblem(422, "application/problem+json", "text/plain")]
-                                                 [Microsoft.AspNetCore.Routing.ExcludeFromDescription]
+                                                 [ExcludeFromDescription]
                                                  public async Task<Results<Ok<GetResponse>, NotFound>> GetComplex(
                                                      [FromRoute] int id,
                                                      [FromQuery] string? filter,
