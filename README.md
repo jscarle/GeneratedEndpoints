@@ -156,3 +156,42 @@ In this example:
 
 Every new handler will automatically appear in the generated routing table the next time the project builds—no manual `MapGet`, `MapPost`, or registration code is required.
 
+### 4. Customize generated endpoints with `Configure`
+
+Some scenarios require direct access to the `IEndpointConventionBuilder` that Minimal APIs use when configuring an endpoint—for example, adding endpoint filters, OpenAPI metadata, or other advanced conventions. Handler classes can now opt-in to that level of control by providing a static `Configure` method with the following signature:
+
+```csharp
+public static void Configure<TBuilder>(TBuilder builder)
+    where TBuilder : IEndpointConventionBuilder
+```
+
+When the generator detects this method on a handler class it will automatically wrap every mapped endpoint from the class in a `.Configure(...)` call that invokes your method. You can use the provided builder to apply conventions that are difficult or impossible to express via attributes alone.
+
+```csharp
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Generated.Attributes;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Todos.Features;
+
+public sealed class CreateTodo
+{
+    [MapPost("/todos")]
+    public static Ok<Todo> Handle([FromBody] Todo todo) => TypedResults.Ok(todo);
+
+    public static void Configure<TBuilder>(TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        builder.AddEndpointFilter(new TimingFilter());
+        builder.WithOpenApi(operation =>
+        {
+            operation.Summary = "Creates a todo";
+            return operation;
+        });
+    }
+}
+```
+
+The method is only generated once per handler class, so any conventions you add will automatically flow to all endpoints defined within that class.
+
