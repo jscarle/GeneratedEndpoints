@@ -53,6 +53,7 @@ internal static class EndpointRouteBuilderExtensions
             .WithName("GetComplex")
             .WithSummary("Gets complex data.")
             .WithDescription("Uses every supported attribute.")
+            .ExcludeFromDescription()
             .WithTags("Shared", "ClassLevel", "MethodLevel")
             .Accepts<global::GeneratedEndpointsTests.ClassLevelRequest>("application/xml", "text/xml")
             .Accepts<global::GeneratedEndpointsTests.GetRequest>("application/custom", "text/custom")
