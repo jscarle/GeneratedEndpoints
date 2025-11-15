@@ -125,6 +125,32 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task BindingAttributeNamesArePreserved(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             using Microsoft.AspNetCore.Mvc;
+
+                                             internal sealed class BindingNameEndpoints
+                                             {
+                                                 [MapGet("/binding/{routeId}")]
+                                                 public Ok Handle(
+                                                     [FromRoute(Name = "route-id")] int routeId,
+                                                     [FromQuery(Name = "filter-term")] string filter,
+                                                     [FromHeader(Name = "x-custom-header")] string traceId)
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(BindingAttributeNamesArePreserved)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task MapAllAttributesAndHttpMethods(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""

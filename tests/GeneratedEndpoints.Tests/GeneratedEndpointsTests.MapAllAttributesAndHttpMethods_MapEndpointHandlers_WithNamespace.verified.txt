@@ -49,7 +49,7 @@ internal static class EndpointRouteBuilderExtensions
         builder.MapPut("/complex/{id:int}", global::GeneratedEndpointsTests.AllHttpMethodEndpoints.UpdateComplex)
             .WithName("UpdateComplex");
 
-        builder.MapGet("/complex/{id:int}", static async ([FromServices] global::GeneratedEndpointsTests.ComplexEndpoints handler, [FromRoute] int id, [FromQuery] string filter, [FromHeader] string traceId, [FromBody] global::GeneratedEndpointsTests.GetRequest request, [FromForm] string formValue, [FromServices] IServiceProvider services, object keyed, [AsParameters] global::GeneratedEndpointsTests.AdditionalParameters parameters, global::System.Threading.CancellationToken cancellationToken) => await handler.GetComplex(id, filter, traceId, request, formValue, services, keyed, parameters, cancellationToken))
+        builder.MapGet("/complex/{id:int}", static async ([FromServices] global::GeneratedEndpointsTests.ComplexEndpoints handler, [FromRoute] int id, [FromQuery] string filter, [FromHeader(Name = "x-trace-id")] string traceId, [FromBody] global::GeneratedEndpointsTests.GetRequest request, [FromForm] string formValue, [FromServices] IServiceProvider services, [FromKeyedServices("special")] object keyed, [AsParameters] global::GeneratedEndpointsTests.AdditionalParameters parameters, global::System.Threading.CancellationToken cancellationToken) => await handler.GetComplex(id, filter, traceId, request, formValue, services, keyed, parameters, cancellationToken))
             .WithName("GetComplex")
             .WithSummary("Gets complex data.")
             .WithDescription("Uses every supported attribute.")

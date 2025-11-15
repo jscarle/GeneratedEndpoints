@@ -1212,6 +1212,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
             var source = BindingSource.None;
             TypedConstant? typedKey = null;
+            string? bindingName = null;
 
             var attributes = parameter.GetAttributes();
             foreach (var attribute in attributes)
@@ -1221,15 +1222,27 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     continue;
 
                 if (attributeClass.IsFromRouteAttribute())
+                {
                     source = BindingSource.FromRoute;
+                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                }
                 if (attributeClass.IsFromQueryAttribute())
+                {
                     source = BindingSource.FromQuery;
+                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                }
                 if (attributeClass.IsFromHeaderAttribute())
+                {
                     source = BindingSource.FromHeader;
+                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                }
                 if (attributeClass.IsFromBodyAttribute())
                     source = BindingSource.FromBody;
                 if (attributeClass.IsFromFormAttribute())
+                {
                     source = BindingSource.FromForm;
+                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                }
                 if (attributeClass.IsFromServicesAttribute())
                     source = BindingSource.FromServices;
                 if (attributeClass.IsFromKeyedServicesAttribute())
@@ -1244,10 +1257,38 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             var parameterName = parameter.Name;
             var parameterType = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var key = typedKey.HasValue ? ConstLiteral(typedKey.Value) : null;
-            methodParameters.Add(new Parameter(parameterName, parameterType, source, key));
+            methodParameters.Add(new Parameter(parameterName, parameterType, source, key, bindingName));
         }
 
         return methodParameters.ToEquatableImmutableArray();
+    }
+
+    private static string? GetBindingAttributeName(AttributeData attribute)
+    {
+        foreach (var namedArg in attribute.NamedArguments)
+        {
+            if (string.Equals(namedArg.Key, NameAttributeNamedParameter, StringComparison.Ordinal)
+                && namedArg.Value.Value is string namedValue)
+            {
+                var normalized = NormalizeBindingName(namedValue);
+                if (normalized is not null)
+                    return normalized;
+            }
+        }
+
+        if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string constructorName)
+            return NormalizeBindingName(constructorName);
+
+        return null;
+    }
+
+    private static string? NormalizeBindingName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value!.Trim();
+        return trimmed.Length > 0 ? trimmed : null;
     }
 
     private static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
@@ -1431,7 +1472,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             foreach (var parameter in requestHandler.Method.Parameters)
             {
                 source.Append(", ");
-                source.Append(GetBindingSourceAttribute(parameter.Source, parameter.Key));
+                source.Append(GetBindingSourceAttribute(parameter.Source, parameter.Key, parameter.BindingName));
                 source.Append(parameter.Type);
                 source.Append(' ');
                 source.Append(parameter.Name);
@@ -1621,21 +1662,29 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         };
     }
 
-    private static string GetBindingSourceAttribute(BindingSource source, string? key)
+    private static string GetBindingSourceAttribute(BindingSource source, string? key, string? bindingName)
     {
         return source switch
         {
             BindingSource.None => "",
-            BindingSource.FromRoute => "[FromRoute] ",
-            BindingSource.FromQuery => "[FromQuery] ",
-            BindingSource.FromHeader => "[FromHeader] ",
-            BindingSource.FromBody => "[FromBody] ",
-            BindingSource.FromForm => "[FromForm] ",
+            BindingSource.FromRoute => FormatBindingAttribute("FromRoute", bindingName),
+            BindingSource.FromQuery => FormatBindingAttribute("FromQuery", bindingName),
+            BindingSource.FromHeader => FormatBindingAttribute("FromHeader", bindingName),
+            BindingSource.FromBody => FormatBindingAttribute("FromBody", bindingName),
+            BindingSource.FromForm => FormatBindingAttribute("FromForm", bindingName),
             BindingSource.FromServices => "[FromServices] ",
             BindingSource.FromKeyedServices => $"[FromKeyedServices({key})] ",
             BindingSource.AsParameters => "[AsParameters] ",
             _ => throw new NotImplementedException(),
         };
+    }
+
+    private static string FormatBindingAttribute(string attributeName, string? bindingName)
+    {
+        if (bindingName is null)
+            return $"[{attributeName}] ";
+
+        return $"[{attributeName}(Name = {StringLiteral(bindingName)})] ";
     }
 
     private static StringBuilder GetUseEndpointHandlersStringBuilder(ImmutableArray<RequestHandler> requestHandlers)
@@ -1841,7 +1890,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private readonly record struct ProducesValidationProblemMetadata(int StatusCode, string? ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
 
-    private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key);
+    private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key, string? BindingName);
 
     private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
