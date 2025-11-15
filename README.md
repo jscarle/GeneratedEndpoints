@@ -240,6 +240,12 @@ public sealed class CreateTodo
 }
 ```
 
+When you can't use the generic form (for example, the request type is only known at runtime), set the `RequestType` named argument instead:
+
+```csharp
+[Accepts("application/xml", RequestType = typeof(CreateTodoRequest))]
+```
+
 The generator translates these attributes into `.Accepts`, `.Produces`, `.ProducesProblem`, and `.ProducesValidationProblem`
 calls on the endpoint builder.
 
