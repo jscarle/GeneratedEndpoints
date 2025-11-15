@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Generated.Attributes;
@@ -7,12 +8,15 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
+// ReSharper disable UnusedParameter.Global
+#pragma warning disable CS9113 // Parameter is unread.
+
 namespace GeneratedEndpoints.Tests.Lab;
 
 [Tags("Users", "Profiles")]
 [RequireAuthorization("Users.Read", "Administrators")]
 [DisableAntiforgery]
-internal sealed class GetUserEndpoint(IServiceCollection services)
+internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
 {
     [Tags("Featured")]
     [AllowAnonymous]
