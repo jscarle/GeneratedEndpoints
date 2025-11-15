@@ -337,6 +337,35 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task WithGroupNameAttribute(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             [WithGroupName("SampleGroup")]
+                                             internal static class GroupedEndpoints
+                                             {
+                                                 [MapGet("/grouped/first")]
+                                                 public static Ok First()
+                                                     => TypedResults.Ok();
+
+                                                 [MapPost("/grouped/second")]
+                                                 public static Ok Second()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(WithGroupNameAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(WithGroupNameAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task ConfigureRegistersEndpointFilters(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
