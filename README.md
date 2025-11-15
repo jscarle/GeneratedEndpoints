@@ -77,7 +77,7 @@ Key points:
 * Optional `Name`, `Summary`, and `Description` named parameters populate the generated `.WithName`, `.WithSummary`, and `.WithDescription` metadata calls. When omitted, the generator derives the endpoint name from the method name (stripping a trailing `Async`).
 * Apply standard ASP.NET Core parameter binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromServices]`, `[FromKeyedServices]`, `[AsParameters]`, etc.). The generator mirrors them onto the produced delegate so binding behaves exactly as declared.
 * Annotate the **class**, an individual **method**, or both with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, or `[AllowAnonymous]`. Class-level metadata is merged onto every generated endpoint, while method-level attributes can refine or augment the settings for a specific handler. `[AllowAnonymous]` lets a method opt out of authorization even if the enclosing class (or other conventions) require authenticated access.
-* Non-static handler classes are automatically registered with dependency injection (as transient services). Their instance methods receive a scoped instance resolved from DI, while static methods continue to behave like any other static helper.
+* Non-static handler classes are automatically registered with dependency injection (as scoped services). Their instance methods receive a scoped instance resolved from DI, while static methods continue to behave like any other static helper.
 
 #### Static handler example
 
@@ -103,11 +103,12 @@ public static class ListTodos
 The generator emits extension methods in the `Microsoft.AspNetCore.Generated.Routing` namespace. Call them during startup to register handler types and map the generated endpoints.
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Generated.Routing;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Registers non-static handler classes with the DI container.
+// Registers every non-static handler class as a scoped service.
 builder.Services.AddEndpointHandlers();
 
 var app = builder.Build();
@@ -118,7 +119,9 @@ app.MapEndpointHandlers();
 app.Run();
 ```
 
-`AddEndpointHandlers` ensures any non-static handler types can be resolved from dependency injection, while `MapEndpointHandlers` generates Minimal API route mappings for every annotated method in the application. Both extension methods reside in the `Microsoft.AspNetCore.Generated.Routing` namespace.
+`AddEndpointHandlers` is intentionally minimal: it calls `TryAddScoped<THandler>()` once per **non-static** handler type so constructor-injected dependencies are available whenever an instance method executes. Static handler classes are skipped because they never require dependency injection.
+
+`MapEndpointHandlers` iterates over the same set of handler types, emits the correct `MapGet`/`MapPost`/etc. call for every annotated method, and returns the `IEndpointRouteBuilder` so you can keep chaining configuration. Instance methods are invoked through a generated delegate that pulls the handler instance from `[FromServices]`, ensuring the same scoped object handles the entire request.
 
 ### 3. Compose additional endpoints
 
@@ -246,6 +249,8 @@ When you can't use the generic form (for example, the request type is only known
 [Accepts("application/xml", RequestType = typeof(CreateTodoRequest))]
 ```
 
+If the request body is optional, set `IsOptional = true` on the `[Accepts]` attribute to generate `.Accepts(..., isOptional: true)` in the resulting endpoint metadata.
+
 The generator translates these attributes into `.Accepts`, `.Produces`, `.ProducesProblem`, and `.ProducesValidationProblem`
 calls on the endpoint builder.
 
@@ -258,7 +263,8 @@ calls on the endpoint builder.
 | `[RequireAuthorization]` | Class or method | Requires authorization for the endpoint. Pass an array of policy names to enforce specific policies; when omitted the standard authorization middleware is applied. |
 | `[AllowAnonymous]` | Class or method | Explicitly opts a method (or all methods in a class) into anonymous access, overriding `[RequireAuthorization]`. |
 | `[DisableAntiforgery]` | Class or method | Calls `.DisableAntiforgery()` on the generated endpoint, matching the ASP.NET Core extension. |
-| `[Accepts]` / `[Accepts<TRequest>]` | Class or method | Emits `.Accepts<TRequest>(contentType, additionalContentTypes...)` to document supported request bodies. Multiple attributes are allowed per endpoint. |
+| `[ExcludeFromDescription]` | Class or method | Generates `.ExcludeFromDescription()` so the endpoint is hidden from OpenAPI/metadata. |
+| `[Accepts]` / `[Accepts<TRequest>]` | Class or method | Emits `.Accepts<TRequest>(contentType, additionalContentTypes..., isOptional: true|false)` to document supported request bodies. Multiple attributes are allowed per endpoint. |
 | `[ProducesResponse]` / `[ProducesResponse<TResponse>]` | Class or method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. Multiple attributes are allowed. |
 | `[ProducesProblem]` | Class or method | Emits `.ProducesProblem(statusCode, contentTypes...)` for endpoints that return RFC 7807 problem details. |
 | `[ProducesValidationProblem]` | Class or method | Emits `.ProducesValidationProblem(statusCode, contentTypes...)` when validation failures are returned. |
@@ -276,7 +282,7 @@ calls on the endpoint builder.
 
 ### Tips for handler classes
 
-* Non-static handler classes are automatically registered as transient services when you call `builder.Services.AddEndpointHandlers();`.
+* Non-static handler classes are automatically registered as **scoped** services when you call `builder.Services.AddEndpointHandlers();`.
 * You can mix static and instance methods within the same class. Instance methods receive the injected handler instance; static methods work like regular static helpers and can continue to rely on `[FromServices]` for dependencies.
 * Use the optional `Configure` method for per-feature conventions. Its optional `IServiceProvider` parameter lets you resolve scoped services when adding endpoint filters or other runtime configuration.
 
