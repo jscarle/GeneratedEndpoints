@@ -20,6 +20,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static readonly string[] AspNetCoreAuthorizationNamespaceParts = new[] { "Microsoft", "AspNetCore", "Authorization" };
     private static readonly string[] AspNetCoreRoutingNamespaceParts = new[] { "Microsoft", "AspNetCore", "Routing" };
 
+    private const string FallbackHttpMethod = "__FALLBACK__";
+
     private static readonly ImmutableArray<HttpAttributeDefinition> HttpAttributeDefinitions =
     [
         CreateHttpAttributeDefinition("MapGetAttribute", "GET"),
@@ -32,6 +34,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         CreateHttpAttributeDefinition("MapQueryAttribute", "QUERY"),
         CreateHttpAttributeDefinition("MapTraceAttribute", "TRACE"),
         CreateHttpAttributeDefinition("MapConnectAttribute", "CONNECT"),
+        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod, allowEmptyPattern: true),
     ];
 
     private static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =
@@ -123,10 +126,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                                  #nullable enable
                                                  """;
 
-    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb)
+    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb, bool allowEmptyPattern = false)
     {
         var fullyQualifiedName = $"{AttributesNamespace}.{attributeName}";
-        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, $"{fullyQualifiedName}.gs.cs", verb);
+        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, $"{fullyQualifiedName}.gs.cs", verb, allowEmptyPattern);
     }
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -170,7 +173,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         foreach (var definition in HttpAttributeDefinitions)
         {
-            var source = GenerateHttpAttributeSource(FileHeader, AttributesNamespace, definition.Name, definition.Verb);
+            var summaryVerb = definition.Verb == FallbackHttpMethod ? "fallback" : definition.Verb;
+            var source = GenerateHttpAttributeSource(FileHeader, AttributesNamespace, definition.Name, summaryVerb,
+                definition.AllowEmptyPattern);
             context.AddSource(definition.Hint, SourceText.From(source, Encoding.UTF8));
         }
 
@@ -671,8 +676,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.AddSource(ProducesValidationProblemAttributeHint, SourceText.From(producesValidationProblemSource, Encoding.UTF8));
     }
 
-    private static string GenerateHttpAttributeSource(string fileHeader, string attributesNamespace, string attributeName, string summaryVerb)
+    private static string GenerateHttpAttributeSource(
+        string fileHeader,
+        string attributesNamespace,
+        string attributeName,
+        string summaryVerb,
+        bool allowEmptyPattern)
     {
+        var patternDefaultValue = allowEmptyPattern ? " = \\\"\\\"" : string.Empty;
         return $$"""
                  {{fileHeader}}
 
@@ -708,10 +719,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      /// Initializes a new instance of the <see cref="{{attributeName}}"/> class.
                      /// </summary>
                      /// <param name="pattern">The route pattern for the endpoint.</param>
-                     public {{attributeName}}([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string pattern)
-                     {
-                         Pattern = pattern;
-                     }
+                     public {{attributeName}}([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string pattern{{patternDefaultValue}})
+                      {
+                          Pattern = pattern;
+                      }
                  }
                  """;
     }
@@ -1871,19 +1882,32 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine("(");
         }
 
-        var mapMethodSuffix = GetMapMethodSuffix(requestHandler.HttpMethod);
+        var isFallback = string.Equals(requestHandler.HttpMethod, FallbackHttpMethod, StringComparison.Ordinal);
+        var mapMethodSuffix = isFallback ? null : GetMapMethodSuffix(requestHandler.HttpMethod);
 
         source.Append(indent);
-        source.Append("builder.Map");
-        source.Append(mapMethodSuffix ?? "Methods");
-        source.Append('(');
-        source.Append(StringLiteral(requestHandler.Pattern));
-        source.Append(", ");
-        if (mapMethodSuffix is null)
+        if (isFallback)
         {
-            source.Append("new[] { \"");
-            source.Append(requestHandler.HttpMethod);
-            source.Append("\" }, ");
+            source.Append("builder.MapFallback(");
+            if (!string.IsNullOrEmpty(requestHandler.Pattern))
+            {
+                source.Append(StringLiteral(requestHandler.Pattern));
+                source.Append(", ");
+            }
+        }
+        else
+        {
+            source.Append("builder.Map");
+            source.Append(mapMethodSuffix ?? "Methods");
+            source.Append('(');
+            source.Append(StringLiteral(requestHandler.Pattern));
+            source.Append(", ");
+            if (mapMethodSuffix is null)
+            {
+                source.Append("new[] { \"");
+                source.Append(requestHandler.HttpMethod);
+                source.Append("\" }, ");
+            }
         }
         if (requestHandler.Method.IsStatic)
         {
@@ -2334,7 +2358,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         };
     }
 
-    private readonly record struct HttpAttributeDefinition(string Name, string FullyQualifiedName, string Hint, string Verb);
+    private readonly record struct HttpAttributeDefinition(
+        string Name,
+        string FullyQualifiedName,
+        string Hint,
+        string Verb,
+        bool AllowEmptyPattern);
 
     private readonly record struct RequestHandler(
         RequestHandlerClass Class,
