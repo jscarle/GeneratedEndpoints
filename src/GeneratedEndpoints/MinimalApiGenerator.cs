@@ -60,6 +60,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string DescriptionAttributeNamedParameter = "Description";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
     private const string RequestTypeAttributeNamedParameter = "RequestType";
+    private const string IsOptionalAttributeNamedParameter = "IsOptional";
 
     private const string RequireAuthorizationAttributeName = "RequireAuthorizationAttribute";
     private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";
@@ -285,6 +286,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    public global::System.Type RequestType { get; init; } = default!;
 
                                    /// <summary>
+                                   /// Gets a value indicating whether the request body is optional.
+                                   /// </summary>
+                                   public bool IsOptional { get; init; }
+
+                                   /// <summary>
                                    /// Gets the primary content type accepted by the endpoint.
                                    /// </summary>
                                    public string ContentType { get; }
@@ -317,6 +323,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    /// Gets the request type accepted by the endpoint.
                                    /// </summary>
                                    public global::System.Type RequestType => typeof(TRequest);
+
+                                   /// <summary>
+                                   /// Gets a value indicating whether the request body is optional.
+                                   /// </summary>
+                                   public bool IsOptional { get; init; }
 
                                    /// <summary>
                                    /// Gets the primary content type accepted by the endpoint.
@@ -915,6 +926,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string? requestType = null;
         string contentType;
         EquatableImmutableArray<string>? additionalContentTypes;
+        var isOptional = GetNamedBoolValue(attribute, IsOptionalAttributeNamedParameter);
 
         if (attributeClass.IsGenericType && attributeClass.TypeArguments.Length == 1)
         {
@@ -942,7 +954,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         var acceptsList = accepts ??= new List<AcceptsMetadata>();
-        acceptsList.Add(new AcceptsMetadata(requestType, contentType, additionalContentTypes));
+        acceptsList.Add(new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional));
     }
 
     private static void TryAddProducesMetadata(
@@ -999,6 +1011,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         return null;
+    }
+
+    private static bool GetNamedBoolValue(AttributeData attribute, string namedParameter, bool defaultValue = false)
+    {
+        foreach (var namedArg in attribute.NamedArguments)
+        {
+            if (namedArg.Key == namedParameter && namedArg.Value.Value is bool boolValue)
+                return boolValue;
+        }
+
+        return defaultValue;
     }
 
     private static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
@@ -1510,6 +1533,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(accepts.RequestType);
                 source.Append('>');
                 source.Append('(');
+                if (accepts.IsOptional)
+                {
+                    source.Append("isOptional: true, ");
+                }
                 source.Append(StringLiteral(accepts.ContentType));
                 AppendAdditionalContentTypes(source, accepts.AdditionalContentTypes);
                 source.Append(')');
@@ -1660,7 +1687,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     var additionalCost = accepts.AdditionalContentTypes is { Count: > 0 }
                         ? accepts.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
                         : 0;
-                    cost += 32 + accepts.RequestType.Length + accepts.ContentType.Length + additionalCost;
+                    var optionalCost = accepts.IsOptional ? 20 : 0;
+                    cost += 32 + optionalCost + accepts.RequestType.Length + accepts.ContentType.Length + additionalCost;
                 }
             }
 
@@ -1902,7 +1930,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool ExcludeFromDescription
     );
 
-    private readonly record struct AcceptsMetadata(string RequestType, string ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
+    private readonly record struct AcceptsMetadata(
+        string RequestType,
+        string ContentType,
+        EquatableImmutableArray<string>? AdditionalContentTypes,
+        bool IsOptional);
 
     private readonly record struct ProducesMetadata(
         string ResponseType,
