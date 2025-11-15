@@ -1657,107 +1657,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static StringBuilder GetUseEndpointHandlersStringBuilder(ImmutableArray<RequestHandler> requestHandlers)
     {
-        var estimate = 1024;
+        const int baseSize = 4096;
+        const int perHandler = 512;
 
-        foreach (var rh in requestHandlers)
-        {
-            var cost = 160;
+        var estimate = baseSize + (requestHandlers.Length * perHandler);
 
-            cost += 2 + rh.Pattern.Length;
-            cost += rh.Class.Name.Length + rh.Method.Name.Length;
-
-            var parameters = rh.Method.Parameters;
-            foreach (var p in parameters)
-                cost += 12 + p.Type.Length + p.Name.Length;
-
-            var metadata = rh.Metadata;
-            if (metadata.Name is { Length: > 0 })
-                cost += 22 + metadata.Name.Length;
-            if (metadata.Summary is { Length: > 0 })
-                cost += 24 + metadata.Summary.Length;
-            if (metadata.Description is { Length: > 0 })
-                cost += 28 + metadata.Description.Length;
-            if (metadata.ExcludeFromDescription)
-                cost += 32;
-
-            if (metadata.Tags is { Count: > 0 })
-                cost += metadata.Tags.Value.Sum(tag => 6 + tag.Length);
-
-            if (metadata.Accepts is { Count: > 0 })
-            {
-                foreach (var accepts in metadata.Accepts.Value)
-                {
-                    var additionalCost = accepts.AdditionalContentTypes is { Count: > 0 }
-                        ? accepts.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
-                        : 0;
-                    var optionalCost = accepts.IsOptional ? 20 : 0;
-                    cost += 32 + optionalCost + accepts.RequestType.Length + accepts.ContentType.Length + additionalCost;
-                }
-            }
-
-            if (metadata.Produces is { Count: > 0 })
-            {
-                foreach (var produces in metadata.Produces.Value)
-                {
-                    var additionalCost = produces.AdditionalContentTypes is { Count: > 0 }
-                        ? produces.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
-                        : 0;
-                    var contentTypeLength = produces.ContentType?.Length ?? 0;
-                    cost += 40 + produces.ResponseType.Length + contentTypeLength + additionalCost;
-                }
-            }
-
-            if (metadata.ProducesProblem is { Count: > 0 })
-            {
-                foreach (var producesProblem in metadata.ProducesProblem.Value)
-                {
-                    var additionalCost = producesProblem.AdditionalContentTypes is { Count: > 0 }
-                        ? producesProblem.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
-                        : 0;
-                    var contentTypeLength = producesProblem.ContentType?.Length ?? 0;
-                    cost += 28 + contentTypeLength + additionalCost;
-                }
-            }
-
-            if (metadata.ProducesValidationProblem is { Count: > 0 })
-            {
-                foreach (var producesValidationProblem in metadata.ProducesValidationProblem.Value)
-                {
-                    var additionalCost = producesValidationProblem.AdditionalContentTypes is { Count: > 0 }
-                        ? producesValidationProblem.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
-                        : 0;
-                    var contentTypeLength = producesValidationProblem.ContentType?.Length ?? 0;
-                    cost += 32 + contentTypeLength + additionalCost;
-                }
-            }
-
-            if (rh.RequireAuthorization)
-                cost += 24;
-            if (rh.AuthorizationPolicies is { Count: > 0 })
-                cost += rh.AuthorizationPolicies.Value.Sum(p => 6 + p.Length);
-            if (rh.DisableAntiforgery)
-                cost += 24;
-            if (rh.AllowAnonymous)
-                cost += 24;
-            if (rh.Class.HasConfigureMethod)
-            {
-                cost += 32 + rh.Class.Name.Length;
-                if (rh.Class.ConfigureMethodAcceptsServiceProvider)
-                    cost += 32;
-            }
-
-            estimate += cost;
-        }
-
-        estimate += Math.Max(256, requestHandlers.Length * 16);
-        estimate = (int)(estimate * 1.12);
-
-        estimate = estimate switch
-        {
-            < 4096 => 4096,
-            > 65536 => 65536,
-            _ => estimate,
-        };
+        if (estimate > 65536)
+            estimate = 65536;
 
         return new StringBuilder(estimate);
     }
