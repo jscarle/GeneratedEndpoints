@@ -211,7 +211,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                /// <summary>
                                /// Specifies the request type and content types accepted by the annotated endpoint or class.
                                /// </summary>
-                               [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                internal sealed class {{AcceptsAttributeName}} : global::System.Attribute
                                {
                                    /// <summary>
@@ -250,7 +250,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                /// Specifies the request type using a generic argument and the content types accepted by the annotated endpoint or class.
                                /// </summary>
                                /// <typeparam name="TRequest">The CLR type of the request body.</typeparam>
-                               [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                internal sealed class {{AcceptsAttributeName}}<TRequest> : global::System.Attribute
                                {
                                    /// <summary>
@@ -297,7 +297,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 /// <summary>
                                 /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
                                 /// </summary>
-                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                 internal sealed class {{ProducesResponseAttributeName}} : global::System.Attribute
                                 {
                                 /// <summary>
@@ -338,7 +338,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 /// Specifies a response type using a generic argument along with status code and content types produced by the annotated endpoint or class.
                                 /// </summary>
                                 /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
-                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                 internal sealed class {{ProducesResponseAttributeName}}<TResponse> : global::System.Attribute
                                 {
                                     /// <summary>
@@ -387,7 +387,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                         /// <summary>
                                         /// Specifies that the endpoint produces a problem details payload.
                                         /// </summary>
-                                        [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                        [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                         internal sealed class {{ProducesProblemAttributeName}} : global::System.Attribute
                                         {
                                             /// <summary>
@@ -431,7 +431,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                                 /// <summary>
                                                 /// Specifies that the endpoint produces a validation problem details payload.
                                                 /// </summary>
-                                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                                 internal sealed class {{ProducesValidationProblemAttributeName}} : global::System.Attribute
                                                 {
                                                     /// <summary>

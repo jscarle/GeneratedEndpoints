@@ -26,7 +26,7 @@ GeneratedEndpoints focuses on three goals:
 
 * **Attribute-driven routing** – use `[MapGet]`, `[MapPost]`, `[MapDelete]`, `[MapOptions]`, `[MapHead]`, `[MapPatch]`, `[MapTrace]`, `[MapConnect]`, and even `[MapQuery]` to describe the verb and route pattern. The generator creates the matching `Map*` call and wires up metadata like `.WithName`, `.WithSummary`, and `.WithDescription`.
 * **Feature-first organization** – keep handlers close to the code they execute (for example, alongside your `Todos` feature). Non-static handler classes are automatically registered with dependency injection so you can inject EF Core DbContexts, services, etc.
-* **Metadata composition** – decorate classes and methods with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, `[AllowAnonymous]`, `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]`. Class-level metadata is merged into every method, while method-level metadata can refine or override.
+* **Metadata composition** – decorate classes and methods with `[Tags]`, `[RequireAuthorization]`, `[DisableAntiforgery]`, `[AllowAnonymous]`, and `[ExcludeFromDescription]`. Apply `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]` directly to the methods they describe. Class-level metadata is merged into every method, while method-level metadata can refine or override.
 
 The generator also emits the `AddEndpointHandlers` and `MapEndpointHandlers` extension methods that do all the registration work for you.
 
@@ -78,7 +78,7 @@ Key ideas:
 * Choose the attribute that matches the verb (`[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]`).
 * Named arguments like `Summary`, `Description`, and `Name` are translated into `.WithSummary`, `.WithDescription`, and `.WithName` calls.
 * Use existing ASP.NET Core binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]`, `[FromServices]`, `[FromKeyedServices]`, `[AsParameters]`, etc.). The generator preserves them in the produced delegate.
-* Metadata attributes (`[Tags]`, `[RequireAuthorization]`, `[AllowAnonymous]`, `[DisableAntiforgery]`) can be placed on the class, on a method, or on both. Class-level metadata is merged with method-level metadata.
+* Metadata attributes (`[Tags]`, `[RequireAuthorization]`, `[AllowAnonymous]`, `[DisableAntiforgery]`, `[ExcludeFromDescription]`) can be placed on the class, on a method, or on both. Class-level metadata is merged with method-level metadata. Request/response attributes (`[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, `[ProducesValidationProblem]`) must be applied directly to the method they describe.
 
 ### 3. Register handlers and map endpoints
 
@@ -226,12 +226,12 @@ The `Configure` method is emitted once per handler class, so every endpoint in t
 GeneratedEndpoints ships with attribute helpers for request/response metadata. They keep your OpenAPI description in sync with the implementation.
 
 ```csharp
-[Accepts<CreateTodoRequest>("application/json", "application/xml")]
-[ProducesResponse<Todo>(StatusCodes.Status201Created)]
-[ProducesProblem(StatusCodes.Status500InternalServerError)]
 public sealed class CreateTodo
 {
     [MapPost("/todos", Summary = "Create a todo")]
+    [Accepts<CreateTodoRequest>("application/json", "application/xml")]
+    [ProducesResponse<Todo>(StatusCodes.Status201Created)]
+    [ProducesProblem(StatusCodes.Status500InternalServerError)]
     [ProducesValidationProblem(StatusCodes.Status400BadRequest)]
     public static Created<Todo> Handle([FromBody] CreateTodoRequest request)
         => TypedResults.Created($"/todos/{request.Id}", request.ToTodo());
@@ -240,7 +240,7 @@ public sealed class CreateTodo
 
 * Use the generic form when the request/response type is known at compile time. For runtime types, set `RequestType` on `[Accepts]` and `ResponseType` on `[ProducesResponse]`.
 * Mark `IsOptional = true` on `[Accepts]` to call `.Accepts(..., isOptional: true)`.
-* Multiple `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]` attributes can be applied to the same method or class. The generator creates every corresponding `.Accepts` or `.Produces` call.
+* Multiple `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, and `[ProducesValidationProblem]` attributes can be applied to the same method. The generator creates every corresponding `.Accepts` or `.Produces` call.
 
 ---
 
@@ -254,10 +254,10 @@ public sealed class CreateTodo
 | `[AllowAnonymous]` | Class or method | Explicitly opts an endpoint into anonymous access, overriding `[RequireAuthorization]`. |
 | `[DisableAntiforgery]` | Class or method | Calls `.DisableAntiforgery()` on the generated endpoint. |
 | `[ExcludeFromDescription]` | Class or method | Generates `.ExcludeFromDescription()` so the endpoint is hidden from OpenAPI/metadata. |
-| `[Accepts]` / `[Accepts<TRequest>]` | Class or method | Emits `.Accepts<TRequest>(contentTypes..., isOptional: true|false)` to document supported request bodies. Multiple attributes allowed. |
-| `[ProducesResponse]` / `[ProducesResponse<TResponse>]` | Class or method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. |
-| `[ProducesProblem]` | Class or method | Emits `.ProducesProblem(statusCode, contentTypes...)` for endpoints that return RFC 7807 problem details. |
-| `[ProducesValidationProblem]` | Class or method | Emits `.ProducesValidationProblem(statusCode, contentTypes...)`. |
+| `[Accepts]` / `[Accepts<TRequest>]` | Method | Emits `.Accepts<TRequest>(contentTypes..., isOptional: true|false)` to document supported request bodies. Multiple attributes allowed. |
+| `[ProducesResponse]` / `[ProducesResponse<TResponse>]` | Method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. |
+| `[ProducesProblem]` | Method | Emits `.ProducesProblem(statusCode, contentTypes...)` for endpoints that return RFC 7807 problem details. |
+| `[ProducesValidationProblem]` | Method | Emits `.ProducesValidationProblem(statusCode, contentTypes...)`. |
 
 > ℹ️ Metadata defined on a class is applied to every annotated method inside the class. Method-level attributes can add entries (tags, accepts, produces, etc.) or override boolean flags like `[AllowAnonymous]`.
 
