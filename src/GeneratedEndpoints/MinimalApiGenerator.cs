@@ -41,6 +41,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
     private const string NameAttributeNamedParameter = "Name";
+    private const string DisplayNameAttributeNamedParameter = "DisplayName";
     private const string SummaryAttributeNamedParameter = "Summary";
     private const string DescriptionAttributeNamedParameter = "Description";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
@@ -740,6 +741,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      public string Name { get; set; } = "";
 
                      /// <summary>
+                     /// Gets or sets the endpoint display name.
+                     /// </summary>
+                     public string DisplayName { get; set; } = "";
+
+                     /// <summary>
                      /// Gets or sets the endpoint summary.
                      /// </summary>
                      public string Summary { get; set; } = "";
@@ -784,7 +790,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
-        var (httpMethod, pattern, name, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
+        var (httpMethod, pattern, name, displayName, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requireRateLimiting,
@@ -796,6 +802,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var metadata = new RequestHandlerMetadata(
             name,
+            displayName,
             summary,
             description,
             tags,
@@ -823,7 +830,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return methodName;
     }
 
-    private static (string HttpMethod, string Pattern, string? Name, string? Summary, string? Description) GetRequestHandlerAttribute(
+    private static (
+        string HttpMethod,
+        string Pattern,
+        string? Name,
+        string? DisplayName,
+        string? Summary,
+        string? Description
+    ) GetRequestHandlerAttribute(
         AttributeData attribute,
         CancellationToken cancellationToken
     )
@@ -839,6 +853,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
         string? name = null;
+        string? displayName = null;
         string? summary = null;
         string? description = null;
         foreach (var namedArg in attribute.NamedArguments)
@@ -849,6 +864,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 {
                     var value = namedArg.Value.Value as string;
                     name = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+                    break;
+                }
+                case DisplayNameAttributeNamedParameter:
+                {
+                    var value = namedArg.Value.Value as string;
+                    displayName = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
                     break;
                 }
                 case SummaryAttributeNamedParameter:
@@ -866,7 +887,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             }
         }
 
-        return (httpMethod, pattern, name, summary, description);
+        return (httpMethod, pattern, name, displayName, summary, description);
     }
 
     private static (
@@ -2005,6 +2026,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
+        if (!string.IsNullOrEmpty(requestHandler.Metadata.DisplayName))
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".WithDisplayName(");
+            source.Append(StringLiteral(requestHandler.Metadata.DisplayName));
+            source.Append(')');
+        }
+
         if (!string.IsNullOrEmpty(requestHandler.Metadata.Summary))
         {
             source.AppendLine();
@@ -2455,6 +2485,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private readonly record struct RequestHandlerMetadata(
         string? Name,
+        string? DisplayName,
         string? Summary,
         string? Description,
         EquatableImmutableArray<string>? Tags,

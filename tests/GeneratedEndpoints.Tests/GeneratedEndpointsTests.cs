@@ -48,7 +48,7 @@ public class GeneratedEndpointsTests
                                              [Tags("Users")]
                                              internal static class GetUserEndpoint
                                              {
-                                                 [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.", Description = "Gets a user by ID when the ID is greater than zero.")]
+                                                [MapGet("/users/{id:int}", Name = nameof(GetUser), DisplayName = "User lookup endpoint", Summary = "Gets a user by ID.", Description = "Gets a user by ID when the ID is greater than zero.")]
                                                  public static Results<Ok, NotFound> GetUser2(int id)
                                                  {
                                                      if (id > 0)
@@ -435,7 +435,7 @@ public class GeneratedEndpointsTests
                                                      builder.WithMetadata("configured");
                                                  }
 
-                                                 [MapGet("/complex/{id:int}", Name = nameof(GetComplex), Summary = "Gets complex data.", Description = "Uses every supported attribute.")]
+                                                [MapGet("/complex/{id:int}", Name = nameof(GetComplex), DisplayName = "Complex data endpoint", Summary = "Gets complex data.", Description = "Uses every supported attribute.")]
                                                  [AllowAnonymous]
                                                  [Tags("MethodLevel")]
                                                  [RequireAuthorization("MethodPolicy")]
