@@ -43,6 +43,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
     private const string RequestTypeAttributeNamedParameter = "RequestType";
     private const string IsOptionalAttributeNamedParameter = "IsOptional";
+    private const string PolicyNameAttributeNamedParameter = "PolicyName";
 
     private const string RequireAuthorizationAttributeName = "RequireAuthorizationAttribute";
     private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";
@@ -59,6 +60,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string DisableAntiforgeryAttributeName = "DisableAntiforgeryAttribute";
     private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
     private const string DisableAntiforgeryAttributeHint = $"{DisableAntiforgeryAttributeFullyQualifiedName}.gs.cs";
+
+    private const string ShortCircuitAttributeName = "ShortCircuitAttribute";
+    private const string ShortCircuitAttributeFullyQualifiedName = $"{AttributesNamespace}.{ShortCircuitAttributeName}";
+    private const string ShortCircuitAttributeHint = $"{ShortCircuitAttributeFullyQualifiedName}.gs.cs";
+
+    private const string DisableRequestTimeoutAttributeName = "DisableRequestTimeoutAttribute";
+    private const string DisableRequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableRequestTimeoutAttributeName}";
+    private const string DisableRequestTimeoutAttributeHint = $"{DisableRequestTimeoutAttributeFullyQualifiedName}.gs.cs";
+
+    private const string WithRequestTimeoutAttributeName = "WithRequestTimeoutAttribute";
+    private const string WithRequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithRequestTimeoutAttributeName}";
+    private const string WithRequestTimeoutAttributeHint = $"{WithRequestTimeoutAttributeFullyQualifiedName}.gs.cs";
 
     private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
 
@@ -278,6 +291,77 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                                          """;
         context.AddSource(DisableAntiforgeryAttributeHint, SourceText.From(disableAntiforgerySource, Encoding.UTF8));
+
+        // ShortCircuit
+        var shortCircuitSource = $$"""
+                                   {{FileHeader}}
+
+                                   namespace {{AttributesNamespace}};
+
+                                   /// <summary>
+                                   /// Marks the annotated endpoint or class to short-circuit the request pipeline.
+                                   /// </summary>
+                                   [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                   internal sealed class {{ShortCircuitAttributeName}} : global::System.Attribute
+                                   {
+                                   }
+
+                                   """;
+        context.AddSource(ShortCircuitAttributeHint, SourceText.From(shortCircuitSource, Encoding.UTF8));
+
+        // DisableRequestTimeout
+        var disableRequestTimeoutSource = $$"""
+                                           {{FileHeader}}
+
+                                           namespace {{AttributesNamespace}};
+
+                                           /// <summary>
+                                           /// Disables the request timeout for the annotated endpoint or class.
+                                           /// </summary>
+                                           [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                           internal sealed class {{DisableRequestTimeoutAttributeName}} : global::System.Attribute
+                                           {
+                                           }
+
+                                           """;
+        context.AddSource(DisableRequestTimeoutAttributeHint, SourceText.From(disableRequestTimeoutSource, Encoding.UTF8));
+
+        // WithRequestTimeout
+        var withRequestTimeoutSource = $$"""
+                                         {{FileHeader}}
+
+                                         namespace {{AttributesNamespace}};
+
+                                         /// <summary>
+                                         /// Applies the request timeout metadata to the annotated endpoint or class.
+                                         /// </summary>
+                                         [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                         internal sealed class {{WithRequestTimeoutAttributeName}} : global::System.Attribute
+                                         {
+                                             /// <summary>
+                                             /// Gets the optional request timeout policy name.
+                                             /// </summary>
+                                             public string? PolicyName { get; init; }
+
+                                             /// <summary>
+                                             /// Applies the default request timeout behavior.
+                                             /// </summary>
+                                             public {{WithRequestTimeoutAttributeName}}()
+                                             {
+                                             }
+
+                                             /// <summary>
+                                             /// Applies the specified request timeout policy.
+                                             /// </summary>
+                                             /// <param name="policyName">The request timeout policy name.</param>
+                                             public {{WithRequestTimeoutAttributeName}}(string policyName)
+                                             {
+                                                 PolicyName = policyName;
+                                             }
+                                         }
+
+                                         """;
+        context.AddSource(WithRequestTimeoutAttributeHint, SourceText.From(withRequestTimeoutSource, Encoding.UTF8));
 
         // Accepts
         var acceptsSource = $$"""
@@ -659,7 +743,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requireRateLimiting,
-                rateLimitingPolicyName, endpointFilterTypes)
+                rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
+                requestTimeoutPolicyName)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -678,7 +763,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
             authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requireRateLimiting,
-            rateLimitingPolicyName, endpointFilterTypes
+            rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
+            requestTimeoutPolicyName
         );
 
         return requestHandler;
@@ -753,7 +839,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string? corsPolicyName,
         bool requireRateLimiting,
         string? rateLimitingPolicyName,
-        EquatableImmutableArray<string>? endpointFilterTypes
+        EquatableImmutableArray<string>? endpointFilterTypes,
+        bool shortCircuit,
+        bool disableRequestTimeout,
+        bool withRequestTimeout,
+        string? requestTimeoutPolicyName
     ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -769,6 +859,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool? requireRateLimiting = null;
         string? rateLimitingPolicyName = null;
         List<string>? endpointFilters = null;
+        bool? shortCircuit = null;
+        bool? disableRequestTimeout = null;
+        bool? withRequestTimeout = null;
+        string? requestTimeoutPolicyName = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -796,7 +890,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref rateLimitingPolicyName,
             ref endpointFilters,
             ref classHasAllowAnonymousAttribute,
-            ref classHasRequireAuthorizationAttribute
+            ref classHasRequireAuthorizationAttribute,
+            ref shortCircuit,
+            ref disableRequestTimeout,
+            ref withRequestTimeout,
+            ref requestTimeoutPolicyName
         );
 
         var methodAttributes = methodSymbol.GetAttributes();
@@ -820,7 +918,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref rateLimitingPolicyName,
             ref endpointFilters,
             ref methodHasAllowAnonymousAttribute,
-            ref methodHasRequireAuthorizationAttribute
+            ref methodHasRequireAuthorizationAttribute,
+            ref shortCircuit,
+            ref disableRequestTimeout,
+            ref withRequestTimeout,
+            ref requestTimeoutPolicyName
         );
 
         if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
@@ -841,7 +943,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             corsPolicyName,
             requireRateLimiting ?? false,
             rateLimitingPolicyName,
-            ToEquatableOrNull(endpointFilters)
+            ToEquatableOrNull(endpointFilters),
+            shortCircuit ?? false,
+            disableRequestTimeout ?? false,
+            withRequestTimeout ?? false,
+            (withRequestTimeout ?? false) ? requestTimeoutPolicyName : null
         );
     }
 
@@ -863,7 +969,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref string? rateLimitingPolicyName,
         ref List<string>? endpointFilters,
         ref bool hasAllowAnonymousAttribute,
-        ref bool hasRequireAuthorizationAttribute
+        ref bool hasRequireAuthorizationAttribute,
+        ref bool? shortCircuit,
+        ref bool? disableRequestTimeout,
+        ref bool? withRequestTimeout,
+        ref string? requestTimeoutPolicyName
     )
     {
         foreach (var attribute in attributes)
@@ -871,6 +981,35 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             var attributeClass = attribute.AttributeClass;
             if (attributeClass is null)
                 continue;
+
+            if (IsGeneratedAttribute(attributeClass, ShortCircuitAttributeName))
+            {
+                shortCircuit = true;
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, DisableRequestTimeoutAttributeName))
+            {
+                disableRequestTimeout = true;
+                withRequestTimeout = false;
+                requestTimeoutPolicyName = null;
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, WithRequestTimeoutAttributeName))
+            {
+                disableRequestTimeout = false;
+                withRequestTimeout = true;
+
+                string? policyName = null;
+                if (attribute.ConstructorArguments.Length > 0)
+                    policyName = attribute.ConstructorArguments[0].Value as string;
+
+                policyName ??= GetNamedStringValue(attribute, PolicyNameAttributeNamedParameter);
+
+                requestTimeoutPolicyName = NormalizeOptionalString(policyName);
+                continue;
+            }
 
             if (IsGeneratedAttribute(attributeClass, AcceptsAttributeName))
             {
@@ -1210,6 +1349,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         return defaultValue;
+    }
+
+    private static string? GetNamedStringValue(AttributeData attribute, string namedParameter)
+    {
+        foreach (var namedArg in attribute.NamedArguments)
+        {
+            if (namedArg.Key == namedParameter && namedArg.Value.Value is string stringValue)
+                return NormalizeOptionalString(stringValue);
+        }
+
+        return null;
     }
 
     private static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
@@ -1935,6 +2085,35 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(".AllowAnonymous()");
         }
 
+        if (requestHandler.ShortCircuit)
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".ShortCircuit()");
+        }
+
+        if (requestHandler.DisableRequestTimeout)
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".DisableRequestTimeout()");
+        }
+        else if (requestHandler.WithRequestTimeout)
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            if (!string.IsNullOrEmpty(requestHandler.RequestTimeoutPolicyName))
+            {
+                source.Append(".WithRequestTimeout(");
+                source.Append(StringLiteral(requestHandler.RequestTimeoutPolicyName));
+                source.Append(')');
+            }
+            else
+            {
+                source.Append(".WithRequestTimeout()");
+            }
+        }
+
         if (requestHandler.EndpointFilterTypes is { Count: > 0 })
         {
             foreach (var filterType in requestHandler.EndpointFilterTypes.Value)
@@ -2171,7 +2350,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string? CorsPolicyName,
         bool RequireRateLimiting,
         string? RateLimitingPolicyName,
-        EquatableImmutableArray<string>? EndpointFilterTypes
+        EquatableImmutableArray<string>? EndpointFilterTypes,
+        bool ShortCircuit,
+        bool DisableRequestTimeout,
+        bool WithRequestTimeout,
+        string? RequestTimeoutPolicyName
     );
 
     private readonly record struct RequestHandlerClass(
