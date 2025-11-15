@@ -71,6 +71,23 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string AllowAnonymousAttributeFullyQualifiedName = $"{AttributesNamespace}.{AllowAnonymousAttributeName}";
     private const string AllowAnonymousAttributeHint = $"{AllowAnonymousAttributeFullyQualifiedName}.gs.cs";
 
+    private const string AcceptsAttributeName = "AcceptsAttribute";
+    private const string AcceptsAttributeFullyQualifiedName = $"{AttributesNamespace}.{AcceptsAttributeName}";
+    private const string AcceptsAttributeHint = $"{AcceptsAttributeFullyQualifiedName}.gs.cs";
+
+    private const string ProducesAttributeName = "ProducesAttribute";
+    private const string ProducesAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesAttributeName}";
+    private const string ProducesAttributeHint = $"{ProducesAttributeFullyQualifiedName}.gs.cs";
+
+    private const string ProducesProblemAttributeName = "ProducesProblemAttribute";
+    private const string ProducesProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesProblemAttributeName}";
+    private const string ProducesProblemAttributeHint = $"{ProducesProblemAttributeFullyQualifiedName}.gs.cs";
+
+    private const string ProducesValidationProblemAttributeName = "ProducesValidationProblemAttribute";
+    private const string ProducesValidationProblemAttributeFullyQualifiedName =
+        $"{AttributesNamespace}.{ProducesValidationProblemAttributeName}";
+    private const string ProducesValidationProblemAttributeHint = $"{ProducesValidationProblemAttributeFullyQualifiedName}.gs.cs";
+
     private const string RoutingNamespace = $"{BaseNamespace}.Routing";
 
     private const string AddEndpointHandlersClassName = "EndpointServicesExtensions";
@@ -266,6 +283,264 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                                      """;
         context.AddSource(AllowAnonymousAttributeHint, SourceText.From(allowAnonymousSource, Encoding.UTF8));
+
+        // Accepts
+        var acceptsSource = $$"""
+                               {{FileHeader}}
+
+                               namespace {{AttributesNamespace}};
+
+                               /// <summary>
+                               /// Specifies the request type and content types accepted by the annotated endpoint or class.
+                               /// </summary>
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                               internal sealed class {{AcceptsAttributeName}} : global::System.Attribute
+                               {
+                                   /// <summary>
+                                   /// Gets the request type accepted by the endpoint.
+                                   /// </summary>
+                                   public global::System.Type RequestType { get; }
+
+                                   /// <summary>
+                                   /// Gets the primary content type accepted by the endpoint.
+                                   /// </summary>
+                                   public string ContentType { get; }
+
+                                   /// <summary>
+                                   /// Gets the additional content types accepted by the endpoint.
+                                   /// </summary>
+                                   public string[] AdditionalContentTypes { get; }
+
+                                   /// <summary>
+                                   /// Initializes a new instance of the <see cref="{{AcceptsAttributeName}}"/> class.
+                                   /// </summary>
+                                   /// <param name="requestType">The CLR type of the request body.</param>
+                                   /// <param name="contentType">The primary content type accepted by the endpoint.</param>
+                                   /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
+                                   public {{AcceptsAttributeName}}(global::System.Type requestType, string contentType = "application/json", params string[] additionalContentTypes)
+                                   {
+                                       RequestType = requestType ?? throw new global::System.ArgumentNullException(nameof(requestType));
+                                       ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
+                                       AdditionalContentTypes = additionalContentTypes ?? [];
+                                   }
+                               }
+
+                               /// <summary>
+                               /// Specifies the request type using a generic argument and the content types accepted by the annotated endpoint or class.
+                               /// </summary>
+                               /// <typeparam name="TRequest">The CLR type of the request body.</typeparam>
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                               internal sealed class {{AcceptsAttributeName}}<TRequest> : global::System.Attribute
+                               {
+                                   /// <summary>
+                                   /// Gets the request type accepted by the endpoint.
+                                   /// </summary>
+                                   public global::System.Type RequestType => typeof(TRequest);
+
+                                   /// <summary>
+                                   /// Gets the primary content type accepted by the endpoint.
+                                   /// </summary>
+                                   public string ContentType { get; }
+
+                                   /// <summary>
+                                   /// Gets the additional content types accepted by the endpoint.
+                                   /// </summary>
+                                   public string[] AdditionalContentTypes { get; }
+
+                                   /// <summary>
+                                   /// Initializes a new instance of the generic Accepts attribute class.
+                                   /// </summary>
+                                   /// <param name="contentType">The primary content type accepted by the endpoint.</param>
+                                   /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
+                                   public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
+                                   {
+                                       ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
+                                       AdditionalContentTypes = additionalContentTypes ?? [];
+                                   }
+                               }
+
+                               """;
+        context.AddSource(AcceptsAttributeHint, SourceText.From(acceptsSource, Encoding.UTF8));
+
+        // Produces
+        var producesSource = $$"""
+                                {{FileHeader}}
+
+                                namespace {{AttributesNamespace}};
+
+                                /// <summary>
+                                /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
+                                /// </summary>
+                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                internal sealed class {{ProducesAttributeName}} : global::System.Attribute
+                                {
+                                    /// <summary>
+                                    /// Gets the response type produced by the endpoint.
+                                    /// </summary>
+                                    public global::System.Type ResponseType { get; }
+
+                                    /// <summary>
+                                    /// Gets the HTTP status code returned by the endpoint.
+                                    /// </summary>
+                                    public int StatusCode { get; }
+
+                                    /// <summary>
+                                    /// Gets the primary content type produced by the endpoint.
+                                    /// </summary>
+                                    public string? ContentType { get; }
+
+                                    /// <summary>
+                                    /// Gets the additional content types produced by the endpoint.
+                                    /// </summary>
+                                    public string[] AdditionalContentTypes { get; }
+
+                                    /// <summary>
+                                    /// Initializes a new instance of the <see cref="{{ProducesAttributeName}}"/> class.
+                                    /// </summary>
+                                    /// <param name="responseType">The CLR type of the response body.</param>
+                                    /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                    /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                    /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                    public {{ProducesAttributeName}}(global::System.Type responseType, int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
+                                    {
+                                        ResponseType = responseType ?? throw new global::System.ArgumentNullException(nameof(responseType));
+                                        StatusCode = statusCode;
+                                        ContentType = contentType;
+                                        AdditionalContentTypes = additionalContentTypes ?? [];
+                                    }
+                                }
+
+                                /// <summary>
+                                /// Specifies a response type using a generic argument along with status code and content types produced by the annotated endpoint or class.
+                                /// </summary>
+                                /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
+                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                internal sealed class {{ProducesAttributeName}}<TResponse> : global::System.Attribute
+                                {
+                                    /// <summary>
+                                    /// Gets the response type produced by the endpoint.
+                                    /// </summary>
+                                    public global::System.Type ResponseType => typeof(TResponse);
+
+                                    /// <summary>
+                                    /// Gets the HTTP status code returned by the endpoint.
+                                    /// </summary>
+                                    public int StatusCode { get; }
+
+                                    /// <summary>
+                                    /// Gets the primary content type produced by the endpoint.
+                                    /// </summary>
+                                    public string? ContentType { get; }
+
+                                    /// <summary>
+                                    /// Gets the additional content types produced by the endpoint.
+                                    /// </summary>
+                                    public string[] AdditionalContentTypes { get; }
+
+                                    /// <summary>
+                                    /// Initializes a new instance of the generic Produces attribute class.
+                                    /// </summary>
+                                    /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                    /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                    /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                    public {{ProducesAttributeName}}(int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
+                                    {
+                                        StatusCode = statusCode;
+                                        ContentType = contentType;
+                                        AdditionalContentTypes = additionalContentTypes ?? [];
+                                    }
+                                }
+
+                                """;
+        context.AddSource(ProducesAttributeHint, SourceText.From(producesSource, Encoding.UTF8));
+
+        // ProducesProblem
+        var producesProblemSource = $$"""
+                                        {{FileHeader}}
+
+                                        namespace {{AttributesNamespace}};
+
+                                        /// <summary>
+                                        /// Specifies that the endpoint produces a problem details payload.
+                                        /// </summary>
+                                        [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                        internal sealed class {{ProducesProblemAttributeName}} : global::System.Attribute
+                                        {
+                                            /// <summary>
+                                            /// Gets the HTTP status code returned by the endpoint.
+                                            /// </summary>
+                                            public int StatusCode { get; }
+
+                                            /// <summary>
+                                            /// Gets the primary content type produced by the endpoint.
+                                            /// </summary>
+                                            public string? ContentType { get; }
+
+                                            /// <summary>
+                                            /// Gets the additional content types produced by the endpoint.
+                                            /// </summary>
+                                            public string[] AdditionalContentTypes { get; }
+
+                                            /// <summary>
+                                            /// Initializes a new instance of the <see cref="{{ProducesProblemAttributeName}}"/> class.
+                                            /// </summary>
+                                            /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                            /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                            /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                            public {{ProducesProblemAttributeName}}(int statusCode = 500, string? contentType = null, params string[] additionalContentTypes)
+                                            {
+                                                StatusCode = statusCode;
+                                                ContentType = contentType;
+                                                AdditionalContentTypes = additionalContentTypes ?? [];
+                                            }
+                                        }
+
+                                        """;
+        context.AddSource(ProducesProblemAttributeHint, SourceText.From(producesProblemSource, Encoding.UTF8));
+
+        // ProducesValidationProblem
+        var producesValidationProblemSource = $$"""
+                                                {{FileHeader}}
+
+                                                namespace {{AttributesNamespace}};
+
+                                                /// <summary>
+                                                /// Specifies that the endpoint produces a validation problem details payload.
+                                                /// </summary>
+                                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                internal sealed class {{ProducesValidationProblemAttributeName}} : global::System.Attribute
+                                                {
+                                                    /// <summary>
+                                                    /// Gets the HTTP status code returned by the endpoint.
+                                                    /// </summary>
+                                                    public int StatusCode { get; }
+
+                                                    /// <summary>
+                                                    /// Gets the primary content type produced by the endpoint.
+                                                    /// </summary>
+                                                    public string? ContentType { get; }
+
+                                                    /// <summary>
+                                                    /// Gets the additional content types produced by the endpoint.
+                                                    /// </summary>
+                                                    public string[] AdditionalContentTypes { get; }
+
+                                                    /// <summary>
+                                                    /// Initializes a new instance of the <see cref="{{ProducesValidationProblemAttributeName}}"/> class.
+                                                    /// </summary>
+                                                    /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                                    /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                                    /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                                    public {{ProducesValidationProblemAttributeName}}(int statusCode = 400, string? contentType = null, params string[] additionalContentTypes)
+                                                    {
+                                                        StatusCode = statusCode;
+                                                        ContentType = contentType;
+                                                        AdditionalContentTypes = additionalContentTypes ?? [];
+                                                    }
+                                                }
+
+                                                """;
+        context.AddSource(ProducesValidationProblemAttributeHint, SourceText.From(producesValidationProblemSource, Encoding.UTF8));
     }
 
     private static string GenerateHttpAttributeSource(string fileHeader, string attributesNamespace, string attributeName, string summaryVerb)
@@ -338,12 +613,22 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (httpMethod, pattern, name, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
-        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous) =
-            GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
+        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, accepts, produces,
+                producesProblem, producesValidationProblem)
+            = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
 
-        var metadata = new RequestHandlerMetadata(name, summary, description, tags);
+        var metadata = new RequestHandlerMetadata(
+            name,
+            summary,
+            description,
+            tags,
+            accepts,
+            produces,
+            producesProblem,
+            producesValidationProblem
+        );
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
             authorizationPolicies, disableAntiforgery, allowAnonymous
@@ -417,8 +702,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return (httpMethod, pattern, name, summary, description);
     }
 
-    private static (EquatableImmutableArray<string>? tags, bool requireAuthorization, EquatableImmutableArray<string>? authorizationPolicies, bool
-        disableAntiforgery, bool allowAnonymous) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    private static (
+        EquatableImmutableArray<string>? tags,
+        bool requireAuthorization,
+        EquatableImmutableArray<string>? authorizationPolicies,
+        bool disableAntiforgery,
+        bool allowAnonymous,
+        EquatableImmutableArray<AcceptsMetadata>? accepts,
+        EquatableImmutableArray<ProducesMetadata>? produces,
+        EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
+        EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem
+    ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -428,13 +722,50 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var disableAntiforgery = false;
         var allowAnonymous = false;
 
+        List<AcceptsMetadata>? accepts = null;
+        List<ProducesMetadata>? produces = null;
+        List<ProducesProblemMetadata>? producesProblem = null;
+        List<ProducesValidationProblemMetadata>? producesValidationProblem = null;
+
         var classAttributes = classSymbol.GetAttributes();
-        GetAdditionalRequestHandlerAttributeValues(classAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery, ref allowAnonymous);
+        GetAdditionalRequestHandlerAttributeValues(
+            classAttributes,
+            ref tags,
+            ref requireAuthorization,
+            ref authorizationPolicies,
+            ref disableAntiforgery,
+            ref allowAnonymous,
+            ref accepts,
+            ref produces,
+            ref producesProblem,
+            ref producesValidationProblem
+        );
 
         var methodAttributes = methodSymbol.GetAttributes();
-        GetAdditionalRequestHandlerAttributeValues(methodAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery, ref allowAnonymous);
+        GetAdditionalRequestHandlerAttributeValues(
+            methodAttributes,
+            ref tags,
+            ref requireAuthorization,
+            ref authorizationPolicies,
+            ref disableAntiforgery,
+            ref allowAnonymous,
+            ref accepts,
+            ref produces,
+            ref producesProblem,
+            ref producesValidationProblem
+        );
 
-        return (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous);
+        return (
+            tags,
+            requireAuthorization,
+            authorizationPolicies,
+            disableAntiforgery,
+            allowAnonymous,
+            ToEquatableOrNull(accepts),
+            ToEquatableOrNull(produces),
+            ToEquatableOrNull(producesProblem),
+            ToEquatableOrNull(producesValidationProblem)
+        );
     }
 
     private static void GetAdditionalRequestHandlerAttributeValues(
@@ -443,7 +774,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref bool requireAuthorization,
         ref EquatableImmutableArray<string>? authorizationPolicies,
         ref bool disableAntiforgery,
-        ref bool allowAnonymous
+        ref bool allowAnonymous,
+        ref List<AcceptsMetadata>? accepts,
+        ref List<ProducesMetadata>? produces,
+        ref List<ProducesProblemMetadata>? producesProblem,
+        ref List<ProducesValidationProblemMetadata>? producesValidationProblem
     )
     {
         foreach (var attribute in attributes)
@@ -453,6 +788,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
 
             var fullyQualifiedName = attributeClass.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+            if (IsGeneratedAttribute(fullyQualifiedName, AcceptsAttributeName))
+            {
+                TryAddAcceptsMetadata(attribute, attributeClass, ref accepts);
+                continue;
+            }
+
+            if (IsGeneratedAttribute(fullyQualifiedName, ProducesAttributeName))
+            {
+                TryAddProducesMetadata(attribute, attributeClass, ref produces);
+                continue;
+            }
 
             switch (fullyQualifiedName)
             {
@@ -493,6 +840,38 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 case $"global::{AllowAnonymousAttributeFullyQualifiedName}":
                     allowAnonymous = true;
                     break;
+                case $"global::{ProducesProblemAttributeFullyQualifiedName}":
+                {
+                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
+                        ? producesProblemStatusCode
+                        : 500;
+                    var contentType = attribute.ConstructorArguments.Length > 1
+                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                        : null;
+                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2
+                        ? GetStringArrayValues(attribute.ConstructorArguments[2])
+                        : null;
+
+                    var producesProblemList = producesProblem ??= new List<ProducesProblemMetadata>();
+                    producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    break;
+                }
+                case $"global::{ProducesValidationProblemAttributeFullyQualifiedName}":
+                {
+                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
+                        ? producesValidationProblemStatusCode
+                        : 400;
+                    var contentType = attribute.ConstructorArguments.Length > 1
+                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                        : null;
+                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2
+                        ? GetStringArrayValues(attribute.ConstructorArguments[2])
+                        : null;
+
+                    var producesValidationProblemList = producesValidationProblem ??= new List<ProducesValidationProblemMetadata>();
+                    producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    break;
+                }
             }
         }
     }
@@ -501,6 +880,127 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         var merged = MergeUnion(target, values);
         target = merged.Count > 0 ? merged : null;
+    }
+
+    private static EquatableImmutableArray<T>? ToEquatableOrNull<T>(List<T>? values)
+    {
+        return values is { Count: > 0 } ? values.ToEquatableImmutableArray() : null;
+    }
+
+    private static string NormalizeRequiredContentType(string? contentType, string defaultValue)
+    {
+        return string.IsNullOrWhiteSpace(contentType) ? defaultValue : contentType!.Trim();
+    }
+
+    private static string? NormalizeOptionalContentType(string? contentType)
+    {
+        return string.IsNullOrWhiteSpace(contentType) ? null : contentType!.Trim();
+    }
+
+    private static EquatableImmutableArray<string>? GetStringArrayValues(TypedConstant typedConstant)
+    {
+        if (typedConstant.Kind != TypedConstantKind.Array || typedConstant.Values.IsDefaultOrEmpty)
+            return null;
+
+        var builder = ImmutableArray.CreateBuilder<string>(typedConstant.Values.Length);
+        foreach (var value in typedConstant.Values)
+        {
+            if (value.Value is string s && !string.IsNullOrWhiteSpace(s))
+                builder.Add(s.Trim());
+        }
+
+        return builder.Count > 0 ? builder.ToEquatableImmutable() : null;
+    }
+
+    private static bool IsGeneratedAttribute(string fullyQualifiedName, string attributeName)
+    {
+        var prefix = $"global::{AttributesNamespace}.{attributeName}";
+        return fullyQualifiedName.StartsWith(prefix, StringComparison.Ordinal);
+    }
+
+    private static void TryAddAcceptsMetadata(
+        AttributeData attribute,
+        INamedTypeSymbol attributeClass,
+        ref List<AcceptsMetadata>? accepts)
+    {
+        string? requestType = null;
+        string contentType;
+        EquatableImmutableArray<string>? additionalContentTypes;
+
+        if (attributeClass.IsGenericType && attributeClass.TypeArguments.Length == 1)
+        {
+            requestType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            contentType = attribute.ConstructorArguments.Length > 0
+                ? NormalizeRequiredContentType(attribute.ConstructorArguments[0].Value as string, "application/json")
+                : "application/json";
+            additionalContentTypes = attribute.ConstructorArguments.Length > 1
+                ? GetStringArrayValues(attribute.ConstructorArguments[1])
+                : null;
+        }
+        else if (attribute.ConstructorArguments.Length >= 1 &&
+                 attribute.ConstructorArguments[0].Value is ITypeSymbol requestTypeSymbol)
+        {
+            requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            contentType = attribute.ConstructorArguments.Length > 1
+                ? NormalizeRequiredContentType(attribute.ConstructorArguments[1].Value as string, "application/json")
+                : "application/json";
+            additionalContentTypes = attribute.ConstructorArguments.Length > 2
+                ? GetStringArrayValues(attribute.ConstructorArguments[2])
+                : null;
+        }
+        else
+        {
+            return;
+        }
+
+        var acceptsList = accepts ??= new List<AcceptsMetadata>();
+        acceptsList.Add(new AcceptsMetadata(requestType, contentType, additionalContentTypes));
+    }
+
+    private static void TryAddProducesMetadata(
+        AttributeData attribute,
+        INamedTypeSymbol attributeClass,
+        ref List<ProducesMetadata>? produces)
+    {
+        string? responseType = null;
+        int statusCode;
+        string? contentType;
+        EquatableImmutableArray<string>? additionalContentTypes;
+
+        if (attributeClass.IsGenericType && attributeClass.TypeArguments.Length == 1)
+        {
+            responseType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
+                ? producesStatusCode
+                : 200;
+            contentType = attribute.ConstructorArguments.Length > 1
+                ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                : null;
+            additionalContentTypes = attribute.ConstructorArguments.Length > 2
+                ? GetStringArrayValues(attribute.ConstructorArguments[2])
+                : null;
+        }
+        else if (attribute.ConstructorArguments.Length >= 1 &&
+                 attribute.ConstructorArguments[0].Value is ITypeSymbol responseTypeSymbol)
+        {
+            responseType = responseTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            statusCode = attribute.ConstructorArguments.Length > 1 && attribute.ConstructorArguments[1].Value is int producesStatusCode
+                ? producesStatusCode
+                : 200;
+            contentType = attribute.ConstructorArguments.Length > 2
+                ? NormalizeOptionalContentType(attribute.ConstructorArguments[2].Value as string)
+                : null;
+            additionalContentTypes = attribute.ConstructorArguments.Length > 3
+                ? GetStringArrayValues(attribute.ConstructorArguments[3])
+                : null;
+        }
+        else
+        {
+            return;
+        }
+
+        var producesList = produces ??= new List<ProducesMetadata>();
+        producesList.Add(new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes));
     }
 
     private static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
@@ -995,6 +1495,64 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
+        if (requestHandler.Metadata.Accepts is { Count: > 0 })
+        {
+            foreach (var accepts in requestHandler.Metadata.Accepts.Value)
+            {
+                source.AppendLine();
+                source.Append(continuationIndent);
+                source.Append(".Accepts<");
+                source.Append(accepts.RequestType);
+                source.Append('>');
+                source.Append('(');
+                source.Append(StringLiteral(accepts.ContentType));
+                AppendAdditionalContentTypes(source, accepts.AdditionalContentTypes);
+                source.Append(')');
+            }
+        }
+
+        if (requestHandler.Metadata.Produces is { Count: > 0 })
+        {
+            foreach (var produces in requestHandler.Metadata.Produces.Value)
+            {
+                source.AppendLine();
+                source.Append(continuationIndent);
+                source.Append(".Produces<");
+                source.Append(produces.ResponseType);
+                source.Append('>');
+                source.Append('(');
+                source.Append(produces.StatusCode);
+                AppendOptionalContentTypes(source, produces.ContentType, produces.AdditionalContentTypes);
+                source.Append(')');
+            }
+        }
+
+        if (requestHandler.Metadata.ProducesProblem is { Count: > 0 })
+        {
+            foreach (var producesProblem in requestHandler.Metadata.ProducesProblem.Value)
+            {
+                source.AppendLine();
+                source.Append(continuationIndent);
+                source.Append(".ProducesProblem(");
+                source.Append(producesProblem.StatusCode);
+                AppendOptionalContentTypes(source, producesProblem.ContentType, producesProblem.AdditionalContentTypes);
+                source.Append(')');
+            }
+        }
+
+        if (requestHandler.Metadata.ProducesValidationProblem is { Count: > 0 })
+        {
+            foreach (var producesValidationProblem in requestHandler.Metadata.ProducesValidationProblem.Value)
+            {
+                source.AppendLine();
+                source.Append(continuationIndent);
+                source.Append(".ProducesValidationProblem(");
+                source.Append(producesValidationProblem.StatusCode);
+                AppendOptionalContentTypes(source, producesValidationProblem.ContentType, producesValidationProblem.AdditionalContentTypes);
+                source.Append(')');
+            }
+        }
+
         if (requestHandler.RequireAuthorization)
         {
             source.AppendLine();
@@ -1077,16 +1635,63 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             foreach (var p in parameters)
                 cost += 12 + p.Type.Length + p.Name.Length;
 
-            var (name, summary, description, tags) = rh.Metadata;
-            if (name is { Length: > 0 })
-                cost += 22 + name.Length;
-            if (summary is { Length: > 0 })
-                cost += 24 + summary.Length;
-            if (description is { Length: > 0 })
-                cost += 28 + description.Length;
+            var metadata = rh.Metadata;
+            if (metadata.Name is { Length: > 0 })
+                cost += 22 + metadata.Name.Length;
+            if (metadata.Summary is { Length: > 0 })
+                cost += 24 + metadata.Summary.Length;
+            if (metadata.Description is { Length: > 0 })
+                cost += 28 + metadata.Description.Length;
 
-            if (tags is { Count: > 0 })
-                cost += tags.Value.Sum(tag => 6 + tag.Length);
+            if (metadata.Tags is { Count: > 0 })
+                cost += metadata.Tags.Value.Sum(tag => 6 + tag.Length);
+
+            if (metadata.Accepts is { Count: > 0 })
+            {
+                foreach (var accepts in metadata.Accepts.Value)
+                {
+                    var additionalCost = accepts.AdditionalContentTypes is { Count: > 0 }
+                        ? accepts.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
+                        : 0;
+                    cost += 32 + accepts.RequestType.Length + accepts.ContentType.Length + additionalCost;
+                }
+            }
+
+            if (metadata.Produces is { Count: > 0 })
+            {
+                foreach (var produces in metadata.Produces.Value)
+                {
+                    var additionalCost = produces.AdditionalContentTypes is { Count: > 0 }
+                        ? produces.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
+                        : 0;
+                    var contentTypeLength = produces.ContentType?.Length ?? 0;
+                    cost += 40 + produces.ResponseType.Length + contentTypeLength + additionalCost;
+                }
+            }
+
+            if (metadata.ProducesProblem is { Count: > 0 })
+            {
+                foreach (var producesProblem in metadata.ProducesProblem.Value)
+                {
+                    var additionalCost = producesProblem.AdditionalContentTypes is { Count: > 0 }
+                        ? producesProblem.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
+                        : 0;
+                    var contentTypeLength = producesProblem.ContentType?.Length ?? 0;
+                    cost += 28 + contentTypeLength + additionalCost;
+                }
+            }
+
+            if (metadata.ProducesValidationProblem is { Count: > 0 })
+            {
+                foreach (var producesValidationProblem in metadata.ProducesValidationProblem.Value)
+                {
+                    var additionalCost = producesValidationProblem.AdditionalContentTypes is { Count: > 0 }
+                        ? producesValidationProblem.AdditionalContentTypes.Value.Sum(ct => 6 + ct.Length)
+                        : 0;
+                    var contentTypeLength = producesValidationProblem.ContentType?.Length ?? 0;
+                    cost += 32 + contentTypeLength + additionalCost;
+                }
+            }
 
             if (rh.RequireAuthorization)
                 cost += 24;
@@ -1220,6 +1825,28 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return sb.ToString();
     }
 
+    private static void AppendAdditionalContentTypes(StringBuilder source, EquatableImmutableArray<string>? additionalContentTypes)
+    {
+        if (additionalContentTypes is not { Count: > 0 })
+            return;
+
+        foreach (var additional in additionalContentTypes.Value)
+        {
+            source.Append(", ");
+            source.Append(StringLiteral(additional));
+        }
+    }
+
+    private static void AppendOptionalContentTypes(StringBuilder source, string? contentType, EquatableImmutableArray<string>? additionalContentTypes)
+    {
+        if (string.IsNullOrEmpty(contentType) && additionalContentTypes is not { Count: > 0 })
+            return;
+
+        source.Append(", ");
+        source.Append(contentType is { Length: > 0 } ? StringLiteral(contentType) : "null");
+        AppendAdditionalContentTypes(source, additionalContentTypes);
+    }
+
     private static string EscapeChar(char c)
     {
         return c switch
@@ -1256,7 +1883,29 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private readonly record struct RequestHandlerMethod(string Name, bool IsStatic, bool IsAwaitable, EquatableImmutableArray<Parameter> Parameters);
 
-    private readonly record struct RequestHandlerMetadata(string? Name, string? Summary, string? Description, EquatableImmutableArray<string>? Tags);
+    private readonly record struct RequestHandlerMetadata(
+        string? Name,
+        string? Summary,
+        string? Description,
+        EquatableImmutableArray<string>? Tags,
+        EquatableImmutableArray<AcceptsMetadata>? Accepts,
+        EquatableImmutableArray<ProducesMetadata>? Produces,
+        EquatableImmutableArray<ProducesProblemMetadata>? ProducesProblem,
+        EquatableImmutableArray<ProducesValidationProblemMetadata>? ProducesValidationProblem
+    );
+
+    private readonly record struct AcceptsMetadata(string RequestType, string ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
+
+    private readonly record struct ProducesMetadata(
+        string ResponseType,
+        int StatusCode,
+        string? ContentType,
+        EquatableImmutableArray<string>? AdditionalContentTypes
+    );
+
+    private readonly record struct ProducesProblemMetadata(int StatusCode, string? ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
+
+    private readonly record struct ProducesValidationProblemMetadata(int StatusCode, string? ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
 
     private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key);
 
