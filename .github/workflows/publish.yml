@@ -13,17 +13,14 @@ jobs:
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET 9.0
+      - name: Setup .NET 10.0
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.x
+          dotnet-version: 10.x
 
       - name: Restore dependencies
         run: dotnet restore

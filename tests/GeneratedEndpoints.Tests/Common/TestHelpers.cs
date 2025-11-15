@@ -9,22 +9,25 @@ public static class TestHelpers
 {
     public static GeneratorDriverRunResult RunGenerator(IEnumerable<string> sources)
     {
-        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp11).WithPreprocessorSymbols("NET7_0_OR_GREATER");
+        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp13);
         var cSharpCompilationOptions = new CSharpCompilationOptions(OutputKind.NetModule).WithNullableContextOptions(NullableContextOptions.Enable);
-        return IncrementalGenerator.Run<MinimalApiGenerator>(sources, cSharpParseOptions, ReferenceAssemblies.Net80, cSharpCompilationOptions);
+        var (diagnostics, result) = IncrementalGenerator.RunWithDiagnostics<MinimalApiGenerator>(sources, cSharpParseOptions, AspNet100.References.All, cSharpCompilationOptions);
+        return result;
     }
 
     public static IEnumerable<string> GetSources(string source, bool withNamespace)
     {
         const string usingStatements = """
-
+                                       using Microsoft.AspNetCore.Generated.Attributes;
+                                       using Microsoft.AspNetCore.Http;
+                                       using Microsoft.AspNetCore.Http.HttpResults;
                                        """;
 
         if (withNamespace)
             yield return $"""
                           {usingStatements}
 
-                          namespace EntityFrameworkGeneratorTests;
+                          namespace GeneratedEndpointsTests;
 
                           {source}
                           """;

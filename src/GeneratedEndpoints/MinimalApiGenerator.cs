@@ -1,7 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -296,11 +295,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
         var attribute = context.Attributes[0];
 
-        var requestHandlerClassResult = GetRequestHandlerClass(
-            requestHandlerMethodSymbol,
-            context.SemanticModel.Compilation,
-            cancellationToken
-        );
+        var requestHandlerClassResult = GetRequestHandlerClass(requestHandlerMethodSymbol, context.SemanticModel.Compilation, cancellationToken);
         if (requestHandlerClassResult is null)
             return null;
 
@@ -516,8 +511,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var isStatic = classSymbol.IsStatic;
-        var endpointConventionBuilderSymbol =
-            compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
+        var endpointConventionBuilderSymbol = compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
         var hasConfigureMethod = ContainsConfigureMethod(classSymbol, endpointConventionBuilderSymbol, cancellationToken);
 
         var requestHandlerClass = new RequestHandlerClass(name, isStatic, hasConfigureMethod);
@@ -549,7 +543,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static bool IsConfigureMethod(IMethodSymbol methodSymbol, INamedTypeSymbol? endpointConventionBuilderSymbol)
     {
-        if (!methodSymbol.IsStatic || !methodSymbol.IsExtensionMethod)
+        if (!methodSymbol.IsStatic)
             return false;
 
         if (methodSymbol.TypeParameters.Length != 1)
@@ -564,7 +558,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (!SymbolEqualityComparer.Default.Equals(builderParameter.Type, builderTypeParameter))
             return false;
 
-        if (!SymbolEqualityComparer.Default.Equals(methodSymbol.ReturnType, builderTypeParameter))
+        if (!methodSymbol.ReturnsVoid)
             return false;
 
         if (!HasEndpointConventionBuilderConstraint(builderTypeParameter, methodSymbol, endpointConventionBuilderSymbol))
@@ -579,8 +573,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         INamedTypeSymbol? endpointConventionBuilderSymbol
     )
     {
-        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(
-            constraint => endpointConventionBuilderSymbol is not null
+        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(constraint =>
+            endpointConventionBuilderSymbol is not null
                 ? SymbolEqualityComparer.Default.Equals(constraint, endpointConventionBuilderSymbol)
                 : MatchesEndpointConventionBuilder(constraint)
         );
@@ -763,6 +757,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.AppendLine();
 
         source.AppendLine("using Microsoft.AspNetCore.Builder;");
+        source.AppendLine("using Microsoft.AspNetCore.Http;");
         source.AppendLine("using Microsoft.AspNetCore.Mvc;");
         source.AppendLine("using Microsoft.AspNetCore.Routing;");
         source.AppendLine("using Microsoft.Extensions.DependencyInjection;");
