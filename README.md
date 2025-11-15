@@ -163,9 +163,15 @@ Some scenarios require direct access to the `IEndpointConventionBuilder` that Mi
 ```csharp
 public static void Configure<TBuilder>(TBuilder builder)
     where TBuilder : IEndpointConventionBuilder
+
+// or, when you need to resolve services while configuring
+public static void Configure<TBuilder>(TBuilder builder, IServiceProvider serviceProvider)
+    where TBuilder : IEndpointConventionBuilder
 ```
 
 When the generator detects this method on a handler class it will automatically wrap every mapped endpoint from the class in a `.Configure(...)` call that invokes your method. You can use the provided builder to apply conventions that are difficult or impossible to express via attributes alone.
+
+If you include the optional `IServiceProvider` parameter, the generator passes the `IEndpointRouteBuilder.ServiceProvider` from the `MapEndpointHandlers` call. This makes it easy to resolve scoped services or other helpers needed to configure filters, OpenAPI metadata, or custom conventions without manually re-wiring the app's service provider.
 
 ```csharp
 using Microsoft.AspNetCore.Builder;

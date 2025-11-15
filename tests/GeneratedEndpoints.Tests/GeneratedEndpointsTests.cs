@@ -39,4 +39,34 @@ public class GeneratedEndpointsTests
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{nameof(MapGet)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MapGetWithConfigureServiceProvider(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             using Microsoft.AspNetCore.Builder;
+
+                                             internal static class ConfigureEndpoint
+                                             {
+                                                 [MapGet("/service-provider")]
+                                                 public static Ok Handle()
+                                                     => TypedResults.Ok();
+
+                                                 public static void Configure<TBuilder>(TBuilder builder, System.IServiceProvider serviceProvider)
+                                                     where TBuilder : IEndpointConventionBuilder
+                                                 {
+                                                     _ = serviceProvider;
+                                                     builder.WithMetadata(new object());
+                                                 }
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(MapGetWithConfigureServiceProvider)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
 }
