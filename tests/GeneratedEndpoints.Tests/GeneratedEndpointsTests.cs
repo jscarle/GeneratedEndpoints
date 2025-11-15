@@ -217,6 +217,68 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task ShortCircuitAndRequestTimeoutAttributes(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             [ShortCircuit]
+                                             [WithRequestTimeout]
+                                             internal static class ClassLevelTimeoutEndpoints
+                                             {
+                                                 [MapGet("/timeouts/class-default")]
+                                                 public static Ok ClassDefault()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/timeouts/class-override")]
+                                                 [WithRequestTimeout("ClassPolicy")]
+                                                 public static Ok ClassOverride()
+                                                     => TypedResults.Ok();
+                                             }
+
+                                             [DisableRequestTimeout]
+                                             internal static class ClassLevelDisableRequestTimeoutEndpoints
+                                             {
+                                                 [MapGet("/timeouts/class-disable")]
+                                                 public static Ok ClassDisable()
+                                                     => TypedResults.Ok();
+                                             }
+
+                                             internal static class MethodLevelTimeoutEndpoints
+                                             {
+                                                 [MapGet("/timeouts/method-disable")]
+                                                 [DisableRequestTimeout]
+                                                 public static Ok MethodDisable()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/timeouts/method-default")]
+                                                 [WithRequestTimeout]
+                                                 public static Ok MethodWithDefault()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/timeouts/method-policy")]
+                                                 [WithRequestTimeout("MethodPolicy")]
+                                                 public static Ok MethodWithPolicy()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/timeouts/method-short")]
+                                                 [ShortCircuit]
+                                                 public static Ok MethodShortCircuit()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("AddEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(ShortCircuitAndRequestTimeoutAttributes)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(ShortCircuitAndRequestTimeoutAttributes)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task ConfigureRegistersEndpointFilters(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
