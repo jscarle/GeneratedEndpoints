@@ -14,7 +14,7 @@ by keeping endpoint definitions inside their features while generating the boile
   injection.
 * **Metadata composition** – mix class-level and method-level attributes for tags, authorization requirements, content
   negotiation, and antiforgery/anonymous settings. The generator merges everything into the produced endpoint builder.
-* **Rich request/response contracts** – describe the shape of your API surface with `[Accepts]`, `[Produces]`, `[ProducesProblem]`,
+* **Rich request/response contracts** – describe the shape of your API surface with `[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`,
   and `[ProducesValidationProblem]` so OpenAPI and client tooling stay accurate.
 * **Minimal boilerplate** – `AddEndpointHandlers` auto-registers instance handlers with DI, and `MapEndpointHandlers`
   registers every attribute-decorated method.
@@ -216,7 +216,7 @@ public sealed class CreateTodo
 
 The method is only generated once per handler class, so any conventions you add will automatically flow to all endpoints defined within that class.
 
-### 5. Describe contracts with `Accepts` and `Produces`
+### 5. Describe contracts with `Accepts` and `ProducesResponse`
 
 GeneratedEndpoints ships with helper attributes for request and response metadata. Apply them to either a handler class or
 individual methods to keep your OpenAPI description in sync with the implementation. Attributes on the class are merged into
@@ -229,7 +229,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace Todos.Features;
 
 [Accepts<CreateTodoRequest>("application/json", "application/xml")]
-[Produces<Todo>(StatusCodes.Status201Created)]
+[ProducesResponse<Todo>(StatusCodes.Status201Created)]
 [ProducesProblem(StatusCodes.Status500InternalServerError)]
 public sealed class CreateTodo
 {
@@ -253,7 +253,7 @@ calls on the endpoint builder.
 | `[AllowAnonymous]` | Class or method | Explicitly opts a method (or all methods in a class) into anonymous access, overriding `[RequireAuthorization]`. |
 | `[DisableAntiforgery]` | Class or method | Calls `.DisableAntiforgery()` on the generated endpoint, matching the ASP.NET Core extension. |
 | `[Accepts]` / `[Accepts<TRequest>]` | Class or method | Emits `.Accepts<TRequest>(contentType, additionalContentTypes...)` to document supported request bodies. Multiple attributes are allowed per endpoint. |
-| `[Produces]` / `[Produces<TResponse>]` | Class or method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. Multiple attributes are allowed. |
+| `[ProducesResponse]` / `[ProducesResponse<TResponse>]` | Class or method | Emits `.Produces<TResponse>(statusCode, contentTypes...)` for each documented response type. Multiple attributes are allowed. |
 | `[ProducesProblem]` | Class or method | Emits `.ProducesProblem(statusCode, contentTypes...)` for endpoints that return RFC 7807 problem details. |
 | `[ProducesValidationProblem]` | Class or method | Emits `.ProducesValidationProblem(statusCode, contentTypes...)` when validation failures are returned. |
 

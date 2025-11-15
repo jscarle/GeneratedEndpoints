@@ -116,7 +116,7 @@ public class GeneratedEndpointsTests
                                              [RequireAuthorization("PolicyA", "PolicyB")]
                                              [DisableAntiforgery]
                                              [Accepts(typeof(ClassLevelRequest), "application/xml", "text/xml")]
-                                             [Microsoft.AspNetCore.Generated.Attributes.Produces(typeof(ClassLevelResponse), 201, "application/json", "text/json")]
+                                               [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse(typeof(ClassLevelResponse), 201, "application/json", "text/json")]
                                              [ProducesProblem(503, "application/problem+json")]
                                              [ProducesValidationProblem(409, "application/problem+json", "text/plain")]
                                              internal sealed class ComplexEndpoints
@@ -138,7 +138,7 @@ public class GeneratedEndpointsTests
                                                  [Tags("MethodLevel")]
                                                  [RequireAuthorization("MethodPolicy")]
                                                  [Accepts<GetRequest>("application/custom", "text/custom")]
-                                                 [Microsoft.AspNetCore.Generated.Attributes.Produces<GetResponse>(200, "application/json", "text/json")]
+                                                   [Microsoft.AspNetCore.Generated.Attributes.ProducesResponse<GetResponse>(200, "application/json", "text/json")]
                                                  [ProducesProblem(400, "application/problem+json", "text/plain")]
                                                  [ProducesValidationProblem(422, "application/problem+json", "text/plain")]
                                                  public async Task<Results<Ok<GetResponse>, NotFound>> GetComplex(
