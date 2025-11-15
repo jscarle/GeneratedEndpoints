@@ -80,6 +80,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string WithOrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithOrderAttributeName}";
     private const string WithOrderAttributeHint = $"{WithOrderAttributeFullyQualifiedName}.gs.cs";
 
+    private const string WithGroupNameAttributeName = "WithGroupNameAttribute";
+    private const string WithGroupNameAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithGroupNameAttributeName}";
+    private const string WithGroupNameAttributeHint = $"{WithGroupNameAttributeFullyQualifiedName}.gs.cs";
+
     private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
 
     private const string EndpointFilterAttributeName = "EndpointFilterAttribute";
@@ -401,6 +405,36 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                                """;
         context.AddSource(WithOrderAttributeHint, SourceText.From(withOrderSource, Encoding.UTF8));
+
+        // WithGroupName
+        var withGroupNameSource = $$"""
+                                   {{FileHeader}}
+
+                                   namespace {{AttributesNamespace}};
+
+                                   /// <summary>
+                                   /// Specifies the endpoint group name for the annotated class.
+                                   /// </summary>
+                                   [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+                                   internal sealed class {{WithGroupNameAttributeName}} : global::System.Attribute
+                                   {
+                                       /// <summary>
+                                       /// Gets the endpoint group name.
+                                       /// </summary>
+                                       public string EndpointGroupName { get; }
+
+                                       /// <summary>
+                                       /// Initializes a new instance of the <see cref="{{WithGroupNameAttributeName}}"/> class.
+                                       /// </summary>
+                                       /// <param name="endpointGroupName">The endpoint group name to apply.</param>
+                                       public {{WithGroupNameAttributeName}}(string endpointGroupName)
+                                       {
+                                           EndpointGroupName = endpointGroupName;
+                                       }
+                                   }
+
+                                   """;
+        context.AddSource(WithGroupNameAttributeHint, SourceText.From(withGroupNameSource, Encoding.UTF8));
 
         // Accepts
         var acceptsSource = $$"""
@@ -789,7 +823,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requireRateLimiting,
                 rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-                requestTimeoutPolicyName, order)
+                requestTimeoutPolicyName, order, endpointGroupName)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -809,7 +843,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
             authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requireRateLimiting,
             rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-            requestTimeoutPolicyName, order
+            requestTimeoutPolicyName, order, endpointGroupName
         );
 
         return requestHandler;
@@ -889,7 +923,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool disableRequestTimeout,
         bool withRequestTimeout,
         string? requestTimeoutPolicyName,
-        int? order
+        int? order,
+        string? endpointGroupName
     ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -910,6 +945,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool? withRequestTimeout = null;
         string? requestTimeoutPolicyName = null;
         int? order = null;
+        string? endpointGroupName = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -942,7 +978,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref disableRequestTimeout,
             ref withRequestTimeout,
             ref requestTimeoutPolicyName,
-            ref order
+            ref order,
+            ref endpointGroupName
         );
 
         var methodAttributes = methodSymbol.GetAttributes();
@@ -971,7 +1008,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref disableRequestTimeout,
             ref withRequestTimeout,
             ref requestTimeoutPolicyName,
-            ref order
+            ref order,
+            ref endpointGroupName
         );
 
         if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
@@ -997,7 +1035,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             disableRequestTimeout ?? false,
             withRequestTimeout ?? false,
             (withRequestTimeout ?? false) ? requestTimeoutPolicyName : null,
-            order
+            order,
+            endpointGroupName
         );
     }
 
@@ -1024,7 +1063,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref bool? disableRequestTimeout,
         ref bool? withRequestTimeout,
         ref string? requestTimeoutPolicyName,
-        ref int? order
+        ref int? order,
+        ref string? endpointGroupName
     )
     {
         foreach (var attribute in attributes)
@@ -1066,6 +1106,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             {
                 if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
                     order = orderValue;
+
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, WithGroupNameAttributeName))
+            {
+                if (attribute.ConstructorArguments.Length > 0)
+                {
+                    var groupName = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
+                    if (!string.IsNullOrEmpty(groupName))
+                        endpointGroupName = groupName;
+                }
 
                 continue;
             }
@@ -2023,6 +2075,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
+        if (!string.IsNullOrEmpty(requestHandler.EndpointGroupName))
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".WithGroupName(");
+            source.Append(StringLiteral(requestHandler.EndpointGroupName));
+            source.Append(')');
+        }
+
         if (requestHandler.Order is { } orderValue)
         {
             source.AppendLine();
@@ -2441,7 +2502,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool DisableRequestTimeout,
         bool WithRequestTimeout,
         string? RequestTimeoutPolicyName,
-        int? Order
+        int? Order,
+        string? EndpointGroupName
     );
 
     private readonly record struct RequestHandlerClass(
