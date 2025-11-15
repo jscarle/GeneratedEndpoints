@@ -710,11 +710,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         cancellationToken.ThrowIfCancellationRequested();
 
         EquatableImmutableArray<string>? tags = null;
-        var requireAuthorization = false;
+        bool? requireAuthorization = null;
         EquatableImmutableArray<string>? authorizationPolicies = null;
-        var disableAntiforgery = false;
-        var allowAnonymous = false;
-        var excludeFromDescription = false;
+        bool? disableAntiforgery = null;
+        bool? allowAnonymous = null;
+        bool? excludeFromDescription = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -722,6 +722,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         List<ProducesValidationProblemMetadata>? producesValidationProblem = null;
 
         var classAttributes = classSymbol.GetAttributes();
+        var classHasAllowAnonymousAttribute = false;
+        var classHasRequireAuthorizationAttribute = false;
         GetAdditionalRequestHandlerAttributeValues(
             classAttributes,
             ref tags,
@@ -733,10 +735,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref accepts,
             ref produces,
             ref producesProblem,
-            ref producesValidationProblem
+            ref producesValidationProblem,
+            ref classHasAllowAnonymousAttribute,
+            ref classHasRequireAuthorizationAttribute
         );
 
         var methodAttributes = methodSymbol.GetAttributes();
+        var methodHasAllowAnonymousAttribute = false;
+        var methodHasRequireAuthorizationAttribute = false;
         GetAdditionalRequestHandlerAttributeValues(
             methodAttributes,
             ref tags,
@@ -748,16 +754,21 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref accepts,
             ref produces,
             ref producesProblem,
-            ref producesValidationProblem
+            ref producesValidationProblem,
+            ref methodHasAllowAnonymousAttribute,
+            ref methodHasRequireAuthorizationAttribute
         );
+
+        if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
+            allowAnonymous = false;
 
         return (
             tags,
-            requireAuthorization,
+            requireAuthorization ?? false,
             authorizationPolicies,
-            disableAntiforgery,
-            allowAnonymous,
-            excludeFromDescription,
+            disableAntiforgery ?? false,
+            allowAnonymous ?? false,
+            excludeFromDescription ?? false,
             ToEquatableOrNull(accepts),
             ToEquatableOrNull(produces),
             ToEquatableOrNull(producesProblem),
@@ -768,15 +779,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static void GetAdditionalRequestHandlerAttributeValues(
         ImmutableArray<AttributeData> attributes,
         ref EquatableImmutableArray<string>? tags,
-        ref bool requireAuthorization,
+        ref bool? requireAuthorization,
         ref EquatableImmutableArray<string>? authorizationPolicies,
-        ref bool disableAntiforgery,
-        ref bool allowAnonymous,
-        ref bool excludeFromDescription,
+        ref bool? disableAntiforgery,
+        ref bool? allowAnonymous,
+        ref bool? excludeFromDescription,
         ref List<AcceptsMetadata>? accepts,
         ref List<ProducesMetadata>? produces,
         ref List<ProducesProblemMetadata>? producesProblem,
-        ref List<ProducesValidationProblemMetadata>? producesValidationProblem
+        ref List<ProducesValidationProblemMetadata>? producesValidationProblem,
+        ref bool hasAllowAnonymousAttribute,
+        ref bool hasRequireAuthorizationAttribute
     )
     {
         foreach (var attribute in attributes)
@@ -818,6 +831,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     break;
                 case $"global::{RequireAuthorizationAttributeFullyQualifiedName}":
                     requireAuthorization = true;
+                    hasRequireAuthorizationAttribute = true;
                     if (attribute.ConstructorArguments.Length == 1)
                     {
                         var arg = attribute.ConstructorArguments[0];
@@ -837,6 +851,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     break;
                 case $"global::{AllowAnonymousAttributeFullyQualifiedName}":
                     allowAnonymous = true;
+                    hasAllowAnonymousAttribute = true;
                     break;
                 case "global::Microsoft.AspNetCore.Routing.ExcludeFromDescriptionAttribute":
                     excludeFromDescription = true;

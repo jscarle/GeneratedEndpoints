@@ -102,6 +102,29 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task ClassAllowAnonymousMethodRequireAuthorization(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             [AllowAnonymous]
+                                             internal sealed class AllowAnonymousClass
+                                             {
+                                                 [MapGet("/allow-anon")]
+                                                 [RequireAuthorization]
+                                                 public static Ok Handle()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(ClassAllowAnonymousMethodRequireAuthorization)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task MapAllAttributesAndHttpMethods(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
