@@ -369,7 +369,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 /// <summary>
                                 /// Gets the response type produced by the endpoint.
                                 /// </summary>
-                                public global::System.Type ResponseType { get; init; } = default!;
+                                public global::System.Type? ResponseType { get; init; } = null;
 
                                     /// <summary>
                                     /// Gets the HTTP status code returned by the endpoint.
