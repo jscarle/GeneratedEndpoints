@@ -125,6 +125,55 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task RequireCorsAttributes(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             internal sealed class CorsEndpoints
+                                             {
+                                                 [MapGet("/cors/default")]
+                                                 [RequireCors]
+                                                 public static Ok GetDefault()
+                                                     => TypedResults.Ok();
+
+                                                 [MapGet("/cors/named")]
+                                                 [RequireCors("NamedCorsPolicy")]
+                                                 public static Ok GetNamed()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(RequireCorsAttributes)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RequireRateLimitingAttribute(bool withNamespace)
+    {
+        var sources = TestHelpers.GetSources("""
+                                             internal sealed class RateLimitedEndpoints
+                                             {
+                                                 [MapGet("/rate-limited")]
+                                                 [RequireRateLimiting("NamedRateLimitPolicy")]
+                                                 public static Ok Get()
+                                                     => TypedResults.Ok();
+                                             }
+                                             """, withNamespace
+        );
+
+        var result = TestHelpers.RunGenerator(sources);
+
+        await result.VerifyAsync("MapEndpointHandlers.g.cs")
+            .UseMethodName($"{nameof(RequireRateLimitingAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task BindingAttributeNamesArePreserved(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""

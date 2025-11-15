@@ -47,6 +47,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";
     private const string RequireAuthorizationAttributeHint = $"{RequireAuthorizationAttributeFullyQualifiedName}.gs.cs";
 
+    private const string RequireCorsAttributeName = "RequireCorsAttribute";
+    private const string RequireCorsAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireCorsAttributeName}";
+    private const string RequireCorsAttributeHint = $"{RequireCorsAttributeFullyQualifiedName}.gs.cs";
+
+    private const string RequireRateLimitingAttributeName = "RequireRateLimitingAttribute";
+    private const string RequireRateLimitingAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireRateLimitingAttributeName}";
+    private const string RequireRateLimitingAttributeHint = $"{RequireRateLimitingAttributeFullyQualifiedName}.gs.cs";
+
     private const string DisableAntiforgeryAttributeName = "DisableAntiforgeryAttribute";
     private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
     private const string DisableAntiforgeryAttributeHint = $"{DisableAntiforgeryAttributeFullyQualifiedName}.gs.cs";
@@ -184,6 +192,70 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                            }
                                            """;
         context.AddSource(RequireAuthorizationAttributeHint, SourceText.From(requireAuthorizationSource, Encoding.UTF8));
+
+        // RequireCors
+        var requireCorsSource = $$"""
+                                 {{FileHeader}}
+
+                                 namespace {{AttributesNamespace}};
+
+                                 /// <summary>
+                                 /// Specifies that the annotated endpoint requires a configured CORS policy.
+                                 /// </summary>
+                                 [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                 internal sealed class {{RequireCorsAttributeName}} : global::System.Attribute
+                                 {
+                                     /// <summary>
+                                     /// Gets the optional CORS policy name.
+                                     /// </summary>
+                                     public string? PolicyName { get; }
+
+                                     /// <summary>
+                                     /// Marks the endpoint or class as requiring the default CORS policy.
+                                     /// </summary>
+                                     public {{RequireCorsAttributeName}}()
+                                     {
+                                     }
+
+                                     /// <summary>
+                                     /// Marks the endpoint or class as requiring the specified named CORS policy.
+                                     /// </summary>
+                                     public {{RequireCorsAttributeName}}(string policyName)
+                                     {
+                                         PolicyName = policyName;
+                                     }
+                                 }
+                                 """;
+        context.AddSource(RequireCorsAttributeHint, SourceText.From(requireCorsSource, Encoding.UTF8));
+
+        // RequireRateLimiting
+        var requireRateLimitingSource = $$"""
+                                        {{FileHeader}}
+
+                                        namespace {{AttributesNamespace}};
+
+                                        /// <summary>
+                                        /// Specifies that the annotated endpoint requires the provided rate limiting policy.
+                                        /// </summary>
+                                        [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                        internal sealed class {{RequireRateLimitingAttributeName}} : global::System.Attribute
+                                        {
+                                            /// <summary>
+                                            /// Initializes a new instance of the <see cref="{{RequireRateLimitingAttributeName}}"/> class.
+                                            /// </summary>
+                                            /// <param name="policyName">The rate limiting policy to apply.</param>
+                                            public {{RequireRateLimitingAttributeName}}(string policyName)
+                                            {
+                                                PolicyName = policyName;
+                                            }
+
+                                            /// <summary>
+                                            /// Gets the rate limiting policy name.
+                                            /// </summary>
+                                            public string PolicyName { get; }
+                                        }
+                                        """;
+        context.AddSource(RequireRateLimitingAttributeHint, SourceText.From(requireRateLimitingSource, Encoding.UTF8));
 
         // DisableAntiforgery
         var disableAntiforgerySource = $$"""
@@ -538,7 +610,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var (httpMethod, pattern, name, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
-                accepts, produces, producesProblem, producesValidationProblem)
+                accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requireRateLimiting,
+                rateLimitingPolicyName)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -556,7 +629,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         );
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
-            authorizationPolicies, disableAntiforgery, allowAnonymous
+            authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requireRateLimiting,
+            rateLimitingPolicyName
         );
 
         return requestHandler;
@@ -626,7 +700,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         EquatableImmutableArray<AcceptsMetadata>? accepts,
         EquatableImmutableArray<ProducesMetadata>? produces,
         EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
-        EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem
+        EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem,
+        bool requireCors,
+        string? corsPolicyName,
+        bool requireRateLimiting,
+        string? rateLimitingPolicyName
     ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -637,6 +715,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool? disableAntiforgery = null;
         bool? allowAnonymous = null;
         bool? excludeFromDescription = null;
+        bool? requireCors = null;
+        string? corsPolicyName = null;
+        bool? requireRateLimiting = null;
+        string? rateLimitingPolicyName = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -658,6 +740,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref produces,
             ref producesProblem,
             ref producesValidationProblem,
+            ref requireCors,
+            ref corsPolicyName,
+            ref requireRateLimiting,
+            ref rateLimitingPolicyName,
             ref classHasAllowAnonymousAttribute,
             ref classHasRequireAuthorizationAttribute
         );
@@ -677,6 +763,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref produces,
             ref producesProblem,
             ref producesValidationProblem,
+            ref requireCors,
+            ref corsPolicyName,
+            ref requireRateLimiting,
+            ref rateLimitingPolicyName,
             ref methodHasAllowAnonymousAttribute,
             ref methodHasRequireAuthorizationAttribute
         );
@@ -694,7 +784,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ToEquatableOrNull(accepts),
             ToEquatableOrNull(produces),
             ToEquatableOrNull(producesProblem),
-            ToEquatableOrNull(producesValidationProblem)
+            ToEquatableOrNull(producesValidationProblem),
+            requireCors ?? false,
+            corsPolicyName,
+            requireRateLimiting ?? false,
+            rateLimitingPolicyName
         );
     }
 
@@ -710,6 +804,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref List<ProducesMetadata>? produces,
         ref List<ProducesProblemMetadata>? producesProblem,
         ref List<ProducesValidationProblemMetadata>? producesValidationProblem,
+        ref bool? requireCors,
+        ref string? corsPolicyName,
+        ref bool? requireRateLimiting,
+        ref string? rateLimitingPolicyName,
         ref bool hasAllowAnonymousAttribute,
         ref bool hasRequireAuthorizationAttribute
     )
@@ -767,6 +865,30 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                         MergeInto(ref authorizationPolicies, values);
                     }
+                }
+
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, RequireCorsAttributeName))
+            {
+                requireCors = true;
+                corsPolicyName = attribute.ConstructorArguments.Length > 0
+                    ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
+                    : null;
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, RequireRateLimitingAttributeName))
+            {
+                var policyName = attribute.ConstructorArguments.Length > 0
+                    ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
+                    : null;
+
+                if (!string.IsNullOrEmpty(policyName))
+                {
+                    requireRateLimiting = true;
+                    rateLimitingPolicyName = policyName;
                 }
 
                 continue;
@@ -845,6 +967,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static string? NormalizeOptionalContentType(string? contentType)
     {
         return string.IsNullOrWhiteSpace(contentType) ? null : contentType!.Trim();
+    }
+
+    private static string? NormalizeOptionalString(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
     }
 
     private static EquatableImmutableArray<string>? GetStringArrayValues(TypedConstant typedConstant)
@@ -1384,6 +1511,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.AppendLine("using Microsoft.AspNetCore.Http;");
         source.AppendLine("using Microsoft.AspNetCore.Mvc;");
         source.AppendLine("using Microsoft.AspNetCore.Routing;");
+        if (requestHandlers.Any(static handler => handler.RequireRateLimiting))
+            source.AppendLine("using Microsoft.AspNetCore.RateLimiting;");
         source.AppendLine("using Microsoft.Extensions.DependencyInjection;");
         source.AppendLine();
 
@@ -1614,6 +1743,31 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(continuationIndent);
                 source.Append(".RequireAuthorization()");
             }
+        }
+
+        if (requestHandler.RequireCors)
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            if (!string.IsNullOrEmpty(requestHandler.CorsPolicyName))
+            {
+                source.Append(".RequireCors(");
+                source.Append(StringLiteral(requestHandler.CorsPolicyName));
+                source.Append(')');
+            }
+            else
+            {
+                source.Append(".RequireCors()");
+            }
+        }
+
+        if (requestHandler.RequireRateLimiting && !string.IsNullOrEmpty(requestHandler.RateLimitingPolicyName))
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".RequireRateLimiting(");
+            source.Append(StringLiteral(requestHandler.RateLimitingPolicyName));
+            source.Append(')');
         }
 
         if (requestHandler.DisableAntiforgery)
@@ -1849,7 +2003,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool RequireAuthorization,
         EquatableImmutableArray<string>? AuthorizationPolicies,
         bool DisableAntiforgery,
-        bool AllowAnonymous
+        bool AllowAnonymous,
+        bool RequireCors,
+        string? CorsPolicyName,
+        bool RequireRateLimiting,
+        string? RateLimitingPolicyName
     );
 
     private readonly record struct RequestHandlerClass(
