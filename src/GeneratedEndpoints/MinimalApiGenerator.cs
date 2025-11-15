@@ -67,9 +67,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
     private const string DisableAntiforgeryAttributeHint = $"{DisableAntiforgeryAttributeFullyQualifiedName}.gs.cs";
 
-    private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
-    private const string AllowAnonymousAttributeFullyQualifiedName = $"{AttributesNamespace}.{AllowAnonymousAttributeName}";
-    private const string AllowAnonymousAttributeHint = $"{AllowAnonymousAttributeFullyQualifiedName}.gs.cs";
+    private const string AllowAnonymousAttributeFullyQualifiedName = "Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute";
 
     private const string AcceptsAttributeName = "AcceptsAttribute";
     private const string AcceptsAttributeFullyQualifiedName = $"{AttributesNamespace}.{AcceptsAttributeName}";
@@ -266,23 +264,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                                          """;
         context.AddSource(DisableAntiforgeryAttributeHint, SourceText.From(disableAntiforgerySource, Encoding.UTF8));
-
-        // AllowAnonymous
-        var allowAnonymousSource = $$"""
-                                     {{FileHeader}}
-
-                                     namespace {{AttributesNamespace}};
-
-                                     /// <summary>
-                                     /// Allows the annotated endpoint or class to bypass authorization requirements.
-                                     /// </summary>
-                                     [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                     internal sealed class {{AllowAnonymousAttributeName}} : global::System.Attribute
-                                     {
-                                     }
-
-                                     """;
-        context.AddSource(AllowAnonymousAttributeHint, SourceText.From(allowAnonymousSource, Encoding.UTF8));
 
         // Accepts
         var acceptsSource = $$"""
