@@ -73,9 +73,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string AcceptsAttributeFullyQualifiedName = $"{AttributesNamespace}.{AcceptsAttributeName}";
     private const string AcceptsAttributeHint = $"{AcceptsAttributeFullyQualifiedName}.gs.cs";
 
-    private const string ProducesAttributeName = "ProducesAttribute";
-    private const string ProducesAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesAttributeName}";
-    private const string ProducesAttributeHint = $"{ProducesAttributeFullyQualifiedName}.gs.cs";
+    private const string ProducesResponseAttributeName = "ProducesResponseAttribute";
+    private const string ProducesResponseAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesResponseAttributeName}";
+    private const string ProducesResponseAttributeHint = $"{ProducesResponseAttributeFullyQualifiedName}.gs.cs";
 
     private const string ProducesProblemAttributeName = "ProducesProblemAttribute";
     private const string ProducesProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesProblemAttributeName}";
@@ -353,7 +353,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
                                 /// </summary>
                                 [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                                internal sealed class {{ProducesAttributeName}} : global::System.Attribute
+                                internal sealed class {{ProducesResponseAttributeName}} : global::System.Attribute
                                 {
                                     /// <summary>
                                     /// Gets the response type produced by the endpoint.
@@ -376,13 +376,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                     public string[] AdditionalContentTypes { get; }
 
                                     /// <summary>
-                                    /// Initializes a new instance of the <see cref="{{ProducesAttributeName}}"/> class.
+                                    /// Initializes a new instance of the <see cref="{{ProducesResponseAttributeName}}"/> class.
                                     /// </summary>
                                     /// <param name="responseType">The CLR type of the response body.</param>
                                     /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
                                     /// <param name="contentType">The primary content type produced by the endpoint.</param>
                                     /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                    public {{ProducesAttributeName}}(global::System.Type responseType, int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
+                                    public {{ProducesResponseAttributeName}}(global::System.Type responseType, int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
                                     {
                                         ResponseType = responseType ?? throw new global::System.ArgumentNullException(nameof(responseType));
                                         StatusCode = statusCode;
@@ -396,7 +396,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 /// </summary>
                                 /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
                                 [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                                internal sealed class {{ProducesAttributeName}}<TResponse> : global::System.Attribute
+                                internal sealed class {{ProducesResponseAttributeName}}<TResponse> : global::System.Attribute
                                 {
                                     /// <summary>
                                     /// Gets the response type produced by the endpoint.
@@ -424,7 +424,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                     /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
                                     /// <param name="contentType">The primary content type produced by the endpoint.</param>
                                     /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                    public {{ProducesAttributeName}}(int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
+                                    public {{ProducesResponseAttributeName}}(int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
                                     {
                                         StatusCode = statusCode;
                                         ContentType = contentType;
@@ -433,7 +433,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 }
 
                                 """;
-        context.AddSource(ProducesAttributeHint, SourceText.From(producesSource, Encoding.UTF8));
+        context.AddSource(ProducesResponseAttributeHint, SourceText.From(producesSource, Encoding.UTF8));
 
         // ProducesProblem
         var producesProblemSource = $$"""
@@ -776,7 +776,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(fullyQualifiedName, ProducesAttributeName))
+            if (IsGeneratedAttribute(fullyQualifiedName, ProducesResponseAttributeName))
             {
                 TryAddProducesMetadata(attribute, attributeClass, ref produces);
                 continue;
