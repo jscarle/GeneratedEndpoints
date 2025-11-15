@@ -606,7 +606,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem)
-            = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
+            = GetAdditionalRequestHandlerAttributes(
+                requestHandlerClassSymbol,
+                requestHandlerMethodSymbol,
+                context.SemanticModel.Compilation,
+                cancellationToken
+            );
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
 
@@ -705,9 +710,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         EquatableImmutableArray<ProducesMetadata>? produces,
         EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
         EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem
-    ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    ) GetAdditionalRequestHandlerAttributes(
+        INamedTypeSymbol classSymbol,
+        IMethodSymbol methodSymbol,
+        Compilation compilation,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        var attributeSymbols = GetAdditionalRequestHandlerAttributeSymbols(compilation);
 
         EquatableImmutableArray<string>? tags = null;
         var requireAuthorization = false;
@@ -724,6 +735,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var classAttributes = classSymbol.GetAttributes();
         GetAdditionalRequestHandlerAttributeValues(
             classAttributes,
+            attributeSymbols,
             ref tags,
             ref requireAuthorization,
             ref authorizationPolicies,
@@ -739,6 +751,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var methodAttributes = methodSymbol.GetAttributes();
         GetAdditionalRequestHandlerAttributeValues(
             methodAttributes,
+            attributeSymbols,
             ref tags,
             ref requireAuthorization,
             ref authorizationPolicies,
@@ -767,6 +780,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GetAdditionalRequestHandlerAttributeValues(
         ImmutableArray<AttributeData> attributes,
+        AdditionalRequestHandlerAttributeSymbols attributeSymbols,
         ref EquatableImmutableArray<string>? tags,
         ref bool requireAuthorization,
         ref EquatableImmutableArray<string>? authorizationPolicies,
@@ -785,94 +799,108 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (attributeClass is null)
                 continue;
 
-            var fullyQualifiedName = attributeClass.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-
-            if (IsGeneratedAttribute(fullyQualifiedName, AcceptsAttributeName))
+            if (IsGeneratedAttribute(attributeClass, attributeSymbols.AcceptsAttribute)
+                || IsGeneratedAttribute(attributeClass, attributeSymbols.AcceptsAttributeOfT, matchOriginalDefinition: true))
             {
                 TryAddAcceptsMetadata(attribute, attributeClass, ref accepts);
                 continue;
             }
 
-            if (IsGeneratedAttribute(fullyQualifiedName, ProducesResponseAttributeName))
+            if (IsGeneratedAttribute(attributeClass, attributeSymbols.ProducesResponseAttribute)
+                || IsGeneratedAttribute(attributeClass, attributeSymbols.ProducesResponseAttributeOfT, matchOriginalDefinition: true))
             {
                 TryAddProducesMetadata(attribute, attributeClass, ref produces);
                 continue;
             }
 
-            switch (fullyQualifiedName)
+            if (IsAttribute(attributeClass, attributeSymbols.TagsAttribute))
             {
-                case "global::Microsoft.AspNetCore.Http.TagsAttribute":
-                    if (attribute.ConstructorArguments.Length > 0)
-                    {
-                        var arg = attribute.ConstructorArguments[0];
-                        if (arg.Values.Length > 0)
-                        {
-                            var values = arg.Values
-                                .Select(v => v.Value as string)
-                                .Where(s => !string.IsNullOrWhiteSpace(s))
-                                .Select(s => s!.Trim());
-
-                            MergeInto(ref tags, values);
-                        }
-                    }
-                    break;
-                case $"global::{RequireAuthorizationAttributeFullyQualifiedName}":
-                    requireAuthorization = true;
-                    if (attribute.ConstructorArguments.Length == 1)
-                    {
-                        var arg = attribute.ConstructorArguments[0];
-                        if (arg.Values.Length > 0)
-                        {
-                            var values = arg.Values
-                                .Select(v => v.Value as string)
-                                .Where(s => !string.IsNullOrWhiteSpace(s))
-                                .Select(s => s!.Trim());
-
-                            MergeInto(ref authorizationPolicies, values);
-                        }
-                    }
-                    break;
-                case $"global::{DisableAntiforgeryAttributeFullyQualifiedName}":
-                    disableAntiforgery = true;
-                    break;
-                case $"global::{AllowAnonymousAttributeFullyQualifiedName}":
-                    allowAnonymous = true;
-                    break;
-                case "global::Microsoft.AspNetCore.Routing.ExcludeFromDescriptionAttribute":
-                    excludeFromDescription = true;
-                    break;
-                case $"global::{ProducesProblemAttributeFullyQualifiedName}":
+                if (attribute.ConstructorArguments.Length > 0)
                 {
-                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
-                        ? producesProblemStatusCode
-                        : 500;
-                    var contentType = attribute.ConstructorArguments.Length > 1
-                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
-                        : null;
-                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                        ? GetStringArrayValues(attribute.ConstructorArguments[2])
-                        : null;
+                    var arg = attribute.ConstructorArguments[0];
+                    if (arg.Values.Length > 0)
+                    {
+                        var values = arg.Values
+                            .Select(v => v.Value as string)
+                            .Where(s => !string.IsNullOrWhiteSpace(s))
+                            .Select(s => s!.Trim());
 
-                    var producesProblemList = producesProblem ??= [];
-                    producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
-                    break;
+                        MergeInto(ref tags, values);
+                    }
                 }
-                case $"global::{ProducesValidationProblemAttributeFullyQualifiedName}":
+
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, attributeSymbols.RequireAuthorizationAttribute))
+            {
+                requireAuthorization = true;
+                if (attribute.ConstructorArguments.Length == 1)
                 {
-                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
-                        ? producesValidationProblemStatusCode
-                        : 400;
-                    var contentType = attribute.ConstructorArguments.Length > 1
-                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
-                        : null;
-                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                        ? GetStringArrayValues(attribute.ConstructorArguments[2])
-                        : null;
+                    var arg = attribute.ConstructorArguments[0];
+                    if (arg.Values.Length > 0)
+                    {
+                        var values = arg.Values
+                            .Select(v => v.Value as string)
+                            .Where(s => !string.IsNullOrWhiteSpace(s))
+                            .Select(s => s!.Trim());
 
-                    var producesValidationProblemList = producesValidationProblem ??= [];
-                    producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
-                    break;
+                        MergeInto(ref authorizationPolicies, values);
+                    }
                 }
+
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, attributeSymbols.DisableAntiforgeryAttribute))
+            {
+                disableAntiforgery = true;
+                continue;
+            }
+
+            if (IsAttribute(attributeClass, attributeSymbols.AllowAnonymousAttribute))
+            {
+                allowAnonymous = true;
+                continue;
+            }
+
+            if (IsAttribute(attributeClass, attributeSymbols.ExcludeFromDescriptionAttribute))
+            {
+                excludeFromDescription = true;
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, attributeSymbols.ProducesProblemAttribute))
+            {
+                var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
+                    ? producesProblemStatusCode
+                    : 500;
+                var contentType = attribute.ConstructorArguments.Length > 1
+                    ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                    : null;
+                var additionalContentTypes = attribute.ConstructorArguments.Length > 2
+                    ? GetStringArrayValues(attribute.ConstructorArguments[2])
+                    : null;
+
+                var producesProblemList = producesProblem ??= [];
+                producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, attributeSymbols.ProducesValidationProblemAttribute))
+            {
+                var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
+                    ? producesValidationProblemStatusCode
+                    : 400;
+                var contentType = attribute.ConstructorArguments.Length > 1
+                    ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                    : null;
+                var additionalContentTypes = attribute.ConstructorArguments.Length > 2
+                    ? GetStringArrayValues(attribute.ConstructorArguments[2])
+                    : null;
+
+                var producesValidationProblemList = producesValidationProblem ??= [];
+                producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
             }
         }
     }
@@ -913,11 +941,53 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return builder.Count > 0 ? builder.ToEquatableImmutable() : null;
     }
 
-    private static bool IsGeneratedAttribute(string fullyQualifiedName, string attributeName)
+    private static bool IsGeneratedAttribute(
+        INamedTypeSymbol attributeClass,
+        INamedTypeSymbol? generatedAttribute,
+        bool matchOriginalDefinition = false)
     {
-        var prefix = $"global::{AttributesNamespace}.{attributeName}";
-        return fullyQualifiedName.StartsWith(prefix, StringComparison.Ordinal);
+        if (generatedAttribute is null)
+            return false;
+
+        var symbolToCompare = matchOriginalDefinition ? attributeClass.OriginalDefinition : attributeClass;
+        return SymbolEqualityComparer.Default.Equals(symbolToCompare, generatedAttribute);
     }
+
+    private static bool IsAttribute(INamedTypeSymbol attributeClass, INamedTypeSymbol? attributeSymbol)
+    {
+        return attributeSymbol is not null && SymbolEqualityComparer.Default.Equals(attributeClass, attributeSymbol);
+    }
+
+    private static AdditionalRequestHandlerAttributeSymbols GetAdditionalRequestHandlerAttributeSymbols(Compilation compilation)
+    {
+        return new AdditionalRequestHandlerAttributeSymbols(
+            compilation.GetTypeByMetadataName(AcceptsAttributeFullyQualifiedName),
+            compilation.GetTypeByMetadataName($"{AcceptsAttributeFullyQualifiedName}`1"),
+            compilation.GetTypeByMetadataName(ProducesResponseAttributeFullyQualifiedName),
+            compilation.GetTypeByMetadataName($"{ProducesResponseAttributeFullyQualifiedName}`1"),
+            compilation.GetTypeByMetadataName(RequireAuthorizationAttributeFullyQualifiedName),
+            compilation.GetTypeByMetadataName(DisableAntiforgeryAttributeFullyQualifiedName),
+            compilation.GetTypeByMetadataName(AllowAnonymousAttributeFullyQualifiedName),
+            compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Http.TagsAttribute"),
+            compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Routing.ExcludeFromDescriptionAttribute"),
+            compilation.GetTypeByMetadataName(ProducesProblemAttributeFullyQualifiedName),
+            compilation.GetTypeByMetadataName(ProducesValidationProblemAttributeFullyQualifiedName)
+        );
+    }
+
+    private readonly record struct AdditionalRequestHandlerAttributeSymbols(
+        INamedTypeSymbol? AcceptsAttribute,
+        INamedTypeSymbol? AcceptsAttributeOfT,
+        INamedTypeSymbol? ProducesResponseAttribute,
+        INamedTypeSymbol? ProducesResponseAttributeOfT,
+        INamedTypeSymbol? RequireAuthorizationAttribute,
+        INamedTypeSymbol? DisableAntiforgeryAttribute,
+        INamedTypeSymbol? AllowAnonymousAttribute,
+        INamedTypeSymbol? TagsAttribute,
+        INamedTypeSymbol? ExcludeFromDescriptionAttribute,
+        INamedTypeSymbol? ProducesProblemAttribute,
+        INamedTypeSymbol? ProducesValidationProblemAttribute
+    );
 
     private static void TryAddAcceptsMetadata(
         AttributeData attribute,
