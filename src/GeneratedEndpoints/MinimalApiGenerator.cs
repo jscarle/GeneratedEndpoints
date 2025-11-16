@@ -985,85 +985,59 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool enforceMethodRequireAuthorizationRules
     )
     {
-        EquatableImmutableArray<string>? tags = null;
-        bool? requireAuthorization = null;
-        EquatableImmutableArray<string>? authorizationPolicies = null;
-        bool? disableAntiforgery = null;
-        bool? allowAnonymous = null;
-        bool? excludeFromDescription = null;
-        bool? requireCors = null;
-        string? corsPolicyName = null;
-        EquatableImmutableArray<string>? requiredHosts = null;
-        bool? requireRateLimiting = null;
-        string? rateLimitingPolicyName = null;
-        List<string>? endpointFilters = null;
-        bool? shortCircuit = null;
-        bool? disableValidation = null;
-        bool? disableRequestTimeout = null;
-        bool? withRequestTimeout = null;
-        string? requestTimeoutPolicyName = null;
-        int? order = null;
-        string? endpointGroupName = null;
-        string? summary = null;
+        var state = new EndpointAttributeState();
 
-        List<AcceptsMetadata>? accepts = null;
-        List<ProducesMetadata>? produces = null;
-        List<ProducesProblemMetadata>? producesProblem = null;
-        List<ProducesValidationProblemMetadata>? producesValidationProblem = null;
+        GetAdditionalRequestHandlerAttributeValues(attributes, ref state);
 
-        var hasAllowAnonymousAttribute = false;
-        var hasRequireAuthorizationAttribute = false;
+        if (enforceMethodRequireAuthorizationRules && state.HasRequireAuthorizationAttribute && !state.HasAllowAnonymousAttribute)
+            state.AllowAnonymous = false;
 
-        GetAdditionalRequestHandlerAttributeValues(attributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery,
-            ref allowAnonymous, ref excludeFromDescription, ref accepts, ref produces, ref producesProblem, ref producesValidationProblem, ref requireCors,
-            ref corsPolicyName, ref requiredHosts, ref requireRateLimiting, ref rateLimitingPolicyName, ref endpointFilters,
-            ref hasAllowAnonymousAttribute, ref hasRequireAuthorizationAttribute, ref shortCircuit, ref disableValidation, ref disableRequestTimeout, ref withRequestTimeout,
-            ref requestTimeoutPolicyName, ref order, ref endpointGroupName, ref summary
+        var metadata = new RequestHandlerMetadata(name, displayName, state.Summary, description, state.Tags, ToEquatableOrNull(state.Accepts),
+            ToEquatableOrNull(state.Produces), ToEquatableOrNull(state.ProducesProblem), ToEquatableOrNull(state.ProducesValidationProblem),
+            state.ExcludeFromDescription ?? false
         );
 
-        if (enforceMethodRequireAuthorizationRules && hasRequireAuthorizationAttribute && !hasAllowAnonymousAttribute)
-            allowAnonymous = false;
+        var withRequestTimeout = state.WithRequestTimeout ?? false;
+        var requestTimeoutPolicyName = withRequestTimeout ? state.RequestTimeoutPolicyName : null;
 
-        var metadata = new RequestHandlerMetadata(name, displayName, summary, description, tags, ToEquatableOrNull(accepts), ToEquatableOrNull(produces),
-            ToEquatableOrNull(producesProblem), ToEquatableOrNull(producesValidationProblem), excludeFromDescription ?? false
-        );
-
-        return new EndpointConfiguration(metadata, requireAuthorization ?? false, authorizationPolicies, disableAntiforgery ?? false,
-            allowAnonymous ?? false, requireCors ?? false, corsPolicyName, requiredHosts, requireRateLimiting ?? false, rateLimitingPolicyName,
-            ToEquatableOrNull(endpointFilters), shortCircuit ?? false, disableValidation ?? false, disableRequestTimeout ?? false, withRequestTimeout ?? false,
-            withRequestTimeout ?? false ? requestTimeoutPolicyName : null, order, endpointGroupName);
+        return new EndpointConfiguration(metadata, state.RequireAuthorization ?? false, state.AuthorizationPolicies, state.DisableAntiforgery ?? false,
+            state.AllowAnonymous ?? false, state.RequireCors ?? false, state.CorsPolicyName, state.RequiredHosts, state.RequireRateLimiting ?? false,
+            state.RateLimitingPolicyName, ToEquatableOrNull(state.EndpointFilters), state.ShortCircuit ?? false, state.DisableValidation ?? false,
+            state.DisableRequestTimeout ?? false, withRequestTimeout, requestTimeoutPolicyName, state.Order, state.EndpointGroupName);
     }
 
     private static void GetAdditionalRequestHandlerAttributeValues(
         ImmutableArray<AttributeData> attributes,
-        ref EquatableImmutableArray<string>? tags,
-        ref bool? requireAuthorization,
-        ref EquatableImmutableArray<string>? authorizationPolicies,
-        ref bool? disableAntiforgery,
-        ref bool? allowAnonymous,
-        ref bool? excludeFromDescription,
-        ref List<AcceptsMetadata>? accepts,
-        ref List<ProducesMetadata>? produces,
-        ref List<ProducesProblemMetadata>? producesProblem,
-        ref List<ProducesValidationProblemMetadata>? producesValidationProblem,
-        ref bool? requireCors,
-        ref string? corsPolicyName,
-        ref EquatableImmutableArray<string>? requiredHosts,
-        ref bool? requireRateLimiting,
-        ref string? rateLimitingPolicyName,
-        ref List<string>? endpointFilters,
-        ref bool hasAllowAnonymousAttribute,
-        ref bool hasRequireAuthorizationAttribute,
-        ref bool? shortCircuit,
-        ref bool? disableValidation,
-        ref bool? disableRequestTimeout,
-        ref bool? withRequestTimeout,
-        ref string? requestTimeoutPolicyName,
-        ref int? order,
-        ref string? endpointGroupName,
-        ref string? summary
+        ref EndpointAttributeState state
     )
     {
+        ref var tags = ref state.Tags;
+        ref var requireAuthorization = ref state.RequireAuthorization;
+        ref var authorizationPolicies = ref state.AuthorizationPolicies;
+        ref var disableAntiforgery = ref state.DisableAntiforgery;
+        ref var allowAnonymous = ref state.AllowAnonymous;
+        ref var excludeFromDescription = ref state.ExcludeFromDescription;
+        ref var accepts = ref state.Accepts;
+        ref var produces = ref state.Produces;
+        ref var producesProblem = ref state.ProducesProblem;
+        ref var producesValidationProblem = ref state.ProducesValidationProblem;
+        ref var requireCors = ref state.RequireCors;
+        ref var corsPolicyName = ref state.CorsPolicyName;
+        ref var requiredHosts = ref state.RequiredHosts;
+        ref var requireRateLimiting = ref state.RequireRateLimiting;
+        ref var rateLimitingPolicyName = ref state.RateLimitingPolicyName;
+        ref var endpointFilters = ref state.EndpointFilters;
+        ref var hasAllowAnonymousAttribute = ref state.HasAllowAnonymousAttribute;
+        ref var hasRequireAuthorizationAttribute = ref state.HasRequireAuthorizationAttribute;
+        ref var shortCircuit = ref state.ShortCircuit;
+        ref var disableValidation = ref state.DisableValidation;
+        ref var disableRequestTimeout = ref state.DisableRequestTimeout;
+        ref var withRequestTimeout = ref state.WithRequestTimeout;
+        ref var requestTimeoutPolicyName = ref state.RequestTimeoutPolicyName;
+        ref var order = ref state.Order;
+        ref var endpointGroupName = ref state.EndpointGroupName;
+        ref var summary = ref state.Summary;
+
         foreach (var attribute in attributes)
         {
             var attributeClass = attribute.AttributeClass;
@@ -1151,15 +1125,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 if (attribute.ConstructorArguments.Length > 0)
                 {
                     var arg = attribute.ConstructorArguments[0];
-                    if (arg.Values.Length > 0)
-                    {
-                        var values = arg.Values
-                            .Select(v => v.Value as string)
-                            .Where(s => !string.IsNullOrWhiteSpace(s))
-                            .Select(s => s!.Trim());
-
-                        MergeInto(ref tags, values);
-                    }
+                    MergeInto(ref tags, arg.Values);
                 }
 
                 continue;
@@ -1172,15 +1138,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 if (attribute.ConstructorArguments.Length == 1)
                 {
                     var arg = attribute.ConstructorArguments[0];
-                    if (arg.Values.Length > 0)
-                    {
-                        var values = arg.Values
-                            .Select(v => v.Value as string)
-                            .Where(s => !string.IsNullOrWhiteSpace(s))
-                            .Select(s => s!.Trim());
-
-                        MergeInto(ref authorizationPolicies, values);
-                    }
+                    MergeInto(ref authorizationPolicies, arg.Values);
                 }
 
                 continue;
@@ -1200,16 +1158,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     var arg = attribute.ConstructorArguments[0];
                     if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
                     {
-                        var values = arg.Values
-                            .Select(v => v.Value as string)
-                            .Where(s => !string.IsNullOrWhiteSpace(s))
-                            .Select(s => s!.Trim());
-
-                        MergeInto(ref requiredHosts, values);
+                        MergeInto(ref requiredHosts, arg.Values);
                     }
                     else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
                     {
-                        MergeInto(ref requiredHosts, [singleHost]);
+                        MergeInto(ref requiredHosts, new[] { singleHost.Trim() });
                     }
                 }
 
@@ -1289,6 +1242,29 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         var merged = MergeUnion(target, values);
         target = merged.Count > 0 ? merged : null;
+    }
+
+    private static void MergeInto(ref EquatableImmutableArray<string>? target, ImmutableArray<TypedConstant> values)
+    {
+        if (values.IsDefaultOrEmpty)
+            return;
+
+        List<string>? normalized = null;
+        foreach (var value in values)
+        {
+            if (value.Value is not string stringValue)
+                continue;
+
+            var trimmed = NormalizeOptionalString(stringValue);
+            if (trimmed is not { Length: > 0 })
+                continue;
+
+            normalized ??= new List<string>(values.Length);
+            normalized.Add(trimmed);
+        }
+
+        if (normalized is { Count: > 0 })
+            MergeInto(ref target, normalized);
     }
 
     private static EquatableImmutableArray<T>? ToEquatableOrNull<T>(List<T>? values)
@@ -1879,7 +1855,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (requestHandlers.IsDefaultOrEmpty)
             return collidingIndices.ToImmutable();
 
-        var nameToMethodMap = new Dictionary<string, Dictionary<string, List<int>>>(StringComparer.Ordinal);
+        var nameToMethodMap = new Dictionary<HandlerNameKey, List<int>>(requestHandlers.Length);
 
         for (var index = 0; index < requestHandlers.Length; index++)
         {
@@ -1888,32 +1864,23 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (string.IsNullOrEmpty(name))
                 continue;
 
-            if (!nameToMethodMap.TryGetValue(name!, out var methodMap))
-            {
-                methodMap = new Dictionary<string, List<int>>(StringComparer.Ordinal);
-                nameToMethodMap.Add(name!, methodMap);
-            }
-
-            var methodName = handler.Method.Name;
-            if (!methodMap.TryGetValue(methodName, out var indices))
+            var key = new HandlerNameKey(name!, handler.Method.Name);
+            if (!nameToMethodMap.TryGetValue(key, out var indices))
             {
                 indices = new List<int>();
-                methodMap.Add(methodName, indices);
+                nameToMethodMap.Add(key, indices);
             }
 
             indices.Add(index);
         }
 
-        foreach (var methodMap in nameToMethodMap.Values)
+        foreach (var indices in nameToMethodMap.Values)
         {
-            foreach (var indices in methodMap.Values)
-            {
-                if (indices.Count <= 1)
-                    continue;
+            if (indices.Count <= 1)
+                continue;
 
-                foreach (var index in indices)
-                    collidingIndices.Add(index);
-            }
+            foreach (var index in indices)
+                collidingIndices.Add(index);
         }
 
         return collidingIndices.ToImmutable();
@@ -2805,6 +2772,38 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key, string? BindingName);
 
     private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
+
+    private readonly record struct HandlerNameKey(string Name, string Method);
+
+    private struct EndpointAttributeState
+    {
+        public EquatableImmutableArray<string>? Tags;
+        public bool? RequireAuthorization;
+        public EquatableImmutableArray<string>? AuthorizationPolicies;
+        public bool? DisableAntiforgery;
+        public bool? AllowAnonymous;
+        public bool? ExcludeFromDescription;
+        public List<AcceptsMetadata>? Accepts;
+        public List<ProducesMetadata>? Produces;
+        public List<ProducesProblemMetadata>? ProducesProblem;
+        public List<ProducesValidationProblemMetadata>? ProducesValidationProblem;
+        public bool? RequireCors;
+        public string? CorsPolicyName;
+        public EquatableImmutableArray<string>? RequiredHosts;
+        public bool? RequireRateLimiting;
+        public string? RateLimitingPolicyName;
+        public List<string>? EndpointFilters;
+        public bool HasAllowAnonymousAttribute;
+        public bool HasRequireAuthorizationAttribute;
+        public bool? ShortCircuit;
+        public bool? DisableValidation;
+        public bool? DisableRequestTimeout;
+        public bool? WithRequestTimeout;
+        public string? RequestTimeoutPolicyName;
+        public int? Order;
+        public string? EndpointGroupName;
+        public string? Summary;
+    }
 
     private enum BindingSource
     {
