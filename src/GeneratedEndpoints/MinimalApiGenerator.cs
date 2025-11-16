@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
@@ -131,15 +132,28 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (context.TargetSymbol is not IMethodSymbol requestHandlerMethodSymbol)
-            return null;
         var attribute = context.Attributes[0];
+        var attributeLocation = GetAttributeLocation(attribute, cancellationToken) ?? context.TargetNode.GetLocation();
 
-        var requestHandlerClass = GetRequestHandlerClass(requestHandlerMethodSymbol, context.SemanticModel.Compilation, cancellationToken);
-        if (requestHandlerClass is null)
+        if (context.TargetSymbol is not IMethodSymbol requestHandlerMethodSymbol)
+        {
+            ReportDiagnostic(context.ReportDiagnostic, InvalidEndpointTargetDiagnostic, attributeLocation, attribute.AttributeClass?.Name ?? "Map");
             return null;
+        }
 
-        var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
+        if (requestHandlerMethodSymbol.ContainingType is not { TypeKind: TypeKind.Class })
+        {
+            ReportDiagnostic(context.ReportDiagnostic, InvalidEndpointContainerDiagnostic, attributeLocation, requestHandlerMethodSymbol.Name);
+            return null;
+        }
+
+        var requestHandlerClass = GetRequestHandlerClass(
+            requestHandlerMethodSymbol,
+            context.SemanticModel.Compilation,
+            context.ReportDiagnostic,
+            cancellationToken);
+
+        var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, context.ReportDiagnostic, cancellationToken);
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
@@ -147,9 +161,17 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
 
-        var methodConfiguration = GetEndpointConfiguration(requestHandlerMethodSymbol.GetAttributes(), name, displayName, description, true);
+        var methodConfiguration = GetEndpointConfiguration(
+            requestHandlerMethodSymbol,
+            requestHandlerMethodSymbol.GetAttributes(),
+            name,
+            displayName,
+            description,
+            true,
+            context.ReportDiagnostic,
+            cancellationToken);
 
-        var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
+        var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, methodConfiguration, attributeLocation);
 
         return requestHandler;
     }
@@ -215,16 +237,25 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
     }
 
     private static EndpointConfiguration GetEndpointConfiguration(
+        ISymbol ownerSymbol,
         ImmutableArray<AttributeData> attributes,
         string? name,
         string? displayName,
         string? description,
-        bool enforceMethodRequireAuthorizationRules
+        bool enforceMethodRequireAuthorizationRules,
+        Action<Diagnostic>? reportDiagnostic,
+        CancellationToken cancellationToken
     )
     {
         var state = new EndpointAttributeState();
 
-        GetAdditionalRequestHandlerAttributeValues(attributes, ref state);
+        GetAdditionalRequestHandlerAttributeValues(attributes, ref state, cancellationToken);
+
+        if (state.HasAllowAnonymousAttribute && state.HasRequireAuthorizationAttribute)
+        {
+            var conflictLocation = state.AllowAnonymousLocation ?? state.RequireAuthorizationLocation ?? (ownerSymbol.Locations.Length > 0 ? ownerSymbol.Locations[0] : null);
+            ReportDiagnostic(reportDiagnostic, ConflictingAuthorizationAttributesDiagnostic, conflictLocation, ownerSymbol.Name);
+        }
 
         if (enforceMethodRequireAuthorizationRules && state is { HasRequireAuthorizationAttribute: true, HasAllowAnonymousAttribute: false })
             state.AllowAnonymous = false;
@@ -244,7 +275,10 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         );
     }
 
-    private static void GetAdditionalRequestHandlerAttributeValues(ImmutableArray<AttributeData> attributes, ref EndpointAttributeState state)
+    private static void GetAdditionalRequestHandlerAttributeValues(
+        ImmutableArray<AttributeData> attributes,
+        ref EndpointAttributeState state,
+        CancellationToken cancellationToken)
     {
         ref var tags = ref state.Tags;
         ref var requireAuthorization = ref state.RequireAuthorization;
@@ -265,6 +299,8 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         ref var endpointFilterSet = ref state.EndpointFilterSet;
         ref var hasAllowAnonymousAttribute = ref state.HasAllowAnonymousAttribute;
         ref var hasRequireAuthorizationAttribute = ref state.HasRequireAuthorizationAttribute;
+        ref var allowAnonymousLocation = ref state.AllowAnonymousLocation;
+        ref var requireAuthorizationLocation = ref state.RequireAuthorizationLocation;
         ref var shortCircuit = ref state.ShortCircuit;
         ref var disableValidation = ref state.DisableValidation;
         ref var disableRequestTimeout = ref state.DisableRequestTimeout;
@@ -276,6 +312,8 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
         foreach (var attribute in attributes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var attributeClass = attribute.AttributeClass;
             if (attributeClass is null)
                 continue;
@@ -334,6 +372,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
                 case GeneratedAttributeKind.RequireAuthorization:
                     requireAuthorization = true;
                     hasRequireAuthorizationAttribute = true;
+                    requireAuthorizationLocation ??= GetAttributeLocation(attribute, cancellationToken);
                     if (attribute.ConstructorArguments.Length == 1)
                     {
                         var arg = attribute.ConstructorArguments[0];
@@ -413,6 +452,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             {
                 allowAnonymous = true;
                 hasAllowAnonymousAttribute = true;
+                allowAnonymousLocation ??= GetAttributeLocation(attribute, cancellationToken);
                 continue;
             }
 
@@ -778,21 +818,28 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return list?.ToEquatableImmutableArray() ?? EquatableImmutableArray<string>.Empty;
     }
 
-    private static RequestHandlerMethod GetRequestHandlerMethod(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    private static RequestHandlerMethod GetRequestHandlerMethod(
+        IMethodSymbol methodSymbol,
+        Action<Diagnostic>? reportDiagnostic,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var name = methodSymbol.Name;
         var isStatic = methodSymbol.IsStatic;
         var isAwaitable = methodSymbol.ReturnType.IsTask(out _) || methodSymbol.ReturnType.IsValueTask(out _);
-        var parameters = GetRequestHandlerParameters(methodSymbol, cancellationToken);
+        var parameters = GetRequestHandlerParameters(methodSymbol, reportDiagnostic, cancellationToken);
 
         var requestHandlerMethod = new RequestHandlerMethod(name, isStatic, isAwaitable, parameters);
 
         return requestHandlerMethod;
     }
 
-    private static RequestHandlerClass? GetRequestHandlerClass(IMethodSymbol methodSymbol, Compilation compilation, CancellationToken cancellationToken)
+    private static RequestHandlerClass? GetRequestHandlerClass(
+        IMethodSymbol methodSymbol,
+        Compilation compilation,
+        Action<Diagnostic>? reportDiagnostic,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -802,7 +849,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
         var typeCache = GetCompilationTypeCache(compilation);
         var cacheEntry = RequestHandlerClassCache.GetValue(classSymbol, static _ => new RequestHandlerClassCacheEntry());
-        var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, typeCache, cancellationToken);
+        var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, typeCache, reportDiagnostic, cancellationToken);
         return requestHandlerClass;
     }
 
@@ -953,7 +1000,10 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return string.Equals(containingNamespace, "System", StringComparison.Ordinal);
     }
 
-    private static EquatableImmutableArray<Parameter> GetRequestHandlerParameters(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    private static EquatableImmutableArray<Parameter> GetRequestHandlerParameters(
+        IMethodSymbol methodSymbol,
+        Action<Diagnostic>? reportDiagnostic,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -965,6 +1015,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             var source = BindingSource.None;
             TypedConstant? typedKey = null;
             string? bindingName = null;
+            var parameterLocation = parameter.Locations.Length > 0 ? parameter.Locations[0] : null;
 
             foreach (var attribute in parameter.GetAttributes())
             {
@@ -983,7 +1034,15 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
                     case BindingSource.FromQuery:
                     case BindingSource.FromHeader:
                     case BindingSource.FromForm:
-                        bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                        var bindingResult = GetBindingAttributeName(attribute, cancellationToken);
+                        if (bindingResult.IsInvalid)
+                        {
+                            ReportDiagnostic(reportDiagnostic, InvalidBindingAnnotationDiagnostic,
+                                bindingResult.Location ?? parameterLocation, parameter.Name);
+                            continue;
+                        }
+
+                        bindingName = bindingResult.Name ?? bindingName;
                         break;
                     case BindingSource.FromKeyedServices:
                         typedKey = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0] : null;
@@ -1001,22 +1060,31 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return methodParameters.ToEquatableImmutable();
     }
 
-    private static string? GetBindingAttributeName(AttributeData attribute)
+    private static BindingNameResult GetBindingAttributeName(AttributeData attribute, CancellationToken cancellationToken)
     {
         foreach (var namedArg in attribute.NamedArguments)
         {
-            if (string.Equals(namedArg.Key, NameAttributeNamedParameter, StringComparison.Ordinal) && namedArg.Value.Value is string namedValue)
+            if (!string.Equals(namedArg.Key, NameAttributeNamedParameter, StringComparison.Ordinal))
+                continue;
+
+            if (namedArg.Value.Value is string namedValue)
             {
                 var normalized = NormalizeBindingName(namedValue);
-                if (normalized is not null)
-                    return normalized;
+                var invalid = normalized is null && !string.IsNullOrEmpty(namedValue);
+                var location = invalid ? GetAttributeLocation(attribute, cancellationToken) : null;
+                return new BindingNameResult(normalized, true, invalid, location);
             }
         }
 
         if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string constructorName)
-            return NormalizeBindingName(constructorName);
+        {
+            var normalized = NormalizeBindingName(constructorName);
+            var invalid = normalized is null && !string.IsNullOrEmpty(constructorName);
+            var location = invalid ? GetAttributeLocation(attribute, cancellationToken) : null;
+            return new BindingNameResult(normalized, true, invalid, location);
+        }
 
-        return null;
+        return new BindingNameResult(null, false, false, null);
     }
 
     private static string? NormalizeBindingName(string? value)
@@ -1028,12 +1096,36 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return trimmed.Length > 0 ? trimmed : null;
     }
 
+    private static Location? GetAttributeLocation(AttributeData attribute, CancellationToken cancellationToken)
+    {
+        var syntaxReference = attribute.ApplicationSyntaxReference;
+        if (syntaxReference is null)
+            return null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var syntax = syntaxReference.GetSyntax(cancellationToken);
+        return syntax?.GetLocation();
+    }
+
+    private static void ReportDiagnostic(
+        Action<Diagnostic>? reportDiagnostic,
+        DiagnosticDescriptor descriptor,
+        Location? location,
+        params object[] messageArgs)
+    {
+        if (reportDiagnostic is null)
+            return;
+
+        var diagnostic = Diagnostic.Create(descriptor, location ?? Location.None, messageArgs);
+        reportDiagnostic(diagnostic);
+    }
+
     private static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
         var sorted = SortRequestHandlers(requestHandlers);
-        sorted = EnsureUniqueEndpointNames(sorted);
+        sorted = EnsureUniqueEndpointNames(context, sorted);
 
         GenerateAddEndpointHandlersClass(context, sorted);
         GenerateUseEndpointHandlersClass(context, sorted);
@@ -1049,7 +1141,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return [..array];
     }
 
-    private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(ImmutableArray<RequestHandler> requestHandlers)
+    private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
         var collidingHandlers = GetRequestHandlersWithNameCollisions(requestHandlers);
         if (collidingHandlers.IsEmpty)
@@ -1059,6 +1151,13 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         foreach (var index in collidingHandlers)
         {
             var handler = builder[index];
+            var metadataName = handler.Configuration.Metadata.Name;
+            if (!string.IsNullOrEmpty(metadataName))
+            {
+                var diagnosticLocation = handler.Location ?? Location.None;
+                context.ReportDiagnostic(Diagnostic.Create(DuplicateEndpointNameDiagnostic, diagnosticLocation, metadataName!, handler.Method.Name));
+            }
+
             var configuration = handler.Configuration;
             var metadata = configuration.Metadata with
             {

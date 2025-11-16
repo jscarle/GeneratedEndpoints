@@ -1,4 +1,5 @@
 using GeneratedEndpoints.Common;
+using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
@@ -19,7 +20,8 @@ public sealed partial class MinimalApiGenerator
         RequestHandlerMethod Method,
         string HttpMethod,
         string Pattern,
-        EndpointConfiguration Configuration
+        EndpointConfiguration Configuration,
+        Location? Location
     );
 
     private readonly record struct RequestHandlerClass(
@@ -92,6 +94,8 @@ public sealed partial class MinimalApiGenerator
 
     private readonly record struct Parameter(string Name, string Type, string BindingPrefix);
 
+    private readonly record struct BindingNameResult(string? Name, bool HasValue, bool IsInvalid, Location? Location);
+
     private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
     private struct EndpointAttributeState
@@ -115,6 +119,8 @@ public sealed partial class MinimalApiGenerator
         public HashSet<string>? EndpointFilterSet;
         public bool HasAllowAnonymousAttribute;
         public bool HasRequireAuthorizationAttribute;
+        public Location? AllowAnonymousLocation;
+        public Location? RequireAuthorizationLocation;
         public bool? ShortCircuit;
         public bool? DisableValidation;
         public bool? DisableRequestTimeout;
@@ -196,7 +202,11 @@ public sealed partial class MinimalApiGenerator
         private RequestHandlerClass _value;
         private bool _initialized;
 
-        public RequestHandlerClass GetOrCreate(INamedTypeSymbol classSymbol, CompilationTypeCache compilationCache, CancellationToken cancellationToken)
+        public RequestHandlerClass GetOrCreate(
+            INamedTypeSymbol classSymbol,
+            CompilationTypeCache compilationCache,
+            Action<Diagnostic>? reportDiagnostic,
+            CancellationToken cancellationToken)
         {
             if (_initialized)
                 return _value;
@@ -216,7 +226,15 @@ public sealed partial class MinimalApiGenerator
 
                 var mapGroupPattern = GetMapGroupPattern(classSymbol);
                 var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
-                var classConfiguration = GetEndpointConfiguration(classSymbol.GetAttributes(), null, null, null, false);
+                var classConfiguration = GetEndpointConfiguration(
+                    classSymbol,
+                    classSymbol.GetAttributes(),
+                    null,
+                    null,
+                    null,
+                    false,
+                    reportDiagnostic,
+                    cancellationToken);
 
                 _value = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
                     configureMethodDetails.ConfigureMethodAcceptsServiceProvider, mapGroupPattern, mapGroupIdentifier, classConfiguration
