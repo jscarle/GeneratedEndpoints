@@ -154,6 +154,7 @@ applied to all endpoints within the class.
 * `[MapConnect(string pattern = "", Name = null)]`
 * `[MapDelete(string pattern = "", Name = null)]`
 * `[MapFallback(string pattern = "", Name = null)]`
+* `[MapGroup(string pattern)]`
 * `[MapGet(string pattern = "", Name = null)]`
 * `[MapHead(string pattern = "", Name = null)]`
 * `[MapOptions(string pattern = "", Name = null)]`

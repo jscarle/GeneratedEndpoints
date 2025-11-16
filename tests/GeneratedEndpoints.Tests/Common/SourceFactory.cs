@@ -50,7 +50,8 @@ public static class SourceFactory
         bool disableRequestTimeout,
         int orderValue,
         string? groupName,
-        bool excludeFromDescription)
+        bool excludeFromDescription,
+        string? mapGroupPattern = null)
     {
         var builder = new StringBuilder();
 
@@ -83,6 +84,11 @@ public static class SourceFactory
         if (!string.IsNullOrWhiteSpace(groupName))
         {
             builder.AppendLine($"[GroupName(\"{groupName}\")]");
+        }
+
+        if (!string.IsNullOrWhiteSpace(mapGroupPattern))
+        {
+            builder.AppendLine($"[MapGroup(\"{mapGroupPattern}\")]");
         }
 
         if (applyShortCircuit)
@@ -150,6 +156,15 @@ public static class SourceFactory
         }
 
         builder.AppendLine("    public static Ok Handle(int id) => id >= 0 ? TypedResults.Ok() : TypedResults.Ok();");
+
+        if (!string.IsNullOrWhiteSpace(mapGroupPattern))
+        {
+            builder.AppendLine();
+            builder.AppendLine("    [MapDelete(\"/matrix/{id:int}\")]");
+            builder.AppendLine("    public static Results<NoContent, NotFound> Delete(int id)");
+            builder.AppendLine("        => id >= 0 ? TypedResults.NoContent() : TypedResults.NotFound();");
+        }
+
         builder.AppendLine("}");
         return builder.ToString();
     }
