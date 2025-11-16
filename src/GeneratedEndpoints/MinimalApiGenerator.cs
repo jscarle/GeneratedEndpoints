@@ -1030,6 +1030,8 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
         var sorted = SortRequestHandlers(requestHandlers);
         sorted = EnsureUniqueEndpointNames(sorted);
 
@@ -1146,6 +1148,8 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GenerateAddEndpointHandlersClass(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
         var nonStaticClassNames = GetDistinctNonStaticClassNames(requestHandlers);
         var source = GetAddEndpointHandlersStringBuilder(nonStaticClassNames);
         source.AppendLine(FileHeader);
@@ -1234,6 +1238,8 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GenerateUseEndpointHandlersClass(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
         var source = GetUseEndpointHandlersStringBuilder(requestHandlers);
         source.AppendLine(FileHeader);
 
