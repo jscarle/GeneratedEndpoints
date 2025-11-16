@@ -81,14 +81,22 @@ public static class SourceFactory
             builder.AppendLine($"[RequireCors{cors}]");
         }
 
-        if (!string.IsNullOrWhiteSpace(groupName))
+        if (!string.IsNullOrWhiteSpace(groupName) && mapGroupPattern is null)
         {
-            builder.AppendLine($"[GroupName(\"{groupName}\")]");
+            mapGroupPattern = string.Empty;
         }
 
-        if (!string.IsNullOrWhiteSpace(mapGroupPattern))
+        if (mapGroupPattern is not null)
         {
-            builder.AppendLine($"[MapGroup(\"{mapGroupPattern}\")]");
+            var mapGroupAttribute = new StringBuilder();
+            mapGroupAttribute.Append($"[MapGroup(\"{mapGroupPattern}\"");
+            if (!string.IsNullOrWhiteSpace(groupName))
+            {
+                mapGroupAttribute.Append($", Name = \"{groupName}\"");
+            }
+
+            mapGroupAttribute.Append(")]");
+            builder.AppendLine(mapGroupAttribute.ToString());
         }
 
         if (applyShortCircuit)

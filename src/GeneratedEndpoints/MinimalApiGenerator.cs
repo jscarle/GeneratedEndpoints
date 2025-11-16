@@ -60,10 +60,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string OrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{OrderAttributeName}";
     private const string OrderAttributeHint = $"{OrderAttributeFullyQualifiedName}.gs.cs";
 
-    private const string GroupNameAttributeName = "GroupNameAttribute";
-    private const string GroupNameAttributeFullyQualifiedName = $"{AttributesNamespace}.{GroupNameAttributeName}";
-    private const string GroupNameAttributeHint = $"{GroupNameAttributeFullyQualifiedName}.gs.cs";
-
     private const string MapGroupAttributeName = "MapGroupAttribute";
     private const string MapGroupAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapGroupAttributeName}";
     private const string MapGroupAttributeHint = $"{MapGroupAttributeFullyQualifiedName}.gs.cs";
@@ -446,36 +442,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                             """;
         context.AddSource(OrderAttributeHint, SourceText.From(orderSource, Encoding.UTF8));
 
-        // GroupName
-        var groupNameSource = $$"""
-                                {{FileHeader}}
-
-                                namespace {{AttributesNamespace}};
-
-                                /// <summary>
-                                /// Specifies the endpoint group name for the annotated class.
-                                /// </summary>
-                                [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-                                internal sealed class {{GroupNameAttributeName}} : global::System.Attribute
-                                {
-                                    /// <summary>
-                                    /// Gets the endpoint group name.
-                                    /// </summary>
-                                    public string GroupName { get; }
-
-                                    /// <summary>
-                                    /// Initializes a new instance of the <see cref="{{GroupNameAttributeName}}"/> class.
-                                    /// </summary>
-                                    /// <param name="groupName">The endpoint group name to apply.</param>
-                                    public {{GroupNameAttributeName}}(string groupName)
-                                    {
-                                        GroupName = groupName;
-                                    }
-                                }
-
-                                """;
-        context.AddSource(GroupNameAttributeHint, SourceText.From(groupNameSource, Encoding.UTF8));
-
         // MapGroup
         var mapGroupSource = $$"""
                                {{FileHeader}}
@@ -492,6 +458,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    /// Gets the route group pattern.
                                    /// </summary>
                                    public string Pattern { get; }
+
+                                   /// <summary>
+                                   /// Gets or sets the endpoint group name.
+                                   /// </summary>
+                                   public string? Name { get; set; }
 
                                    /// <summary>
                                    /// Initializes a new instance of the <see cref="{{MapGroupAttributeName}}"/> class.
@@ -1110,14 +1081,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, GroupNameAttributeName))
+            if (IsGeneratedAttribute(attributeClass, MapGroupAttributeName))
             {
-                if (attribute.ConstructorArguments.Length > 0)
-                {
-                    var groupName = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
-                    if (!string.IsNullOrEmpty(groupName))
-                        endpointGroupName = groupName;
-                }
+                var groupName = GetNamedStringValue(attribute, NameAttributeNamedParameter);
+                if (!string.IsNullOrEmpty(groupName))
+                    endpointGroupName = groupName;
 
                 continue;
             }
@@ -1324,9 +1292,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
             if (attribute.ConstructorArguments.Length > 0)
             {
-                var pattern = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
-                if (!string.IsNullOrEmpty(pattern))
-                    return pattern;
+                var pattern = attribute.ConstructorArguments[0].Value as string;
+                if (pattern is not null)
+                    return pattern.Trim();
             }
         }
 
@@ -1993,7 +1961,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.AppendLine("    {");
 
         var groupedClasses = requestHandlers.Select(static handler => handler.Class)
-            .Where(static handlerClass => !string.IsNullOrEmpty(handlerClass.MapGroupPattern))
+            .Where(static handlerClass => handlerClass.MapGroupPattern is not null)
             .Distinct()
             .ToArray();
 

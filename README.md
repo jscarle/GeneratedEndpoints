@@ -150,11 +150,10 @@ applied to all endpoints within the class.
 * `[EndpointFilter(Type filterType)]`
 * `[EndpointFilter<TFilter>]`
 * `[ExcludeFromDescription]`
-* `[GroupName(string name)]`
 * `[MapConnect(string pattern = "", Name = null)]`
 * `[MapDelete(string pattern = "", Name = null)]`
 * `[MapFallback(string pattern = "", Name = null)]`
-* `[MapGroup(string pattern)]`
+* `[MapGroup(string pattern, Name = null)]`
 * `[MapGet(string pattern = "", Name = null)]`
 * `[MapHead(string pattern = "", Name = null)]`
 * `[MapOptions(string pattern = "", Name = null)]`
