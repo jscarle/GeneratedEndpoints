@@ -23,18 +23,21 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        builder.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
-            .WithName("GetMatrix")
+        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("")
             .WithGroupName("Docs")
             .WithOrder(-5)
             .ExcludeFromDescription()
+            .RequireCors()
+            .RequireHost("api.alt.com")
+            .DisableRequestTimeout();
+
+        _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
+            .WithName("GetMatrix")
             .WithTags("Method", "Matrix")
             .RequireAuthorization("MethodPolicy")
             .RequireCors("MethodCors")
-            .RequireHost("api.alt.com")
             .RequireRateLimiting("BurstPolicy")
-            .AllowAnonymous()
-            .DisableRequestTimeout();
+            .AllowAnonymous();
 
         return builder;
     }

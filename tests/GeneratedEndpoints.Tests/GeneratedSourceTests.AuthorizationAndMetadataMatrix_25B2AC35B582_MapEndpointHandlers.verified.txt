@@ -23,19 +23,23 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        builder.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
-            .WithName("GetMatrix")
+        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("")
             .WithGroupName("Reporting")
             .WithOrder(5)
             .ExcludeFromDescription()
-            .WithTags("Class", "Matrix", "Method")
+            .WithTags("Class", "Matrix")
             .RequireAuthorization("ClassPolicy")
             .RequireCors("NamedCorsPolicy")
-            .RequireHost("*.contoso.com", "api.contoso.com", "contoso.com")
-            .RequireRateLimiting("RatePolicy")
+            .RequireHost("*.contoso.com")
             .AllowAnonymous()
             .ShortCircuit()
             .WithRequestTimeout("TimeoutPolicy");
+
+        _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
+            .WithName("GetMatrix")
+            .WithTags("Method", "Matrix")
+            .RequireHost("api.contoso.com", "contoso.com")
+            .RequireRateLimiting("RatePolicy");
 
         return builder;
     }
