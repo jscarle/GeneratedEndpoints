@@ -77,17 +77,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string DisableRequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableRequestTimeoutAttributeName}";
     private const string DisableRequestTimeoutAttributeHint = $"{DisableRequestTimeoutAttributeFullyQualifiedName}.gs.cs";
 
-    private const string WithRequestTimeoutAttributeName = "WithRequestTimeoutAttribute";
-    private const string WithRequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithRequestTimeoutAttributeName}";
-    private const string WithRequestTimeoutAttributeHint = $"{WithRequestTimeoutAttributeFullyQualifiedName}.gs.cs";
+    private const string RequestTimeoutAttributeName = "RequestTimeoutAttribute";
+    private const string RequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequestTimeoutAttributeName}";
+    private const string RequestTimeoutAttributeHint = $"{RequestTimeoutAttributeFullyQualifiedName}.gs.cs";
 
-    private const string WithOrderAttributeName = "WithOrderAttribute";
-    private const string WithOrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithOrderAttributeName}";
-    private const string WithOrderAttributeHint = $"{WithOrderAttributeFullyQualifiedName}.gs.cs";
+    private const string EndpointOrderAttributeName = "EndpointOrderAttribute";
+    private const string EndpointOrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointOrderAttributeName}";
+    private const string EndpointOrderAttributeHint = $"{EndpointOrderAttributeFullyQualifiedName}.gs.cs";
 
-    private const string WithGroupNameAttributeName = "WithGroupNameAttribute";
-    private const string WithGroupNameAttributeFullyQualifiedName = $"{AttributesNamespace}.{WithGroupNameAttributeName}";
-    private const string WithGroupNameAttributeHint = $"{WithGroupNameAttributeFullyQualifiedName}.gs.cs";
+    private const string EndpointGroupMetadataAttributeName = "EndpointGroupMetadataAttribute";
+    private const string EndpointGroupMetadataAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointGroupMetadataAttributeName}";
+    private const string EndpointGroupMetadataAttributeHint = $"{EndpointGroupMetadataAttributeFullyQualifiedName}.gs.cs";
 
     private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
 
@@ -373,8 +373,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                            """;
         context.AddSource(DisableRequestTimeoutAttributeHint, SourceText.From(disableRequestTimeoutSource, Encoding.UTF8));
 
-        // WithRequestTimeout
-        var withRequestTimeoutSource = $$"""
+        // RequestTimeout
+        var requestTimeoutSource = $$"""
                                         {{FileHeader}}
 
                                         namespace {{AttributesNamespace}};
@@ -383,7 +383,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                          /// Applies the request timeout metadata to the annotated endpoint or class.
                                          /// </summary>
                                          [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                         internal sealed class {{WithRequestTimeoutAttributeName}} : global::System.Attribute
+                                         internal sealed class {{RequestTimeoutAttributeName}} : global::System.Attribute
                                          {
                                              /// <summary>
                                              /// Gets the optional request timeout policy name.
@@ -393,7 +393,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                              /// <summary>
                                              /// Applies the default request timeout behavior.
                                              /// </summary>
-                                             public {{WithRequestTimeoutAttributeName}}()
+                                             public {{RequestTimeoutAttributeName}}()
                                              {
                                              }
 
@@ -401,17 +401,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                              /// Applies the specified request timeout policy.
                                              /// </summary>
                                              /// <param name="policyName">The request timeout policy name.</param>
-                                             public {{WithRequestTimeoutAttributeName}}(string policyName)
+                                             public {{RequestTimeoutAttributeName}}(string policyName)
                                              {
                                                  PolicyName = policyName;
                                         }
                                     }
 
                                     """;
-        context.AddSource(WithRequestTimeoutAttributeHint, SourceText.From(withRequestTimeoutSource, Encoding.UTF8));
+        context.AddSource(RequestTimeoutAttributeHint, SourceText.From(requestTimeoutSource, Encoding.UTF8));
 
-        // WithOrder
-        var withOrderSource = $$"""
+        // EndpointOrder
+        var endpointOrderSource = $$"""
                                {{FileHeader}}
 
                                namespace {{AttributesNamespace}};
@@ -420,7 +420,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                /// Specifies the order for the annotated endpoint when building conventions.
                                /// </summary>
                                [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                               internal sealed class {{WithOrderAttributeName}} : global::System.Attribute
+                               internal sealed class {{EndpointOrderAttributeName}} : global::System.Attribute
                                {
                                    /// <summary>
                                    /// Gets the order that will be applied to the endpoint.
@@ -428,20 +428,20 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    public int Order { get; }
 
                                    /// <summary>
-                                   /// Initializes a new instance of the <see cref="{{WithOrderAttributeName}}"/> class.
+                                   /// Initializes a new instance of the <see cref="{{EndpointOrderAttributeName}}"/> class.
                                    /// </summary>
                                    /// <param name="order">The order value to apply to the endpoint.</param>
-                                   public {{WithOrderAttributeName}}(int order)
+                                   public {{EndpointOrderAttributeName}}(int order)
                                    {
                                        Order = order;
                                    }
                                }
 
                                """;
-        context.AddSource(WithOrderAttributeHint, SourceText.From(withOrderSource, Encoding.UTF8));
+        context.AddSource(EndpointOrderAttributeHint, SourceText.From(endpointOrderSource, Encoding.UTF8));
 
-        // WithGroupName
-        var withGroupNameSource = $$"""
+        // EndpointGroupMetadata
+        var endpointGroupMetadataSource = $$"""
                                    {{FileHeader}}
 
                                    namespace {{AttributesNamespace}};
@@ -450,7 +450,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    /// Specifies the endpoint group name for the annotated class.
                                    /// </summary>
                                    [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-                                   internal sealed class {{WithGroupNameAttributeName}} : global::System.Attribute
+                                   internal sealed class {{EndpointGroupMetadataAttributeName}} : global::System.Attribute
                                    {
                                        /// <summary>
                                        /// Gets the endpoint group name.
@@ -458,17 +458,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                        public string EndpointGroupName { get; }
 
                                        /// <summary>
-                                       /// Initializes a new instance of the <see cref="{{WithGroupNameAttributeName}}"/> class.
+                                       /// Initializes a new instance of the <see cref="{{EndpointGroupMetadataAttributeName}}"/> class.
                                        /// </summary>
                                        /// <param name="endpointGroupName">The endpoint group name to apply.</param>
-                                       public {{WithGroupNameAttributeName}}(string endpointGroupName)
+                                       public {{EndpointGroupMetadataAttributeName}}(string endpointGroupName)
                                        {
                                            EndpointGroupName = endpointGroupName;
                                        }
                                    }
 
                                    """;
-        context.AddSource(WithGroupNameAttributeHint, SourceText.From(withGroupNameSource, Encoding.UTF8));
+        context.AddSource(EndpointGroupMetadataAttributeHint, SourceText.From(endpointGroupMetadataSource, Encoding.UTF8));
 
         // Accepts
         var acceptsSource = $$"""
@@ -1147,7 +1147,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, WithRequestTimeoutAttributeName))
+            if (IsGeneratedAttribute(attributeClass, RequestTimeoutAttributeName))
             {
                 disableRequestTimeout = false;
                 withRequestTimeout = true;
@@ -1162,7 +1162,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, WithOrderAttributeName))
+            if (IsGeneratedAttribute(attributeClass, EndpointOrderAttributeName))
             {
                 if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
                     order = orderValue;
@@ -1170,7 +1170,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, WithGroupNameAttributeName))
+            if (IsGeneratedAttribute(attributeClass, EndpointGroupMetadataAttributeName))
             {
                 if (attribute.ConstructorArguments.Length > 0)
                 {
