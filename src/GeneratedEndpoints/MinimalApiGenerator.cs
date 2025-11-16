@@ -381,6 +381,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         // DisableValidation
         var disableValidationSource = $$"""
+                                       #if NET10_0_OR_GREATER
                                        {{FileHeader}}
 
                                        namespace {{AttributesNamespace}};
@@ -392,6 +393,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                        internal sealed class {{DisableValidationAttributeName}} : global::System.Attribute
                                        {
                                        }
+                                       #endif
 
                                        """;
         context.AddSource(DisableValidationAttributeHint, SourceText.From(disableValidationSource, Encoding.UTF8));
@@ -1319,12 +1321,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (!IsGeneratedAttribute(attributeClass, MapGroupAttributeName))
                 continue;
 
-            if (attribute.ConstructorArguments.Length > 0)
-            {
-                var pattern = attribute.ConstructorArguments[0].Value as string;
-                if (pattern is not null)
-                    return pattern.Trim();
-            }
+            if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string pattern)
+                return pattern.Trim();
         }
 
         return null;
@@ -2339,11 +2337,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (configuration.DisableValidation)
         {
             source.AppendLine();
-            source.AppendLine("#if NET10_0_OR_GREATER");
             source.Append(indent);
             source.Append(".DisableValidation()");
             source.AppendLine();
-            source.AppendLine("#endif");
         }
 
         if (configuration.DisableRequestTimeout)

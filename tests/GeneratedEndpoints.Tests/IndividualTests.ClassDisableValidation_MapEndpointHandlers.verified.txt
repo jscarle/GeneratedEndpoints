@@ -24,9 +24,7 @@ internal static class EndpointRouteBuilderExtensions
     {
         builder.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
             .WithName("GetMatrix")
-#if NET10_0_OR_GREATER
             .DisableValidation()
-#endif
 ;
 
         return builder;
