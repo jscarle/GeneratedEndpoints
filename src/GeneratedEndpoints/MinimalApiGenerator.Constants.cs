@@ -106,8 +106,11 @@ public sealed partial class MinimalApiGenerator
     private const string GlobalPrefix = "global::";
     private static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
     private static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
+    private static readonly string[] AspNetCoreMvcNamespaceParts = ["Microsoft", "AspNetCore", "Mvc"];
     private static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
     private static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
+    private static readonly string[] ExtensionsDependencyInjectionNamespaceParts =
+        ["Microsoft", "Extensions", "DependencyInjection"];
     private static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
     private static readonly ConditionalWeakTable<Compilation, CompilationTypeCache> CompilationTypeCaches = new();
     private static readonly ConditionalWeakTable<INamedTypeSymbol, RequestHandlerClassCacheEntry> RequestHandlerClassCache = new();
