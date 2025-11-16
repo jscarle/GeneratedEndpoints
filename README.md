@@ -146,6 +146,7 @@ applied to all endpoints within the class.
 * `[Description(string description)]`
 * `[DisableAntiforgery]`
 * `[DisableRequestTimeout]`
+* `[DisableValidation]`
 * `[DisplayName(string displayName)]`
 * `[EndpointFilter(Type filterType)]`
 * `[EndpointFilter<TFilter>]`
