@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -1517,17 +1518,41 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
     {
-        var list = new List<string>();
+        List<string>? list = null;
+        HashSet<string>? seen = null;
 
         if (existing is { Count: > 0 })
-            list.AddRange(existing.Value);
+        {
+            list = new List<string>(existing.Value.Count + 4);
+            seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in existing.Value)
+            {
+                if (string.IsNullOrWhiteSpace(item))
+                    continue;
+
+                var trimmed = item.Trim();
+                if (trimmed.Length == 0)
+                    continue;
+
+                if (seen.Add(trimmed))
+                    list.Add(trimmed);
+            }
+        }
+
+        seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        list ??= new List<string>();
 
         foreach (var value in values)
         {
             if (string.IsNullOrWhiteSpace(value))
                 continue;
+
             var trimmed = value.Trim();
-            if (!list.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            if (trimmed.Length == 0)
+                continue;
+
+            if (seen.Add(trimmed))
                 list.Add(trimmed);
         }
 
@@ -1809,16 +1834,21 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
-        var sorted = requestHandlers.OrderBy(r => r.Class.Name, StringComparer.Ordinal)
-            .ThenBy(r => r.Method.Name, StringComparer.Ordinal)
-            .ThenBy(r => r.HttpMethod, StringComparer.Ordinal)
-            .ThenBy(r => r.Pattern, StringComparer.Ordinal)
-            .ToImmutableArray();
-
+        var sorted = SortRequestHandlers(requestHandlers);
         sorted = EnsureUniqueEndpointNames(sorted);
 
         GenerateAddEndpointHandlersClass(context, sorted);
         GenerateUseEndpointHandlersClass(context, sorted);
+    }
+
+    private static ImmutableArray<RequestHandler> SortRequestHandlers(ImmutableArray<RequestHandler> requestHandlers)
+    {
+        if (requestHandlers.Length <= 1)
+            return requestHandlers;
+
+        var array = requestHandlers.ToArray();
+        Array.Sort(array, RequestHandlerComparer.Instance);
+        return array.ToImmutableArray();
     }
 
     private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(ImmutableArray<RequestHandler> requestHandlers)
@@ -1846,25 +1876,43 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static ImmutableHashSet<int> GetRequestHandlersWithNameCollisions(ImmutableArray<RequestHandler> requestHandlers)
     {
         var collidingIndices = ImmutableHashSet.CreateBuilder<int>();
+        if (requestHandlers.IsDefaultOrEmpty)
+            return collidingIndices.ToImmutable();
 
-        var groups = requestHandlers.Select((handler, index) => (handler, index))
-            .Where(static tuple => !string.IsNullOrEmpty(tuple.handler.Configuration.Metadata.Name))
-            .GroupBy(static tuple => tuple.handler.Configuration.Metadata.Name!, StringComparer.Ordinal);
+        var nameToMethodMap = new Dictionary<string, Dictionary<string, List<int>>>(StringComparer.Ordinal);
 
-        foreach (var group in groups)
+        for (var index = 0; index < requestHandlers.Length; index++)
         {
-            if (group.Count() <= 1)
+            var handler = requestHandlers[index];
+            var name = handler.Configuration.Metadata.Name;
+            if (string.IsNullOrEmpty(name))
                 continue;
 
-            var collidingMethodGroups = group.GroupBy(static tuple => tuple.handler.Method.Name, StringComparer.Ordinal)
-                .Where(static methodGroup => methodGroup.Skip(1)
-                    .Any()
-                );
-
-            foreach (var methodGroup in collidingMethodGroups)
+            if (!nameToMethodMap.TryGetValue(name!, out var methodMap))
             {
-                foreach (var entry in methodGroup)
-                    collidingIndices.Add(entry.index);
+                methodMap = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+                nameToMethodMap.Add(name!, methodMap);
+            }
+
+            var methodName = handler.Method.Name;
+            if (!methodMap.TryGetValue(methodName, out var indices))
+            {
+                indices = new List<int>();
+                methodMap.Add(methodName, indices);
+            }
+
+            indices.Add(index);
+        }
+
+        foreach (var methodMap in nameToMethodMap.Values)
+        {
+            foreach (var indices in methodMap.Values)
+            {
+                if (indices.Count <= 1)
+                    continue;
+
+                foreach (var index in indices)
+                    collidingIndices.Add(index);
             }
         }
 
@@ -1885,7 +1933,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static void GenerateAddEndpointHandlersClass(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
     {
-        var source = GetAddEndpointHandlersStringBuilder(requestHandlers);
+        var nonStaticClassNames = GetDistinctNonStaticClassNames(requestHandlers);
+        var source = GetAddEndpointHandlersStringBuilder(nonStaticClassNames);
         source.AppendLine(FileHeader);
 
         source.AppendLine();
@@ -1912,9 +1961,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         source.AppendLine("    {");
 
-        foreach (var className in requestHandlers.Where(requestHandler => !requestHandler.Class.IsStatic)
-                     .Select(x => x.Class.Name)
-                     .Distinct())
+        foreach (var className in nonStaticClassNames)
         {
             source.Append("        services.TryAddScoped<");
             source.Append(className);
@@ -1931,16 +1978,34 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.AddSource(AddEndpointHandlersMethodHint, SourceText.From(source.ToString(), Encoding.UTF8));
     }
 
-    private static StringBuilder GetAddEndpointHandlersStringBuilder(ImmutableArray<RequestHandler> requestHandlers)
+    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified by calling the \"Select\" LINQ method", Justification = "Manual loops avoid repeated allocations in the source generator.")]
+    private static List<string> GetDistinctNonStaticClassNames(ImmutableArray<RequestHandler> requestHandlers)
     {
-        var distinctHandlers = requestHandlers.Select(x => x.Class)
-            .Where(x => !x.IsStatic)
-            .Distinct()
-            .ToArray();
+        var classNames = new List<string>();
+        if (requestHandlers.IsDefaultOrEmpty)
+            return classNames;
 
-        var estimate = 512 + distinctHandlers.Sum(x => 36 + x.Name.Length);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var requestHandler in requestHandlers)
+        {
+            if (requestHandler.Class.IsStatic)
+                continue;
 
-        estimate += Math.Max(256, distinctHandlers.Length * 12);
+            var className = requestHandler.Class.Name;
+            if (seen.Add(className))
+                classNames.Add(className);
+        }
+
+        return classNames;
+    }
+
+    private static StringBuilder GetAddEndpointHandlersStringBuilder(List<string> nonStaticClassNames)
+    {
+        var estimate = 512;
+        foreach (var className in nonStaticClassNames)
+            estimate += 36 + className.Length;
+
+        estimate += Math.Max(256, nonStaticClassNames.Count * 12);
         estimate = (int)(estimate * 1.10);
 
         estimate = estimate switch
@@ -1987,10 +2052,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         source.AppendLine("    {");
 
-        var groupedClasses = requestHandlers.Select(static handler => handler.Class)
-            .Where(static handlerClass => handlerClass.MapGroupPattern is not null)
-            .Distinct()
-            .ToArray();
+        var groupedClasses = GetClassesWithMapGroups(requestHandlers);
 
         foreach (var groupedClass in groupedClasses)
         {
@@ -2003,7 +2065,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine(";");
         }
 
-        if (groupedClasses.Length > 0)
+        if (groupedClasses.Count > 0)
             source.AppendLine();
 
         for (var index = 0; index < requestHandlers.Length; index++)
@@ -2024,6 +2086,27 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         );
 
         context.AddSource(UseEndpointHandlersMethodHint, SourceText.From(source.ToString(), Encoding.UTF8));
+    }
+
+    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified by calling the \"Select\" LINQ method", Justification = "Manual loops avoid repeated allocations in the source generator.")]
+    private static List<RequestHandlerClass> GetClassesWithMapGroups(ImmutableArray<RequestHandler> requestHandlers)
+    {
+        var groupedClasses = new List<RequestHandlerClass>();
+        if (requestHandlers.IsDefaultOrEmpty)
+            return groupedClasses;
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var handler in requestHandlers)
+        {
+            var handlerClass = handler.Class;
+            if (handlerClass.MapGroupPattern is null)
+                continue;
+
+            if (seen.Add(handlerClass.Name))
+                groupedClasses.Add(handlerClass);
+        }
+
+        return groupedClasses;
     }
 
     private static void GenerateMapRequestHandler(StringBuilder source, RequestHandler requestHandler)
@@ -2734,5 +2817,27 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         FromServices = 6,
         FromKeyedServices = 7,
         AsParameters = 8,
+    }
+
+    private sealed class RequestHandlerComparer : IComparer<RequestHandler>
+    {
+        public static RequestHandlerComparer Instance { get; } = new();
+
+        public int Compare(RequestHandler x, RequestHandler y)
+        {
+            var comparison = string.Compare(x.Class.Name, y.Class.Name, StringComparison.Ordinal);
+            if (comparison != 0)
+                return comparison;
+
+            comparison = string.Compare(x.Method.Name, y.Method.Name, StringComparison.Ordinal);
+            if (comparison != 0)
+                return comparison;
+
+            comparison = string.Compare(x.HttpMethod, y.HttpMethod, StringComparison.Ordinal);
+            if (comparison != 0)
+                return comparison;
+
+            return string.Compare(x.Pattern, y.Pattern, StringComparison.Ordinal);
+        }
     }
 }
