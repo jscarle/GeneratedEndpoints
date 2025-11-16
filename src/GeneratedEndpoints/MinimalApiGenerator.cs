@@ -1,7 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -16,10 +15,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string BaseNamespace = "Microsoft.AspNetCore.Generated";
     private const string AttributesNamespace = $"{BaseNamespace}.Attributes";
     private static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
-    private static readonly string[] AspNetCoreHttpNamespaceParts = new[] { "Microsoft", "AspNetCore", "Http" };
-    private static readonly string[] AspNetCoreAuthorizationNamespaceParts = new[] { "Microsoft", "AspNetCore", "Authorization" };
-    private static readonly string[] AspNetCoreRoutingNamespaceParts = new[] { "Microsoft", "AspNetCore", "Routing" };
-    private static readonly string[] ComponentModelNamespaceParts = new[] { "System", "ComponentModel" };
+    private static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
+    private static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
+    private static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
+    private static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
 
     private const string FallbackHttpMethod = "__FALLBACK__";
 
@@ -126,6 +125,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private const string ConfigureMethodName = "Configure";
     private const string AsyncSuffix = "Async";
+    private const string GlobalPrefix = "global::";
 
     private static readonly string FileHeader = $"""
                                                  //-----------------------------------------------------------------------------
@@ -1292,7 +1292,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 if (attribute.ConstructorArguments.Length == 1)
                 {
                     var arg = attribute.ConstructorArguments[0];
-                    if (arg.Kind == TypedConstantKind.Array && arg.Values.Length > 0)
+                    if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
                     {
                         var values = arg.Values
                             .Select(v => v.Value as string)
@@ -1303,7 +1303,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     }
                     else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
                     {
-                        MergeInto(ref requiredHosts, new[] { singleHost });
+                        MergeInto(ref requiredHosts, [singleHost]);
                     }
                 }
 
@@ -1959,7 +1959,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
     {
         var className = requestHandler.Class.Name;
-        const string GlobalPrefix = "global::";
         if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
             className = className.Substring(GlobalPrefix.Length);
 

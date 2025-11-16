@@ -26,6 +26,6 @@ internal static class EquatableImmutableArray
     /// <returns>An <see cref="EquatableImmutableArray{T}"/> containing the same elements as the original enumerable.</returns>
     public static EquatableImmutableArray<T> ToEquatableImmutableArray<T>(this IEnumerable<T> enumerable)
     {
-        return new EquatableImmutableArray<T>(enumerable.ToImmutableArray());
+        return new EquatableImmutableArray<T>([..enumerable]);
     }
 }
