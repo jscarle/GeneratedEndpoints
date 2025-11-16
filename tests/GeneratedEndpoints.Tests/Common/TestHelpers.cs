@@ -9,9 +9,9 @@ public static class TestHelpers
 {
     public static GeneratorDriverRunResult RunGenerator(IEnumerable<string> sources)
     {
-        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp13);
+        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp11);
         var cSharpCompilationOptions = new CSharpCompilationOptions(OutputKind.NetModule).WithNullableContextOptions(NullableContextOptions.Enable);
-        var (_, result) = IncrementalGenerator.RunWithDiagnostics<MinimalApiGenerator>(sources, cSharpParseOptions, AspNet100.References.All, cSharpCompilationOptions);
+        var (_, result) = IncrementalGenerator.RunWithDiagnostics<MinimalApiGenerator>(sources, cSharpParseOptions, AspNet80.References.All, cSharpCompilationOptions);
         return result;
     }
 
