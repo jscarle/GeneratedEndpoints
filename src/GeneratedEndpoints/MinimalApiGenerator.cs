@@ -785,7 +785,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string summaryVerb,
         bool allowEmptyPattern)
     {
-        var patternDefaultValue = allowEmptyPattern ? " = \\\"\\\"" : string.Empty;
+        var patternDefaultValue = allowEmptyPattern ? " = \"\"" : string.Empty;
         return $$"""
                  {{fileHeader}}
 

@@ -38,13 +38,4 @@
         <ProjectReference Include="..\..\src\GeneratedEndpoints\GeneratedEndpoints.csproj"/>
     </ItemGroup>
 
-    <ItemGroup>
-      <None Update="GeneratedEndpointsTests.MapAllAttributesAndHttpMethods_AddEndpointHandlers_WithNamespace.verified.txt">
-        <DependentUpon>GeneratedEndpointsTests.cs</DependentUpon>
-      </None>
-      <None Update="GeneratedEndpointsTests.ClassAllowAnonymousMethodRequireAuthorization_MapEndpointHandlers_WithNamespace.verified.txt">
-        <DependentUpon>GeneratedEndpointsTests.cs</DependentUpon>
-      </None>
-    </ItemGroup>
-
 </Project>
