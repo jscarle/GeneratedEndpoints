@@ -64,6 +64,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string GroupNameAttributeFullyQualifiedName = $"{AttributesNamespace}.{GroupNameAttributeName}";
     private const string GroupNameAttributeHint = $"{GroupNameAttributeFullyQualifiedName}.gs.cs";
 
+    private const string MapGroupAttributeName = "MapGroupAttribute";
+    private const string MapGroupAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapGroupAttributeName}";
+    private const string MapGroupAttributeHint = $"{MapGroupAttributeFullyQualifiedName}.gs.cs";
+
     private const string SummaryAttributeName = "SummaryAttribute";
     private const string SummaryAttributeFullyQualifiedName = $"{AttributesNamespace}.{SummaryAttributeName}";
     private const string SummaryAttributeHint = $"{SummaryAttributeFullyQualifiedName}.gs.cs";
@@ -472,6 +476,36 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                 """;
         context.AddSource(GroupNameAttributeHint, SourceText.From(groupNameSource, Encoding.UTF8));
 
+        // MapGroup
+        var mapGroupSource = $$"""
+                               {{FileHeader}}
+
+                               namespace {{AttributesNamespace}};
+
+                               /// <summary>
+                               /// Specifies the route group for the annotated class.
+                               /// </summary>
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+                               internal sealed class {{MapGroupAttributeName}} : global::System.Attribute
+                               {
+                                   /// <summary>
+                                   /// Gets the route group pattern.
+                                   /// </summary>
+                                   public string Pattern { get; }
+
+                                   /// <summary>
+                                   /// Initializes a new instance of the <see cref="{{MapGroupAttributeName}}"/> class.
+                                   /// </summary>
+                                   /// <param name="pattern">The route group pattern to apply.</param>
+                                   public {{MapGroupAttributeName}}(string pattern)
+                                   {
+                                       Pattern = pattern;
+                                   }
+                               }
+
+                               """;
+        context.AddSource(MapGroupAttributeHint, SourceText.From(mapGroupSource, Encoding.UTF8));
+
         // Summary
         var summarySource = $$"""
                               {{FileHeader}}
@@ -871,7 +905,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (requestHandlerClassResult is null)
             return null;
 
-        var (requestHandlerClassSymbol, requestHandlerClass) = requestHandlerClassResult.Value;
+        var (_, requestHandlerClass) = requestHandlerClassResult.Value;
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
@@ -879,21 +913,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (displayName, description) = GetDisplayAndDescriptionAttributes(requestHandlerMethodSymbol);
 
-        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription, accepts, produces, producesProblem,
-                producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes,
-                shortCircuit, disableRequestTimeout, withRequestTimeout, requestTimeoutPolicyName, order, endpointGroupName, summary) =
-            GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
-
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
 
-        var metadata = new RequestHandlerMetadata(name, displayName, summary, description, tags, accepts, produces, producesProblem, producesValidationProblem,
-            excludeFromDescription
-        );
+        var methodConfiguration = GetEndpointConfiguration(requestHandlerMethodSymbol.GetAttributes(), name, displayName, description, true);
 
-        var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
-            authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts, requireRateLimiting, rateLimitingPolicyName,
-            endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout, requestTimeoutPolicyName, order, endpointGroupName
-        );
+        var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
 
         return requestHandler;
     }
@@ -958,20 +982,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return (displayName, description);
     }
 
-    private static ( EquatableImmutableArray<string>? tags, bool requireAuthorization, EquatableImmutableArray<string>? authorizationPolicies, bool
-        disableAntiforgery, bool allowAnonymous, bool excludeFromDescription, EquatableImmutableArray<AcceptsMetadata>? accepts,
-        EquatableImmutableArray<ProducesMetadata>? produces, EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
-        EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem, bool requireCors, string? corsPolicyName,
-        EquatableImmutableArray<string>? requiredHosts, bool requireRateLimiting, string? rateLimitingPolicyName, EquatableImmutableArray<string>?
-        endpointFilterTypes, bool shortCircuit, bool disableRequestTimeout, bool withRequestTimeout, string? requestTimeoutPolicyName, int? order, string?
-        endpointGroupName, string? summary ) GetAdditionalRequestHandlerAttributes(
-            INamedTypeSymbol classSymbol,
-            IMethodSymbol methodSymbol,
-            CancellationToken cancellationToken
-        )
+    private static EndpointConfiguration GetEndpointConfiguration(
+        ImmutableArray<AttributeData> attributes,
+        string? name,
+        string? displayName,
+        string? description,
+        bool enforceMethodRequireAuthorizationRules
+    )
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         EquatableImmutableArray<string>? tags = null;
         bool? requireAuthorization = null;
         EquatableImmutableArray<string>? authorizationPolicies = null;
@@ -997,34 +1015,27 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         List<ProducesProblemMetadata>? producesProblem = null;
         List<ProducesValidationProblemMetadata>? producesValidationProblem = null;
 
-        var classAttributes = classSymbol.GetAttributes();
-        var classHasAllowAnonymousAttribute = false;
-        var classHasRequireAuthorizationAttribute = false;
-        GetAdditionalRequestHandlerAttributeValues(classAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery,
+        var hasAllowAnonymousAttribute = false;
+        var hasRequireAuthorizationAttribute = false;
+
+        GetAdditionalRequestHandlerAttributeValues(attributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery,
             ref allowAnonymous, ref excludeFromDescription, ref accepts, ref produces, ref producesProblem, ref producesValidationProblem, ref requireCors,
             ref corsPolicyName, ref requiredHosts, ref requireRateLimiting, ref rateLimitingPolicyName, ref endpointFilters,
-            ref classHasAllowAnonymousAttribute, ref classHasRequireAuthorizationAttribute, ref shortCircuit, ref disableRequestTimeout, ref withRequestTimeout,
+            ref hasAllowAnonymousAttribute, ref hasRequireAuthorizationAttribute, ref shortCircuit, ref disableRequestTimeout, ref withRequestTimeout,
             ref requestTimeoutPolicyName, ref order, ref endpointGroupName, ref summary
         );
 
-        var methodAttributes = methodSymbol.GetAttributes();
-        var methodHasAllowAnonymousAttribute = false;
-        var methodHasRequireAuthorizationAttribute = false;
-        GetAdditionalRequestHandlerAttributeValues(methodAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery,
-            ref allowAnonymous, ref excludeFromDescription, ref accepts, ref produces, ref producesProblem, ref producesValidationProblem, ref requireCors,
-            ref corsPolicyName, ref requiredHosts, ref requireRateLimiting, ref rateLimitingPolicyName, ref endpointFilters,
-            ref methodHasAllowAnonymousAttribute, ref methodHasRequireAuthorizationAttribute, ref shortCircuit, ref disableRequestTimeout,
-            ref withRequestTimeout, ref requestTimeoutPolicyName, ref order, ref endpointGroupName, ref summary
-        );
-
-        if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
+        if (enforceMethodRequireAuthorizationRules && hasRequireAuthorizationAttribute && !hasAllowAnonymousAttribute)
             allowAnonymous = false;
 
-        return (tags, requireAuthorization ?? false, authorizationPolicies, disableAntiforgery ?? false, allowAnonymous ?? false,
-            excludeFromDescription ?? false, ToEquatableOrNull(accepts), ToEquatableOrNull(produces), ToEquatableOrNull(producesProblem),
-            ToEquatableOrNull(producesValidationProblem), requireCors ?? false, corsPolicyName, requiredHosts, requireRateLimiting ?? false,
-            rateLimitingPolicyName, ToEquatableOrNull(endpointFilters), shortCircuit ?? false, disableRequestTimeout ?? false, withRequestTimeout ?? false,
-            withRequestTimeout ?? false ? requestTimeoutPolicyName : null, order, endpointGroupName, summary);
+        var metadata = new RequestHandlerMetadata(name, displayName, summary, description, tags, ToEquatableOrNull(accepts), ToEquatableOrNull(produces),
+            ToEquatableOrNull(producesProblem), ToEquatableOrNull(producesValidationProblem), excludeFromDescription ?? false
+        );
+
+        return new EndpointConfiguration(metadata, requireAuthorization ?? false, authorizationPolicies, disableAntiforgery ?? false,
+            allowAnonymous ?? false, requireCors ?? false, corsPolicyName, requiredHosts, requireRateLimiting ?? false, rateLimitingPolicyName,
+            ToEquatableOrNull(endpointFilters), shortCircuit ?? false, disableRequestTimeout ?? false, withRequestTimeout ?? false,
+            withRequestTimeout ?? false ? requestTimeoutPolicyName : null, order, endpointGroupName);
     }
 
     private static void GetAdditionalRequestHandlerAttributeValues(
@@ -1300,6 +1311,45 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
     }
 
+    private static string? GetMapGroupPattern(INamedTypeSymbol classSymbol)
+    {
+        foreach (var attribute in classSymbol.GetAttributes())
+        {
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass is null)
+                continue;
+
+            if (!IsGeneratedAttribute(attributeClass, MapGroupAttributeName))
+                continue;
+
+            if (attribute.ConstructorArguments.Length > 0)
+            {
+                var pattern = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
+                if (!string.IsNullOrEmpty(pattern))
+                    return pattern;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetMapGroupIdentifier(string className)
+    {
+        if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
+            className = className.Substring(GlobalPrefix.Length);
+
+        var builder = new StringBuilder(className.Length + 8);
+        builder.Append('_');
+
+        foreach (var character in className)
+        {
+            builder.Append(char.IsLetterOrDigit(character) ? character : '_');
+        }
+
+        builder.Append("_Group");
+        return builder.ToString();
+    }
+
     private static EquatableImmutableArray<string>? GetStringArrayValues(TypedConstant typedConstant)
     {
         if (typedConstant.Kind != TypedConstantKind.Array || typedConstant.Values.IsDefaultOrEmpty)
@@ -1521,8 +1571,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var serviceProviderSymbol = compilation.GetTypeByMetadataName("System.IServiceProvider");
         var configureMethodDetails = GetConfigureMethodDetails(classSymbol, endpointConventionBuilderSymbol, serviceProviderSymbol, cancellationToken);
 
+        var mapGroupPattern = GetMapGroupPattern(classSymbol);
+        var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
+        var classConfiguration = GetEndpointConfiguration(classSymbol.GetAttributes(), null, null, null, false);
+
         var requestHandlerClass = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
-            configureMethodDetails.ConfigureMethodAcceptsServiceProvider
+            configureMethodDetails.ConfigureMethodAcceptsServiceProvider, mapGroupPattern, mapGroupIdentifier, classConfiguration
         );
 
         return (classSymbol, requestHandlerClass);
@@ -1782,14 +1836,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         foreach (var index in collidingHandlers)
         {
             var handler = builder[index];
-            var metadata = handler.Metadata with
+            var configuration = handler.Configuration;
+            var metadata = configuration.Metadata with
             {
                 Name = GetFullyQualifiedMethodDisplayName(handler),
             };
-            builder[index] = handler with
-            {
-                Metadata = metadata,
-            };
+            configuration = configuration with { Metadata = metadata };
+            builder[index] = handler with { Configuration = configuration };
         }
 
         return builder.MoveToImmutable();
@@ -1800,8 +1853,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var collidingIndices = ImmutableHashSet.CreateBuilder<int>();
 
         var groups = requestHandlers.Select((handler, index) => (handler, index))
-            .Where(static tuple => !string.IsNullOrEmpty(tuple.handler.Metadata.Name))
-            .GroupBy(static tuple => tuple.handler.Metadata.Name!, StringComparer.Ordinal);
+            .Where(static tuple => !string.IsNullOrEmpty(tuple.handler.Configuration.Metadata.Name))
+            .GroupBy(static tuple => tuple.handler.Configuration.Metadata.Name!, StringComparer.Ordinal);
 
         foreach (var group in groups)
         {
@@ -1916,7 +1969,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.AppendLine("using Microsoft.AspNetCore.Http;");
         source.AppendLine("using Microsoft.AspNetCore.Mvc;");
         source.AppendLine("using Microsoft.AspNetCore.Routing;");
-        if (requestHandlers.Any(static handler => handler.RequireRateLimiting))
+        if (requestHandlers.Any(static handler => handler.Configuration.RequireRateLimiting))
             source.AppendLine("using Microsoft.AspNetCore.RateLimiting;");
         source.AppendLine("using Microsoft.Extensions.DependencyInjection;");
         source.AppendLine();
@@ -1938,6 +1991,25 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.AppendLine("(this IEndpointRouteBuilder builder)");
 
         source.AppendLine("    {");
+
+        var groupedClasses = requestHandlers.Select(static handler => handler.Class)
+            .Where(static handlerClass => !string.IsNullOrEmpty(handlerClass.MapGroupPattern))
+            .Distinct()
+            .ToArray();
+
+        foreach (var groupedClass in groupedClasses)
+        {
+            source.Append("        var ");
+            source.Append(groupedClass.MapGroupBuilderIdentifier);
+            source.Append(" = builder.MapGroup(");
+            source.Append(StringLiteral(groupedClass.MapGroupPattern!));
+            source.Append(')');
+            AppendEndpointConfiguration(source, "            ", groupedClass.Configuration, includeNameAndDisplayName: false);
+            source.AppendLine(";");
+        }
+
+        if (groupedClasses.Length > 0)
+            source.AppendLine();
 
         for (var index = 0; index < requestHandlers.Length; index++)
         {
@@ -1965,6 +2037,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var configureAcceptsServiceProvider = requestHandler.Class.ConfigureMethodAcceptsServiceProvider;
         var indent = wrapWithConfigure ? "            " : "        ";
         var continuationIndent = indent + "    ";
+        var routeBuilderIdentifier = requestHandler.Class.MapGroupBuilderIdentifier ?? "builder";
 
         if (wrapWithConfigure)
         {
@@ -1981,7 +2054,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.Append(indent);
         if (isFallback)
         {
-            source.Append("builder.MapFallback(");
+            source.Append(routeBuilderIdentifier);
+            source.Append(".MapFallback(");
             if (!string.IsNullOrEmpty(requestHandler.Pattern))
             {
                 source.Append(StringLiteral(requestHandler.Pattern));
@@ -1990,7 +2064,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
         else
         {
-            source.Append("builder.Map");
+            source.Append(routeBuilderIdentifier);
+            source.Append(".Map");
             source.Append(mapMethodSuffix ?? "Methods");
             source.Append('(');
             source.Append(StringLiteral(requestHandler.Pattern));
@@ -2041,231 +2116,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
         source.Append(')');
 
-        if (!string.IsNullOrEmpty(requestHandler.Metadata.Name))
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithName(");
-            source.Append(StringLiteral(requestHandler.Metadata.Name));
-            source.Append(')');
-        }
+        var configuration = requestHandler.Configuration;
+        if (requestHandler.Class.MapGroupPattern is null)
+            configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
 
-        if (!string.IsNullOrEmpty(requestHandler.Metadata.DisplayName))
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithDisplayName(");
-            source.Append(StringLiteral(requestHandler.Metadata.DisplayName));
-            source.Append(')');
-        }
-
-        if (!string.IsNullOrEmpty(requestHandler.Metadata.Summary))
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithSummary(");
-            source.Append(StringLiteral(requestHandler.Metadata.Summary));
-            source.Append(')');
-        }
-
-        if (!string.IsNullOrEmpty(requestHandler.Metadata.Description))
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithDescription(");
-            source.Append(StringLiteral(requestHandler.Metadata.Description));
-            source.Append(')');
-        }
-
-        if (!string.IsNullOrEmpty(requestHandler.EndpointGroupName))
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithGroupName(");
-            source.Append(StringLiteral(requestHandler.EndpointGroupName));
-            source.Append(')');
-        }
-
-        if (requestHandler.Order is { } orderValue)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithOrder(");
-            source.Append(orderValue);
-            source.Append(')');
-        }
-
-        if (requestHandler.Metadata.ExcludeFromDescription)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".ExcludeFromDescription()");
-        }
-
-        if (requestHandler.Metadata.Tags is { Count: > 0 })
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".WithTags(");
-            source.Append(string.Join(", ", requestHandler.Metadata.Tags.Value.Select(StringLiteral)));
-            source.Append(')');
-        }
-
-        if (requestHandler.Metadata.Accepts is { Count: > 0 })
-            foreach (var accepts in requestHandler.Metadata.Accepts.Value)
-            {
-                source.AppendLine();
-                source.Append(continuationIndent);
-                source.Append(".Accepts<");
-                source.Append(accepts.RequestType);
-                source.Append('>');
-                source.Append('(');
-                if (accepts.IsOptional)
-                    source.Append("isOptional: true, ");
-                source.Append(StringLiteral(accepts.ContentType));
-                AppendAdditionalContentTypes(source, accepts.AdditionalContentTypes);
-                source.Append(')');
-            }
-
-        if (requestHandler.Metadata.Produces is { Count: > 0 })
-            foreach (var produces in requestHandler.Metadata.Produces.Value)
-            {
-                source.AppendLine();
-                source.Append(continuationIndent);
-                source.Append(".Produces<");
-                source.Append(produces.ResponseType);
-                source.Append('>');
-                source.Append('(');
-                source.Append(produces.StatusCode);
-                AppendOptionalContentTypes(source, produces.ContentType, produces.AdditionalContentTypes);
-                source.Append(')');
-            }
-
-        if (requestHandler.Metadata.ProducesProblem is { Count: > 0 })
-            foreach (var producesProblem in requestHandler.Metadata.ProducesProblem.Value)
-            {
-                source.AppendLine();
-                source.Append(continuationIndent);
-                source.Append(".ProducesProblem(");
-                source.Append(producesProblem.StatusCode);
-                AppendOptionalContentTypes(source, producesProblem.ContentType, producesProblem.AdditionalContentTypes);
-                source.Append(')');
-            }
-
-        if (requestHandler.Metadata.ProducesValidationProblem is { Count: > 0 })
-            foreach (var producesValidationProblem in requestHandler.Metadata.ProducesValidationProblem.Value)
-            {
-                source.AppendLine();
-                source.Append(continuationIndent);
-                source.Append(".ProducesValidationProblem(");
-                source.Append(producesValidationProblem.StatusCode);
-                AppendOptionalContentTypes(source, producesValidationProblem.ContentType, producesValidationProblem.AdditionalContentTypes);
-                source.Append(')');
-            }
-
-        if (requestHandler.RequireAuthorization)
-        {
-            source.AppendLine();
-            if (requestHandler.AuthorizationPolicies is { Count: > 0 })
-            {
-                source.Append(continuationIndent);
-                source.Append(".RequireAuthorization(");
-                source.Append(string.Join(", ", requestHandler.AuthorizationPolicies.Value.Select(StringLiteral)));
-                source.Append(')');
-            }
-            else
-            {
-                source.Append(continuationIndent);
-                source.Append(".RequireAuthorization()");
-            }
-        }
-
-        if (requestHandler.RequireCors)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            if (!string.IsNullOrEmpty(requestHandler.CorsPolicyName))
-            {
-                source.Append(".RequireCors(");
-                source.Append(StringLiteral(requestHandler.CorsPolicyName));
-                source.Append(')');
-            }
-            else
-            {
-                source.Append(".RequireCors()");
-            }
-        }
-
-        if (requestHandler.RequiredHosts is { Count: > 0 })
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".RequireHost(");
-            source.Append(string.Join(", ", requestHandler.RequiredHosts.Value.Select(StringLiteral)));
-            source.Append(')');
-        }
-
-        if (requestHandler.RequireRateLimiting && !string.IsNullOrEmpty(requestHandler.RateLimitingPolicyName))
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".RequireRateLimiting(");
-            source.Append(StringLiteral(requestHandler.RateLimitingPolicyName));
-            source.Append(')');
-        }
-
-        if (requestHandler.DisableAntiforgery)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".DisableAntiforgery()");
-        }
-
-        if (requestHandler.AllowAnonymous)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".AllowAnonymous()");
-        }
-
-        if (requestHandler.ShortCircuit)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".ShortCircuit()");
-        }
-
-        if (requestHandler.DisableRequestTimeout)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            source.Append(".DisableRequestTimeout()");
-        }
-        else if (requestHandler.WithRequestTimeout)
-        {
-            source.AppendLine();
-            source.Append(continuationIndent);
-            if (!string.IsNullOrEmpty(requestHandler.RequestTimeoutPolicyName))
-            {
-                source.Append(".WithRequestTimeout(");
-                source.Append(StringLiteral(requestHandler.RequestTimeoutPolicyName));
-                source.Append(')');
-            }
-            else
-            {
-                source.Append(".WithRequestTimeout()");
-            }
-        }
-
-        if (requestHandler.EndpointFilterTypes is { Count: > 0 })
-            foreach (var filterType in requestHandler.EndpointFilterTypes.Value)
-            {
-                source.AppendLine();
-                source.Append(continuationIndent);
-                source.Append(".AddEndpointFilter<");
-                source.Append(filterType);
-                source.Append(">()");
-            }
+        AppendEndpointConfiguration(source, continuationIndent, configuration, includeNameAndDisplayName: true);
 
         if (wrapWithConfigure && configureAcceptsServiceProvider)
         {
@@ -2284,6 +2139,313 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         {
             source.AppendLine(";");
         }
+    }
+
+    private static void AppendEndpointConfiguration(StringBuilder source, string indent, EndpointConfiguration configuration, bool includeNameAndDisplayName)
+    {
+        var metadata = configuration.Metadata;
+
+        if (includeNameAndDisplayName && !string.IsNullOrEmpty(metadata.Name))
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithName(");
+            source.Append(StringLiteral(metadata.Name));
+            source.Append(')');
+        }
+
+        if (includeNameAndDisplayName && !string.IsNullOrEmpty(metadata.DisplayName))
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithDisplayName(");
+            source.Append(StringLiteral(metadata.DisplayName));
+            source.Append(')');
+        }
+
+        if (!string.IsNullOrEmpty(metadata.Summary))
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithSummary(");
+            source.Append(StringLiteral(metadata.Summary));
+            source.Append(')');
+        }
+
+        if (!string.IsNullOrEmpty(metadata.Description))
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithDescription(");
+            source.Append(StringLiteral(metadata.Description));
+            source.Append(')');
+        }
+
+        if (!string.IsNullOrEmpty(configuration.EndpointGroupName))
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithGroupName(");
+            source.Append(StringLiteral(configuration.EndpointGroupName));
+            source.Append(')');
+        }
+
+        if (configuration.Order is { } orderValue)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithOrder(");
+            source.Append(orderValue);
+            source.Append(')');
+        }
+
+        if (metadata.ExcludeFromDescription)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".ExcludeFromDescription()");
+        }
+
+        if (metadata.Tags is { Count: > 0 })
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".WithTags(");
+            source.Append(string.Join(", ", metadata.Tags.Value.Select(StringLiteral)));
+            source.Append(')');
+        }
+
+        if (metadata.Accepts is { Count: > 0 })
+            foreach (var accepts in metadata.Accepts.Value)
+            {
+                source.AppendLine();
+                source.Append(indent);
+                source.Append(".Accepts<");
+                source.Append(accepts.RequestType);
+                source.Append('>');
+                source.Append('(');
+                if (accepts.IsOptional)
+                    source.Append("isOptional: true, ");
+                source.Append(StringLiteral(accepts.ContentType));
+                AppendAdditionalContentTypes(source, accepts.AdditionalContentTypes);
+                source.Append(')');
+            }
+
+        if (metadata.Produces is { Count: > 0 })
+            foreach (var produces in metadata.Produces.Value)
+            {
+                source.AppendLine();
+                source.Append(indent);
+                source.Append(".Produces<");
+                source.Append(produces.ResponseType);
+                source.Append('>');
+                source.Append('(');
+                source.Append(produces.StatusCode);
+                AppendOptionalContentTypes(source, produces.ContentType, produces.AdditionalContentTypes);
+                source.Append(')');
+            }
+
+        if (metadata.ProducesProblem is { Count: > 0 })
+            foreach (var producesProblem in metadata.ProducesProblem.Value)
+            {
+                source.AppendLine();
+                source.Append(indent);
+                source.Append(".ProducesProblem(");
+                source.Append(producesProblem.StatusCode);
+                AppendOptionalContentTypes(source, producesProblem.ContentType, producesProblem.AdditionalContentTypes);
+                source.Append(')');
+            }
+
+        if (metadata.ProducesValidationProblem is { Count: > 0 })
+            foreach (var producesValidationProblem in metadata.ProducesValidationProblem.Value)
+            {
+                source.AppendLine();
+                source.Append(indent);
+                source.Append(".ProducesValidationProblem(");
+                source.Append(producesValidationProblem.StatusCode);
+                AppendOptionalContentTypes(source, producesValidationProblem.ContentType, producesValidationProblem.AdditionalContentTypes);
+                source.Append(')');
+            }
+
+        if (configuration.RequireAuthorization)
+        {
+            source.AppendLine();
+            if (configuration.AuthorizationPolicies is { Count: > 0 })
+            {
+                source.Append(indent);
+                source.Append(".RequireAuthorization(");
+                source.Append(string.Join(", ", configuration.AuthorizationPolicies.Value.Select(StringLiteral)));
+                source.Append(')');
+            }
+            else
+            {
+                source.Append(indent);
+                source.Append(".RequireAuthorization()");
+            }
+        }
+
+        if (configuration.RequireCors)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            if (!string.IsNullOrEmpty(configuration.CorsPolicyName))
+            {
+                source.Append(".RequireCors(");
+                source.Append(StringLiteral(configuration.CorsPolicyName));
+                source.Append(')');
+            }
+            else
+            {
+                source.Append(".RequireCors()");
+            }
+        }
+
+        if (configuration.RequiredHosts is { Count: > 0 })
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".RequireHost(");
+            source.Append(string.Join(", ", configuration.RequiredHosts.Value.Select(StringLiteral)));
+            source.Append(')');
+        }
+
+        if (configuration.RequireRateLimiting && !string.IsNullOrEmpty(configuration.RateLimitingPolicyName))
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".RequireRateLimiting(");
+            source.Append(StringLiteral(configuration.RateLimitingPolicyName));
+            source.Append(')');
+        }
+
+        if (configuration.DisableAntiforgery)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".DisableAntiforgery()");
+        }
+
+        if (configuration.AllowAnonymous)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".AllowAnonymous()");
+        }
+
+        if (configuration.ShortCircuit)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".ShortCircuit()");
+        }
+
+        if (configuration.DisableRequestTimeout)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            source.Append(".DisableRequestTimeout()");
+        }
+        else if (configuration.WithRequestTimeout)
+        {
+            source.AppendLine();
+            source.Append(indent);
+            if (!string.IsNullOrEmpty(configuration.RequestTimeoutPolicyName))
+            {
+                source.Append(".WithRequestTimeout(");
+                source.Append(StringLiteral(configuration.RequestTimeoutPolicyName));
+                source.Append(')');
+            }
+            else
+            {
+                source.Append(".WithRequestTimeout()");
+            }
+        }
+
+        if (configuration.EndpointFilterTypes is { Count: > 0 })
+            foreach (var filterType in configuration.EndpointFilterTypes.Value)
+            {
+                source.AppendLine();
+                source.Append(indent);
+                source.Append(".AddEndpointFilter<");
+                source.Append(filterType);
+                source.Append(">()");
+            }
+    }
+
+    private static EndpointConfiguration MergeEndpointConfigurations(EndpointConfiguration classConfiguration, EndpointConfiguration methodConfiguration)
+    {
+        var metadata = MergeRequestHandlerMetadata(classConfiguration.Metadata, methodConfiguration.Metadata);
+        var authorizationPolicies = MergeDistinctStrings(classConfiguration.AuthorizationPolicies, methodConfiguration.AuthorizationPolicies);
+        var requiredHosts = MergeDistinctStrings(classConfiguration.RequiredHosts, methodConfiguration.RequiredHosts);
+        var endpointFilterTypes = ConcatEquatable(classConfiguration.EndpointFilterTypes, methodConfiguration.EndpointFilterTypes);
+        var requireAuthorization = classConfiguration.RequireAuthorization || methodConfiguration.RequireAuthorization;
+        var disableAntiforgery = classConfiguration.DisableAntiforgery || methodConfiguration.DisableAntiforgery;
+        var allowAnonymous = classConfiguration.AllowAnonymous || methodConfiguration.AllowAnonymous;
+        var requireCors = classConfiguration.RequireCors || methodConfiguration.RequireCors;
+        var corsPolicyName = methodConfiguration.CorsPolicyName ?? classConfiguration.CorsPolicyName;
+        var requireRateLimiting = classConfiguration.RequireRateLimiting || methodConfiguration.RequireRateLimiting;
+        var rateLimitingPolicyName = methodConfiguration.RateLimitingPolicyName ?? classConfiguration.RateLimitingPolicyName;
+        var shortCircuit = classConfiguration.ShortCircuit || methodConfiguration.ShortCircuit;
+        var disableRequestTimeout = classConfiguration.DisableRequestTimeout || methodConfiguration.DisableRequestTimeout;
+        var withRequestTimeout = classConfiguration.WithRequestTimeout || methodConfiguration.WithRequestTimeout;
+        string? requestTimeoutPolicyName = null;
+        if (methodConfiguration.WithRequestTimeout)
+            requestTimeoutPolicyName = methodConfiguration.RequestTimeoutPolicyName;
+        else if (classConfiguration.WithRequestTimeout)
+            requestTimeoutPolicyName = classConfiguration.RequestTimeoutPolicyName;
+
+        if (disableRequestTimeout)
+        {
+            withRequestTimeout = false;
+            requestTimeoutPolicyName = null;
+        }
+
+        var order = methodConfiguration.Order ?? classConfiguration.Order;
+        var endpointGroupName = methodConfiguration.EndpointGroupName ?? classConfiguration.EndpointGroupName;
+
+        return new EndpointConfiguration(metadata, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors,
+            corsPolicyName, requiredHosts, requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout,
+            withRequestTimeout, requestTimeoutPolicyName, order, endpointGroupName);
+    }
+
+    private static RequestHandlerMetadata MergeRequestHandlerMetadata(RequestHandlerMetadata classMetadata, RequestHandlerMetadata methodMetadata)
+    {
+        return new RequestHandlerMetadata(
+            methodMetadata.Name ?? classMetadata.Name,
+            methodMetadata.DisplayName ?? classMetadata.DisplayName,
+            methodMetadata.Summary ?? classMetadata.Summary,
+            methodMetadata.Description ?? classMetadata.Description,
+            MergeDistinctStrings(classMetadata.Tags, methodMetadata.Tags),
+            ConcatEquatable(classMetadata.Accepts, methodMetadata.Accepts),
+            ConcatEquatable(classMetadata.Produces, methodMetadata.Produces),
+            ConcatEquatable(classMetadata.ProducesProblem, methodMetadata.ProducesProblem),
+            ConcatEquatable(classMetadata.ProducesValidationProblem, methodMetadata.ProducesValidationProblem),
+            classMetadata.ExcludeFromDescription || methodMetadata.ExcludeFromDescription
+        );
+    }
+
+    private static EquatableImmutableArray<string>? MergeDistinctStrings(EquatableImmutableArray<string>? first, EquatableImmutableArray<string>? second)
+    {
+        if (first is not { Count: > 0 })
+            return second;
+        if (second is not { Count: > 0 })
+            return first;
+
+        var merged = MergeUnion(first, second.Value);
+        return merged.Count > 0 ? merged : null;
+    }
+
+    private static EquatableImmutableArray<T>? ConcatEquatable<T>(EquatableImmutableArray<T>? first, EquatableImmutableArray<T>? second)
+    {
+        if (first is not { Count: > 0 })
+            return second;
+        if (second is not { Count: > 0 })
+            return first;
+
+        var builder = ImmutableArray.CreateBuilder<T>(first.Value.Count + second.Value.Count);
+        builder.AddRange(first.Value);
+        builder.AddRange(second.Value);
+        return builder.ToEquatableImmutableArray();
     }
 
     private static string? GetMapMethodSuffix(string httpMethod)
@@ -2482,6 +2644,20 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         RequestHandlerMethod Method,
         string HttpMethod,
         string Pattern,
+        EndpointConfiguration Configuration
+    );
+
+    private readonly record struct RequestHandlerClass(
+        string Name,
+        bool IsStatic,
+        bool HasConfigureMethod,
+        bool ConfigureMethodAcceptsServiceProvider,
+        string? MapGroupPattern,
+        string? MapGroupBuilderIdentifier,
+        EndpointConfiguration Configuration
+    );
+
+    private readonly record struct EndpointConfiguration(
         RequestHandlerMetadata Metadata,
         bool RequireAuthorization,
         EquatableImmutableArray<string>? AuthorizationPolicies,
@@ -2500,8 +2676,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         int? Order,
         string? EndpointGroupName
     );
-
-    private readonly record struct RequestHandlerClass(string Name, bool IsStatic, bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
     private readonly record struct RequestHandlerMethod(string Name, bool IsStatic, bool IsAwaitable, EquatableImmutableArray<Parameter> Parameters);
 

@@ -166,6 +166,28 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task ClassMapGroup()
+    {
+        var source = AuthorizationScenario(
+            classRequireAuthorization: true,
+            classTags: true,
+            classHost: "*.individual.com",
+            classRequireCors: true,
+            classCorsPolicy: "ClassCors",
+            applyShortCircuit: true,
+            applyRequestTimeout: true,
+            requestTimeoutPolicy: "ClassTimeout",
+            orderValue: 2,
+            groupName: "ClassGroup",
+            excludeFromDescription: true,
+            methodAllowAnonymous: true,
+            methodTags: true,
+            mapGroupPattern: "/individuals"
+        );
+        await VerifyIndividualAsync(source, nameof(ClassMapGroup));
+    }
+
+    [Fact]
     public async Task ExcludeFromDescription()
     {
         var source = AuthorizationScenario(excludeFromDescription: true);
@@ -446,7 +468,8 @@ public class IndividualTests
         bool disableRequestTimeout = false,
         int orderValue = 0,
         string? groupName = null,
-        bool excludeFromDescription = false)
+        bool excludeFromDescription = false,
+        string? mapGroupPattern = null)
         => SourceFactory.BuildAuthorizationMatrixSource(
             classAllowAnonymous,
             methodAllowAnonymous,
@@ -468,7 +491,8 @@ public class IndividualTests
             disableRequestTimeout,
             orderValue,
             groupName,
-            excludeFromDescription);
+            excludeFromDescription,
+            mapGroupPattern);
 
     private static string ConfigureScenario(
         bool configureWithServiceProvider = false,
