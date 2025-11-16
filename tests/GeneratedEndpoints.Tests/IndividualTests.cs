@@ -446,6 +446,13 @@ public class IndividualTests
         await VerifyIndividualAsync(source, nameof(ContractRequireAuthorization));
     }
 
+    [Fact]
+    public async Task AsyncMethodVariants()
+    {
+        var source = AsyncHandlerScenario();
+        await VerifyIndividualAsync(source, nameof(AsyncMethodVariants));
+    }
+
     private static async Task VerifyIndividualAsync(string source, string scenario, bool withNamespace = true)
     {
         var sources = TestHelpers.GetSources(source, withNamespace);
@@ -594,4 +601,38 @@ public class IndividualTests
             acceptsContentType2,
             producesContentType1,
             producesContentType2);
+
+    private static string AsyncHandlerScenario()
+        => """
+            using System.Threading.Tasks;
+
+            internal sealed class AsyncHandlerEndpoints
+            {
+                [MapGet("/task")]
+                public async Task TaskOnly()
+                {
+                    await Task.Yield();
+                }
+
+                [MapGet("/task-result")]
+                public async Task<Results<Ok<string>, NotFound>> TaskWithResult(int id)
+                {
+                    await Task.Yield();
+                    return id >= 0 ? TypedResults.Ok("task") : TypedResults.NotFound();
+                }
+
+                [MapPost("/valuetask")]
+                public async ValueTask ValueTaskOnly()
+                {
+                    await Task.Yield();
+                }
+
+                [MapPost("/valuetask-result")]
+                public async ValueTask<Results<Ok<string>, NotFound>> ValueTaskWithResult(int id)
+                {
+                    await Task.Yield();
+                    return id >= 0 ? TypedResults.Ok("value") : TypedResults.NotFound();
+                }
+            }
+            """;
 }
