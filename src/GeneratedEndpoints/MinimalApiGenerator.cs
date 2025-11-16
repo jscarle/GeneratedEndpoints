@@ -462,7 +462,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                    /// <summary>
                                    /// Gets or sets the endpoint group name.
                                    /// </summary>
-                                   public string? Name { get; set; }
+                                   public string? Name { get; init; }
 
                                    /// <summary>
                                    /// Initializes a new instance of the <see cref="{{MapGroupAttributeName}}"/> class.
