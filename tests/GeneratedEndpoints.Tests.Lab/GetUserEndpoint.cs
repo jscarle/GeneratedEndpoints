@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Generated.Attributes;
@@ -26,7 +27,9 @@ internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
     [ProducesResponse<UserProfile>(StatusCodes.Status202Accepted, "application/json")]
     [ProducesProblem(StatusCodes.Status500InternalServerError, "application/problem+json")]
     [ProducesValidationProblem(StatusCodes.Status400BadRequest, "application/problem+json")]
-    [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.", Description = "Gets a user by ID when the ID is greater than zero.")]
+    [DisplayName("User lookup endpoint")]
+    [Description("Gets a user by ID when the ID is greater than zero.")]
+    [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.")]
     public Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser(
         [FromQuery] int id,
         [FromKeyedServices(ServiceLifetime.Scoped)] IServiceCollection services
