@@ -131,6 +131,20 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task ClassDisableValidation()
+    {
+        var source = AuthorizationScenario(classDisableValidation: true);
+        await VerifyIndividualAsync(source, nameof(ClassDisableValidation));
+    }
+
+    [Fact]
+    public async Task MethodDisableValidation()
+    {
+        var source = AuthorizationScenario(methodDisableValidation: true);
+        await VerifyIndividualAsync(source, nameof(MethodDisableValidation));
+    }
+
+    [Fact]
     public async Task RequestTimeout()
     {
         var source = AuthorizationScenario(applyRequestTimeout: true);
@@ -469,7 +483,9 @@ public class IndividualTests
         int orderValue = 0,
         string? groupName = null,
         bool excludeFromDescription = false,
-        string? mapGroupPattern = null)
+        string? mapGroupPattern = null,
+        bool classDisableValidation = false,
+        bool methodDisableValidation = false)
         => SourceFactory.BuildAuthorizationMatrixSource(
             classAllowAnonymous,
             methodAllowAnonymous,
@@ -492,7 +508,9 @@ public class IndividualTests
             orderValue,
             groupName,
             excludeFromDescription,
-            mapGroupPattern);
+            mapGroupPattern,
+            classDisableValidation,
+            methodDisableValidation);
 
     private static string ConfigureScenario(
         bool configureWithServiceProvider = false,
