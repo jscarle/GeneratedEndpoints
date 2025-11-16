@@ -20,7 +20,7 @@
 
     <!-- References -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.1" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all" />
         <PackageReference Include="PolySharp" Version="1.15.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -36,9 +36,9 @@
     <!-- Output -->
     <PropertyGroup>
         <AssemblyName>GeneratedEndpoints</AssemblyName>
-        <Version>9.0.0-preview.1</Version>
-        <AssemblyVersion>9.0.0.0</AssemblyVersion>
-        <FileVersion>9.0.0.0</FileVersion>
+        <Version>10.0.0</Version>
+        <AssemblyVersion>10.0.0.0</AssemblyVersion>
+        <FileVersion>10.0.0.0</FileVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <IncludeBuildOutput>false</IncludeBuildOutput>
     </PropertyGroup>
