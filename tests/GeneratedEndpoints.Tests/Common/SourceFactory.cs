@@ -51,7 +51,9 @@ public static class SourceFactory
         int orderValue,
         string? groupName,
         bool excludeFromDescription,
-        string? mapGroupPattern = null)
+        string? mapGroupPattern = null,
+        bool classDisableValidation = false,
+        bool methodDisableValidation = false)
     {
         var builder = new StringBuilder();
 
@@ -102,6 +104,11 @@ public static class SourceFactory
         if (applyShortCircuit)
         {
             builder.AppendLine("[ShortCircuit]");
+        }
+
+        if (classDisableValidation)
+        {
+            builder.AppendLine("[DisableValidation]");
         }
 
         if (applyRequestTimeout)
@@ -161,6 +168,11 @@ public static class SourceFactory
         {
             var rateLimit = string.IsNullOrWhiteSpace(rateLimitingPolicy) ? string.Empty : $"(\"{rateLimitingPolicy}\")";
             builder.AppendLine($"    [RequireRateLimiting{rateLimit}]");
+        }
+
+        if (methodDisableValidation)
+        {
+            builder.AppendLine("    [DisableValidation]");
         }
 
         builder.AppendLine("    public static Ok Handle(int id) => id >= 0 ? TypedResults.Ok() : TypedResults.Ok();");
