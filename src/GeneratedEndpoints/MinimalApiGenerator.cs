@@ -3,6 +3,8 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -115,6 +117,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
     private static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
     private static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
+    private static readonly ConditionalWeakTable<Compilation, CompilationTypeCache> CompilationTypeCaches = new();
+    private static readonly ConditionalWeakTable<INamedTypeSymbol, RequestHandlerClassCacheEntry> RequestHandlerClassCache = new();
+    private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
 
     private static readonly ImmutableArray<HttpAttributeDefinition> HttpAttributeDefinitions =
     [
@@ -896,11 +901,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
         var attribute = context.Attributes[0];
 
-        var requestHandlerClassResult = GetRequestHandlerClass(requestHandlerMethodSymbol, context.SemanticModel.Compilation, cancellationToken);
-        if (requestHandlerClassResult is null)
+        var requestHandlerClass = GetRequestHandlerClass(requestHandlerMethodSymbol, context.SemanticModel.Compilation, cancellationToken);
+        if (requestHandlerClass is null)
             return null;
-
-        var (_, requestHandlerClass) = requestHandlerClassResult.Value;
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
@@ -912,7 +915,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var methodConfiguration = GetEndpointConfiguration(requestHandlerMethodSymbol.GetAttributes(), name, displayName, description, true);
 
-        var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
+        var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
 
         return requestHandler;
     }
@@ -1247,6 +1250,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
     }
 
+    [SuppressMessage("Major Code Smell", "S3398:Move this method into a class of its own", Justification = "Shared helper for multiple caching paths.")]
     private static string? GetMapGroupPattern(INamedTypeSymbol classSymbol)
     {
         foreach (var attribute in classSymbol.GetAttributes())
@@ -1265,6 +1269,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return null;
     }
 
+    [SuppressMessage("Major Code Smell", "S3398:Move this method into a class of its own", Justification = "Shared helper for multiple caching paths.")]
     private static string GetMapGroupIdentifier(string className)
     {
         if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
@@ -1300,6 +1305,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static GeneratedAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
     {
         var definition = attributeClass.OriginalDefinition;
+        var cacheEntry = GeneratedAttributeKindCache.GetValue(definition, static def =>
+            new GeneratedAttributeKindCacheEntry(GetGeneratedAttributeKindCore(def))
+        );
+
+        return cacheEntry.Kind;
+    }
+
+    private static GeneratedAttributeKind GetGeneratedAttributeKindCore(INamedTypeSymbol definition)
+    {
         if (!IsInNamespace(definition.ContainingNamespace, AttributesNamespaceParts))
             return GeneratedAttributeKind.None;
 
@@ -1532,7 +1546,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return requestHandlerMethod;
     }
 
-    private static (INamedTypeSymbol RequestHandlerClassSymbol, RequestHandlerClass RequestHandlerClass)? GetRequestHandlerClass(
+    private static RequestHandlerClass? GetRequestHandlerClass(
         IMethodSymbol methodSymbol,
         Compilation compilation,
         CancellationToken cancellationToken
@@ -1544,23 +1558,19 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (classSymbol.TypeKind != TypeKind.Class)
             return null;
 
-        var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var isStatic = classSymbol.IsStatic;
-        var endpointConventionBuilderSymbol = compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
-        var serviceProviderSymbol = compilation.GetTypeByMetadataName("System.IServiceProvider");
-        var configureMethodDetails = GetConfigureMethodDetails(classSymbol, endpointConventionBuilderSymbol, serviceProviderSymbol, cancellationToken);
-
-        var mapGroupPattern = GetMapGroupPattern(classSymbol);
-        var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
-        var classConfiguration = GetEndpointConfiguration(classSymbol.GetAttributes(), null, null, null, false);
-
-        var requestHandlerClass = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
-            configureMethodDetails.ConfigureMethodAcceptsServiceProvider, mapGroupPattern, mapGroupIdentifier, classConfiguration
-        );
-
-        return (classSymbol, requestHandlerClass);
+        var typeCache = GetCompilationTypeCache(compilation);
+        var cacheEntry = RequestHandlerClassCache.GetValue(classSymbol, static _ => new RequestHandlerClassCacheEntry());
+        var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, typeCache, cancellationToken);
+        return requestHandlerClass;
     }
 
+    private static CompilationTypeCache GetCompilationTypeCache(Compilation compilation)
+    {
+        return CompilationTypeCaches.GetValue(compilation, static c => new CompilationTypeCache(c));
+    }
+
+
+    [SuppressMessage("Major Code Smell", "S3398:Move this method into a class of its own", Justification = "Shared helper reused by caching infrastructure.")]
     private static ConfigureMethodDetails GetConfigureMethodDetails(
         INamedTypeSymbol classSymbol,
         INamedTypeSymbol? endpointConventionBuilderSymbol,
@@ -2856,5 +2866,78 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
             return string.Compare(x.Pattern, y.Pattern, StringComparison.Ordinal);
         }
+    }
+
+    private sealed class CompilationTypeCache
+    {
+        public CompilationTypeCache(Compilation compilation)
+        {
+            EndpointConventionBuilderSymbol = compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
+            ServiceProviderSymbol = compilation.GetTypeByMetadataName("System.IServiceProvider");
+        }
+
+        public INamedTypeSymbol? EndpointConventionBuilderSymbol { get; }
+
+        public INamedTypeSymbol? ServiceProviderSymbol { get; }
+    }
+
+    private sealed class RequestHandlerClassCacheEntry
+    {
+        private RequestHandlerClass _value;
+        private bool _initialized;
+        private readonly object _lock = new();
+
+        public RequestHandlerClass GetOrCreate(
+            INamedTypeSymbol classSymbol,
+            CompilationTypeCache compilationCache,
+            CancellationToken cancellationToken
+        )
+        {
+            if (_initialized)
+                return _value;
+
+            lock (_lock)
+            {
+                if (_initialized)
+                    return _value;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                var isStatic = classSymbol.IsStatic;
+                var configureMethodDetails = GetConfigureMethodDetails(
+                    classSymbol,
+                    compilationCache.EndpointConventionBuilderSymbol,
+                    compilationCache.ServiceProviderSymbol,
+                    cancellationToken
+                );
+
+                var mapGroupPattern = GetMapGroupPattern(classSymbol);
+                var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
+                var classConfiguration = GetEndpointConfiguration(classSymbol.GetAttributes(), null, null, null, false);
+
+                _value = new RequestHandlerClass(
+                    name,
+                    isStatic,
+                    configureMethodDetails.HasConfigureMethod,
+                    configureMethodDetails.ConfigureMethodAcceptsServiceProvider,
+                    mapGroupPattern,
+                    mapGroupIdentifier,
+                    classConfiguration
+                );
+                _initialized = true;
+                return _value;
+            }
+        }
+    }
+
+    private sealed class GeneratedAttributeKindCacheEntry
+    {
+        public GeneratedAttributeKindCacheEntry(GeneratedAttributeKind kind)
+        {
+            Kind = kind;
+        }
+
+        public GeneratedAttributeKind Kind { get; }
     }
 }
