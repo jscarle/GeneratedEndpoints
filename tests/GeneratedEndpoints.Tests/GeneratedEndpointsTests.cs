@@ -50,7 +50,8 @@ public class GeneratedEndpointsTests
                                              {
                                                 [DisplayName("User lookup endpoint")]
                                                 [Description("Gets a user by ID when the ID is greater than zero.")]
-                                                [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.")]
+                                                [Summary("Gets a user by ID.")]
+                                                [MapGet("/users/{id:int}", Name = nameof(GetUser))]
                                                  public static Results<Ok, NotFound> GetUser2(int id)
                                                  {
                                                      if (id > 0)
@@ -339,18 +340,18 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task EndpointOrderAttribute(bool withNamespace)
+    public async Task OrderAttribute(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
                                              internal sealed class OrderedEndpoints
                                              {
                                                  [MapGet("/ordered/low")]
-                                                 [EndpointOrder(-1)]
+                                                 [Order(-1)]
                                                  public static Ok Low()
                                                      => TypedResults.Ok();
 
                                                  [MapGet("/ordered/high")]
-                                                 [EndpointOrder(5)]
+                                                 [Order(5)]
                                                  public static Ok High()
                                                      => TypedResults.Ok();
                                              }
@@ -360,19 +361,19 @@ public class GeneratedEndpointsTests
         var result = TestHelpers.RunGenerator(sources);
 
         await result.VerifyAsync("AddEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(EndpointOrderAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(OrderAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(EndpointOrderAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(OrderAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task EndpointGroupMetadataAttribute(bool withNamespace)
+    public async Task GroupNameAttribute(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
-                                             [EndpointGroupMetadata("SampleGroup")]
+                                             [GroupName("SampleGroup")]
                                              internal static class GroupedEndpoints
                                              {
                                                  [MapGet("/grouped/first")]
@@ -389,10 +390,10 @@ public class GeneratedEndpointsTests
         var result = TestHelpers.RunGenerator(sources);
 
         await result.VerifyAsync("AddEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(EndpointGroupMetadataAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(GroupNameAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(EndpointGroupMetadataAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(GroupNameAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
 
     [Theory]
@@ -498,7 +499,8 @@ public class GeneratedEndpointsTests
 
                                                 [DisplayName("Complex data endpoint")]
                                                 [Description("Uses every supported attribute.")]
-                                                [MapGet("/complex/{id:int}", Name = nameof(GetComplex), Summary = "Gets complex data.")]
+                                                [Summary("Gets complex data.")]
+                                                [MapGet("/complex/{id:int}", Name = nameof(GetComplex))]
                                                  [AllowAnonymous]
                                                  [Tags("MethodLevel")]
                                                  [RequireAuthorization("MethodPolicy")]

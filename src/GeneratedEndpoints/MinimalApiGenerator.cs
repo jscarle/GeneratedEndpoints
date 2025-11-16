@@ -42,7 +42,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
     private const string NameAttributeNamedParameter = "Name";
-    private const string SummaryAttributeNamedParameter = "Summary";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
     private const string RequestTypeAttributeNamedParameter = "RequestType";
     private const string IsOptionalAttributeNamedParameter = "IsOptional";
@@ -80,13 +79,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string RequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequestTimeoutAttributeName}";
     private const string RequestTimeoutAttributeHint = $"{RequestTimeoutAttributeFullyQualifiedName}.gs.cs";
 
-    private const string EndpointOrderAttributeName = "EndpointOrderAttribute";
-    private const string EndpointOrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointOrderAttributeName}";
-    private const string EndpointOrderAttributeHint = $"{EndpointOrderAttributeFullyQualifiedName}.gs.cs";
+    private const string OrderAttributeName = "OrderAttribute";
+    private const string OrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{OrderAttributeName}";
+    private const string OrderAttributeHint = $"{OrderAttributeFullyQualifiedName}.gs.cs";
 
-    private const string EndpointGroupMetadataAttributeName = "EndpointGroupMetadataAttribute";
-    private const string EndpointGroupMetadataAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointGroupMetadataAttributeName}";
-    private const string EndpointGroupMetadataAttributeHint = $"{EndpointGroupMetadataAttributeFullyQualifiedName}.gs.cs";
+    private const string GroupNameAttributeName = "GroupNameAttribute";
+    private const string GroupNameAttributeFullyQualifiedName = $"{AttributesNamespace}.{GroupNameAttributeName}";
+    private const string GroupNameAttributeHint = $"{GroupNameAttributeFullyQualifiedName}.gs.cs";
+
+    private const string SummaryAttributeName = "SummaryAttribute";
+    private const string SummaryAttributeFullyQualifiedName = $"{AttributesNamespace}.{SummaryAttributeName}";
+    private const string SummaryAttributeHint = $"{SummaryAttributeFullyQualifiedName}.gs.cs";
 
     private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
 
@@ -409,65 +412,95 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                     """;
         context.AddSource(RequestTimeoutAttributeHint, SourceText.From(requestTimeoutSource, Encoding.UTF8));
 
-        // EndpointOrder
-        var endpointOrderSource = $$"""
-                               {{FileHeader}}
+        // Order
+        var orderSource = $$"""
+                         {{FileHeader}}
 
-                               namespace {{AttributesNamespace}};
+                         namespace {{AttributesNamespace}};
 
-                               /// <summary>
-                               /// Specifies the order for the annotated endpoint when building conventions.
-                               /// </summary>
-                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                               internal sealed class {{EndpointOrderAttributeName}} : global::System.Attribute
-                               {
-                                   /// <summary>
-                                   /// Gets the order that will be applied to the endpoint.
-                                   /// </summary>
-                                   public int Order { get; }
+                         /// <summary>
+                         /// Specifies the order for the annotated endpoint when building conventions.
+                         /// </summary>
+                         [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                         internal sealed class {{OrderAttributeName}} : global::System.Attribute
+                         {
+                             /// <summary>
+                             /// Gets the order that will be applied to the endpoint.
+                             /// </summary>
+                             public int Order { get; }
 
-                                   /// <summary>
-                                   /// Initializes a new instance of the <see cref="{{EndpointOrderAttributeName}}"/> class.
-                                   /// </summary>
-                                   /// <param name="order">The order value to apply to the endpoint.</param>
-                                   public {{EndpointOrderAttributeName}}(int order)
-                                   {
-                                       Order = order;
-                                   }
-                               }
+                             /// <summary>
+                             /// Initializes a new instance of the <see cref="{{OrderAttributeName}}"/> class.
+                             /// </summary>
+                             /// <param name="order">The order value to apply to the endpoint.</param>
+                             public {{OrderAttributeName}}(int order)
+                             {
+                                 Order = order;
+                             }
+                         }
 
-                               """;
-        context.AddSource(EndpointOrderAttributeHint, SourceText.From(endpointOrderSource, Encoding.UTF8));
+                         """;
+        context.AddSource(OrderAttributeHint, SourceText.From(orderSource, Encoding.UTF8));
 
-        // EndpointGroupMetadata
-        var endpointGroupMetadataSource = $$"""
-                                   {{FileHeader}}
+        // GroupName
+        var groupNameSource = $$"""
+                              {{FileHeader}}
 
-                                   namespace {{AttributesNamespace}};
+                              namespace {{AttributesNamespace}};
 
-                                   /// <summary>
-                                   /// Specifies the endpoint group name for the annotated class.
-                                   /// </summary>
-                                   [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-                                   internal sealed class {{EndpointGroupMetadataAttributeName}} : global::System.Attribute
-                                   {
-                                       /// <summary>
-                                       /// Gets the endpoint group name.
-                                       /// </summary>
-                                       public string EndpointGroupName { get; }
+                              /// <summary>
+                              /// Specifies the endpoint group name for the annotated class.
+                              /// </summary>
+                              [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+                              internal sealed class {{GroupNameAttributeName}} : global::System.Attribute
+                              {
+                                  /// <summary>
+                                  /// Gets the endpoint group name.
+                                  /// </summary>
+                                  public string GroupName { get; }
 
-                                       /// <summary>
-                                       /// Initializes a new instance of the <see cref="{{EndpointGroupMetadataAttributeName}}"/> class.
-                                       /// </summary>
-                                       /// <param name="endpointGroupName">The endpoint group name to apply.</param>
-                                       public {{EndpointGroupMetadataAttributeName}}(string endpointGroupName)
-                                       {
-                                           EndpointGroupName = endpointGroupName;
-                                       }
-                                   }
+                                  /// <summary>
+                                  /// Initializes a new instance of the <see cref="{{GroupNameAttributeName}}"/> class.
+                                  /// </summary>
+                                  /// <param name="groupName">The endpoint group name to apply.</param>
+                                  public {{GroupNameAttributeName}}(string groupName)
+                                  {
+                                      GroupName = groupName;
+                                  }
+                              }
 
-                                   """;
-        context.AddSource(EndpointGroupMetadataAttributeHint, SourceText.From(endpointGroupMetadataSource, Encoding.UTF8));
+                              """;
+        context.AddSource(GroupNameAttributeHint, SourceText.From(groupNameSource, Encoding.UTF8));
+
+        // Summary
+        var summarySource = $$"""
+                            {{FileHeader}}
+
+                            namespace {{AttributesNamespace}};
+
+                            /// <summary>
+                            /// Specifies the summary metadata for the annotated endpoint.
+                            /// </summary>
+                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                            internal sealed class {{SummaryAttributeName}} : global::System.Attribute
+                            {
+                                /// <summary>
+                                /// Gets the summary value for the endpoint.
+                                /// </summary>
+                                public string Summary { get; }
+
+                                /// <summary>
+                                /// Initializes a new instance of the <see cref="{{SummaryAttributeName}}"/> class.
+                                /// </summary>
+                                /// <param name="summary">The summary to apply to the endpoint.</param>
+                                public {{SummaryAttributeName}}(string summary)
+                                {
+                                    Summary = summary;
+                                }
+                            }
+
+                            """;
+        context.AddSource(SummaryAttributeHint, SourceText.From(summarySource, Encoding.UTF8));
 
         // Accepts
         var acceptsSource = $$"""
@@ -807,11 +840,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      public string Name { get; set; } = "";
 
                      /// <summary>
-                     /// Gets or sets the endpoint summary.
-                     /// </summary>
-                     public string Summary { get; set; } = "";
-
-                     /// <summary>
                      /// Initializes a new instance of the <see cref="{{attributeName}}"/> class.
                      /// </summary>
                      /// <param name="pattern">The route pattern for the endpoint.</param>
@@ -846,14 +874,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
-        var (httpMethod, pattern, name, summary) = GetRequestHandlerAttribute(attribute, cancellationToken);
+        var (httpMethod, pattern, name) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
         var (displayName, description) = GetDisplayAndDescriptionAttributes(requestHandlerMethodSymbol);
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
                 rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-                requestTimeoutPolicyName, order, endpointGroupName)
+                requestTimeoutPolicyName, order, endpointGroupName, summary)
             = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
@@ -891,8 +919,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static (
         string HttpMethod,
         string Pattern,
-        string? Name,
-        string? Summary
+        string? Name
     ) GetRequestHandlerAttribute(
         AttributeData attribute,
         CancellationToken cancellationToken
@@ -909,7 +936,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
         string? name = null;
-        string? summary = null;
         foreach (var namedArg in attribute.NamedArguments)
         {
             switch (namedArg.Key)
@@ -920,16 +946,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     name = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
                     break;
                 }
-                case SummaryAttributeNamedParameter:
-                {
-                    var value = namedArg.Value.Value as string;
-                    summary = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
-                    break;
-                }
             }
         }
 
-        return (httpMethod, pattern, name, summary);
+        return (httpMethod, pattern, name);
     }
 
     private static (string? DisplayName, string? Description) GetDisplayAndDescriptionAttributes(IMethodSymbol methodSymbol)
@@ -985,7 +1005,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         bool withRequestTimeout,
         string? requestTimeoutPolicyName,
         int? order,
-        string? endpointGroupName
+        string? endpointGroupName,
+        string? summary
     ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -1008,6 +1029,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string? requestTimeoutPolicyName = null;
         int? order = null;
         string? endpointGroupName = null;
+        string? summary = null;
 
         List<AcceptsMetadata>? accepts = null;
         List<ProducesMetadata>? produces = null;
@@ -1042,7 +1064,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref withRequestTimeout,
             ref requestTimeoutPolicyName,
             ref order,
-            ref endpointGroupName
+            ref endpointGroupName,
+            ref summary
         );
 
         var methodAttributes = methodSymbol.GetAttributes();
@@ -1073,7 +1096,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             ref withRequestTimeout,
             ref requestTimeoutPolicyName,
             ref order,
-            ref endpointGroupName
+            ref endpointGroupName,
+            ref summary
         );
 
         if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
@@ -1101,7 +1125,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             withRequestTimeout ?? false,
             (withRequestTimeout ?? false) ? requestTimeoutPolicyName : null,
             order,
-            endpointGroupName
+            endpointGroupName,
+            summary
         );
     }
 
@@ -1130,7 +1155,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref bool? withRequestTimeout,
         ref string? requestTimeoutPolicyName,
         ref int? order,
-        ref string? endpointGroupName
+        ref string? endpointGroupName,
+        ref string? summary
     )
     {
         foreach (var attribute in attributes)
@@ -1168,7 +1194,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, EndpointOrderAttributeName))
+            if (IsGeneratedAttribute(attributeClass, OrderAttributeName))
             {
                 if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
                     order = orderValue;
@@ -1176,13 +1202,25 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, EndpointGroupMetadataAttributeName))
+            if (IsGeneratedAttribute(attributeClass, GroupNameAttributeName))
             {
                 if (attribute.ConstructorArguments.Length > 0)
                 {
                     var groupName = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
                     if (!string.IsNullOrEmpty(groupName))
                         endpointGroupName = groupName;
+                }
+
+                continue;
+            }
+
+            if (IsGeneratedAttribute(attributeClass, SummaryAttributeName))
+            {
+                if (attribute.ConstructorArguments.Length > 0)
+                {
+                    var summaryValue = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
+                    if (!string.IsNullOrEmpty(summaryValue))
+                        summary = summaryValue;
                 }
 
                 continue;
