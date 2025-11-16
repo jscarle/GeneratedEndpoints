@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Buffers;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -1022,6 +1023,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         ref var requireRateLimiting = ref state.RequireRateLimiting;
         ref var rateLimitingPolicyName = ref state.RateLimitingPolicyName;
         ref var endpointFilters = ref state.EndpointFilters;
+        ref var endpointFilterSet = ref state.EndpointFilterSet;
         ref var hasAllowAnonymousAttribute = ref state.HasAllowAnonymousAttribute;
         ref var hasRequireAuthorizationAttribute = ref state.HasRequireAuthorizationAttribute;
         ref var shortCircuit = ref state.ShortCircuit;
@@ -1132,7 +1134,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     continue;
                 }
                 case GeneratedAttributeKind.EndpointFilter:
-                    TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters);
+                    TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters, ref endpointFilterSet);
                     continue;
                 case GeneratedAttributeKind.DisableAntiforgery:
                     disableAntiforgery = true;
@@ -1414,11 +1416,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         producesList.Add(new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes));
     }
 
-    private static void TryAddEndpointFilter(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<string>? endpointFilters)
+    private static void TryAddEndpointFilter(
+        AttributeData attribute,
+        INamedTypeSymbol attributeClass,
+        ref List<string>? endpointFilters,
+        ref HashSet<string>? endpointFilterSet)
     {
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
-            TryAddEndpointFilterType(attributeClass.TypeArguments[0], ref endpointFilters);
+            TryAddEndpointFilterType(attributeClass.TypeArguments[0], ref endpointFilters, ref endpointFilterSet);
             return;
         }
 
@@ -1426,10 +1432,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return;
 
         if (attribute.ConstructorArguments[0].Value is ITypeSymbol filterTypeSymbol)
-            TryAddEndpointFilterType(filterTypeSymbol, ref endpointFilters);
+            TryAddEndpointFilterType(filterTypeSymbol, ref endpointFilters, ref endpointFilterSet);
     }
 
-    private static void TryAddEndpointFilterType(ITypeSymbol? typeSymbol, ref List<string>? endpointFilters)
+    private static void TryAddEndpointFilterType(
+        ITypeSymbol? typeSymbol,
+        ref List<string>? endpointFilters,
+        ref HashSet<string>? endpointFilterSet)
     {
         if (typeSymbol is null or ITypeParameterSymbol or IErrorTypeSymbol)
             return;
@@ -1438,9 +1447,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (string.IsNullOrWhiteSpace(displayString))
             return;
 
-        var filters = endpointFilters ??= [];
-        if (!filters.Contains(displayString))
-            filters.Add(displayString);
+        endpointFilterSet ??= new HashSet<string>(StringComparer.Ordinal);
+        if (!endpointFilterSet.Add(displayString))
+            return;
+
+        endpointFilters ??= [];
+        endpointFilters.Add(displayString);
     }
 
     private static ITypeSymbol? GetNamedTypeSymbol(AttributeData attribute, string namedParameter)
@@ -1483,40 +1495,29 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         if (existing is { Count: > 0 })
         {
-            list = new List<string>(existing.Value.Count + 4);
-            seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var item in existing.Value)
-            {
-                if (string.IsNullOrWhiteSpace(item))
-                    continue;
-
-                var trimmed = item.Trim();
-                if (trimmed.Length == 0)
-                    continue;
-
-                if (seen.Add(trimmed))
-                    list.Add(trimmed);
-            }
+            var count = existing.Value.Count;
+            list = new List<string>(count + 4);
+            list.AddRange(existing.Value);
+            seen = new HashSet<string>(existing.Value, StringComparer.OrdinalIgnoreCase);
         }
-
-        seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        list ??= [];
 
         foreach (var value in values)
         {
-            if (string.IsNullOrWhiteSpace(value))
+            var normalized = NormalizeOptionalString(value);
+            if (normalized is not { Length: > 0 })
                 continue;
 
-            var trimmed = value.Trim();
-            if (trimmed.Length == 0)
+            seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!seen.Add(normalized))
                 continue;
 
-            if (seen.Add(trimmed))
-                list.Add(trimmed);
+            if (list is null)
+                list = [];
+
+            list.Add(normalized);
         }
 
-        return list.ToEquatableImmutableArray();
+        return list?.ToEquatableImmutableArray() ?? EquatableImmutableArray<string>.Empty;
     }
 
     private static RequestHandlerMethod GetRequestHandlerMethod(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
@@ -1836,38 +1837,56 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (requestHandlers.IsDefaultOrEmpty)
             return ImmutableArray<int>.Empty;
 
-        Dictionary<HandlerNameKey, int>? nameToFirstIndex = null;
-        HashSet<int>? collidingIndices = null;
+        var handlerCount = requestHandlers.Length;
+        var nameToFirstIndex = new Dictionary<HandlerNameKey, int>(handlerCount);
+        var collisionFlags = ArrayPool<bool>.Shared.Rent(handlerCount);
+        Array.Clear(collisionFlags, 0, handlerCount);
+        List<int>? collidingIndices = null;
 
-        for (var index = 0; index < requestHandlers.Length; index++)
+        try
         {
-            var handler = requestHandlers[index];
-            var name = handler.Configuration.Metadata.Name;
-            if (string.IsNullOrEmpty(name))
-                continue;
-
-            nameToFirstIndex ??= new Dictionary<HandlerNameKey, int>(requestHandlers.Length);
-            var key = new HandlerNameKey(name!, handler.Method.Name);
-
-            if (nameToFirstIndex.TryGetValue(key, out var firstIndex))
+            for (var index = 0; index < handlerCount; index++)
             {
-                collidingIndices ??= [];
-                collidingIndices.Add(firstIndex);
-                collidingIndices.Add(index);
+                var handler = requestHandlers[index];
+                var name = handler.Configuration.Metadata.Name;
+                if (string.IsNullOrEmpty(name))
+                    continue;
+
+                var key = new HandlerNameKey(name!, handler.Method.Name);
+
+                if (nameToFirstIndex.TryGetValue(key, out var firstIndex))
+                {
+                    MarkCollision(firstIndex);
+                    MarkCollision(index);
+                }
+                else
+                {
+                    nameToFirstIndex.Add(key, index);
+                }
             }
-            else
-            {
-                nameToFirstIndex.Add(key, index);
-            }
+
+            if (collidingIndices is null || collidingIndices.Count == 0)
+                return ImmutableArray<int>.Empty;
+
+            collidingIndices.Sort();
+            var builder = ImmutableArray.CreateBuilder<int>(collidingIndices.Count);
+            builder.AddRange(collidingIndices);
+            return builder.MoveToImmutable();
+        }
+        finally
+        {
+            ArrayPool<bool>.Shared.Return(collisionFlags);
         }
 
-        if (collidingIndices is null || collidingIndices.Count == 0)
-            return ImmutableArray<int>.Empty;
+        void MarkCollision(int handlerIndex)
+        {
+            if (collisionFlags[handlerIndex])
+                return;
 
-        var builder = ImmutableArray.CreateBuilder<int>(collidingIndices.Count);
-        builder.AddRange(collidingIndices);
-        builder.Sort();
-        return builder.MoveToImmutable();
+            collisionFlags[handlerIndex] = true;
+            collidingIndices ??= new List<int>();
+            collidingIndices.Add(handlerIndex);
+        }
     }
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
@@ -2830,6 +2849,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         public bool? RequireRateLimiting;
         public string? RateLimitingPolicyName;
         public List<string>? EndpointFilters;
+        public HashSet<string>? EndpointFilterSet;
         public bool HasAllowAnonymousAttribute;
         public bool HasRequireAuthorizationAttribute;
         public bool? ShortCircuit;
