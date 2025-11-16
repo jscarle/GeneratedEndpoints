@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -42,7 +41,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         var hint = $"{fullyQualifiedName}.gs.cs";
         var summaryVerb = verb == FallbackHttpMethod ? "fallback" : verb;
         var source = GenerateHttpAttributeSource(AttributesNamespace, attributeName, summaryVerb, allowEmptyPattern);
-        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, hint, verb, allowEmptyPattern, SourceText.From(source, Encoding.UTF8));
+        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, hint, verb, SourceText.From(source, Encoding.UTF8));
     }
 
     private static IncrementalValueProvider<ImmutableArray<RequestHandler>> CombineRequestHandlers(
@@ -1079,7 +1078,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             return ImmutableArray<int>.Empty;
 
         var handlerCount = requestHandlers.Length;
-        var nameToFirstIndex = new Dictionary<HandlerNameKey, int>(handlerCount);
+        var nameToFirstIndex = new Dictionary<(string Name, string Method), int>(handlerCount);
         var collisionFlags = ArrayPool<bool>.Shared.Rent(handlerCount);
         Array.Clear(collisionFlags, 0, handlerCount);
         List<int>? collidingIndices = null;
@@ -1093,7 +1092,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
                 if (string.IsNullOrEmpty(name))
                     continue;
 
-                var key = new HandlerNameKey(name!, handler.Method.Name);
+                var key = (name!, handler.Method.Name);
 
                 if (nameToFirstIndex.TryGetValue(key, out var firstIndex))
                 {

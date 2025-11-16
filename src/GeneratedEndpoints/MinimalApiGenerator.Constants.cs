@@ -1,9 +1,6 @@
-using System.Buffers;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
-using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
@@ -142,7 +139,7 @@ public sealed partial class MinimalApiGenerator
         CreateHttpAttributeDefinition("MapQueryAttribute", "QUERY"),
         CreateHttpAttributeDefinition("MapTraceAttribute", "TRACE"),
         CreateHttpAttributeDefinition("MapConnectAttribute", "CONNECT"),
-        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod, true),
+        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod),
     ];
 
     private static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =

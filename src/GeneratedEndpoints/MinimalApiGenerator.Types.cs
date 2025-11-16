@@ -1,7 +1,3 @@
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -15,7 +11,6 @@ public sealed partial class MinimalApiGenerator
         string FullyQualifiedName,
         string Hint,
         string Verb,
-        bool AllowEmptyPattern,
         SourceText SourceText
     );
 
@@ -98,8 +93,6 @@ public sealed partial class MinimalApiGenerator
     private readonly record struct Parameter(string Name, string Type, string BindingPrefix);
 
     private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
-
-    private readonly record struct HandlerNameKey(string Name, string Method);
 
     private struct EndpointAttributeState
     {
