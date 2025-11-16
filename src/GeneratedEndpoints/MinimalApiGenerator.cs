@@ -574,6 +574,26 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return definition.Name == attributeName && IsInNamespace(definition.ContainingNamespace, namespaceParts);
     }
 
+    private static BindingSource GetBindingSourceFromAttributeClass(INamedTypeSymbol attributeClass)
+    {
+        var definition = attributeClass.OriginalDefinition;
+        var namespaceSymbol = definition.ContainingNamespace;
+
+        return definition.Name switch
+        {
+            "FromRouteAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromRoute,
+            "FromQueryAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromQuery,
+            "FromHeaderAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromHeader,
+            "FromBodyAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromBody,
+            "FromFormAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromForm,
+            "FromServicesAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromServices,
+            "FromKeyedServicesAttribute" when IsInNamespace(namespaceSymbol, ExtensionsDependencyInjectionNamespaceParts)
+                => BindingSource.FromKeyedServices,
+            "AsParametersAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreHttpNamespaceParts) => BindingSource.AsParameters,
+            _ => BindingSource.None,
+        };
+    }
+
     private static bool IsInNamespace(INamespaceSymbol? namespaceSymbol, string[] namespaceParts)
     {
         for (var i = namespaceParts.Length - 1; i >= 0; i--)
@@ -937,7 +957,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var methodParameters = new List<Parameter>(methodSymbol.Parameters.Length);
+        var methodParameters = ImmutableArray.CreateBuilder<Parameter>(methodSymbol.Parameters.Length);
         foreach (var parameter in methodSymbol.Parameters)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -946,44 +966,29 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             TypedConstant? typedKey = null;
             string? bindingName = null;
 
-            var attributes = parameter.GetAttributes();
-            foreach (var attribute in attributes)
+            foreach (var attribute in parameter.GetAttributes())
             {
                 var attributeClass = attribute.AttributeClass;
                 if (attributeClass is null)
                     continue;
 
-                if (attributeClass.IsFromRouteAttribute())
+                var attributeSource = GetBindingSourceFromAttributeClass(attributeClass);
+                if (attributeSource == BindingSource.None)
+                    continue;
+
+                source = attributeSource;
+                switch (attributeSource)
                 {
-                    source = BindingSource.FromRoute;
-                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                    case BindingSource.FromRoute:
+                    case BindingSource.FromQuery:
+                    case BindingSource.FromHeader:
+                    case BindingSource.FromForm:
+                        bindingName = GetBindingAttributeName(attribute) ?? bindingName;
+                        break;
+                    case BindingSource.FromKeyedServices:
+                        typedKey = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0] : null;
+                        break;
                 }
-                if (attributeClass.IsFromQueryAttribute())
-                {
-                    source = BindingSource.FromQuery;
-                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
-                }
-                if (attributeClass.IsFromHeaderAttribute())
-                {
-                    source = BindingSource.FromHeader;
-                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
-                }
-                if (attributeClass.IsFromBodyAttribute())
-                    source = BindingSource.FromBody;
-                if (attributeClass.IsFromFormAttribute())
-                {
-                    source = BindingSource.FromForm;
-                    bindingName = GetBindingAttributeName(attribute) ?? bindingName;
-                }
-                if (attributeClass.IsFromServicesAttribute())
-                    source = BindingSource.FromServices;
-                if (attributeClass.IsFromKeyedServicesAttribute())
-                {
-                    source = BindingSource.FromKeyedServices;
-                    typedKey = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0] : null;
-                }
-                if (attributeClass.IsAsParametersAttribute())
-                    source = BindingSource.AsParameters;
             }
 
             var parameterName = parameter.Name;
@@ -993,7 +998,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             methodParameters.Add(new Parameter(parameterName, parameterType, bindingPrefix));
         }
 
-        return methodParameters.ToEquatableImmutableArray();
+        return methodParameters.ToEquatableImmutable();
     }
 
     private static string? GetBindingAttributeName(AttributeData attribute)
