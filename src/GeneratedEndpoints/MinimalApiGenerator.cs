@@ -1,7 +1,5 @@
 ﻿using System.Buffers;
 using System.Collections.Immutable;
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 using GeneratedEndpoints.Common;
@@ -11,6 +9,10 @@ using Microsoft.CodeAnalysis.Text;
 using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints;
+
+// ReSharper disable ForCanBeConvertedToForeach
+// ReSharper disable LoopCanBeConvertedToQuery
+// Do not refactor, use for loop to avoid allocations.
 
 [Generator]
 public sealed class MinimalApiGenerator : IIncrementalGenerator
@@ -24,8 +26,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerProviders = ImmutableArray.CreateBuilder<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
 
-        // ReSharper disable once ForCanBeConvertedToForeach
-        // Do not refactor, use for loop to avoid allocations.
         for (var index = 0; index < HttpAttributeDefinitions.Length; index++)
         {
             var definition = HttpAttributeDefinitions[index];
@@ -65,23 +65,23 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         foreach (var definition in HttpAttributeDefinitions)
             context.AddSource(definition.Hint, definition.SourceText);
 
-        context.AddSource(RequireAuthorizationAttributeHint, RequireAuthorizationAttributeSourceText);
-        context.AddSource(RequireCorsAttributeHint, RequireCorsAttributeSourceText);
-        context.AddSource(RequireRateLimitingAttributeHint, RequireRateLimitingAttributeSourceText);
-        context.AddSource(RequireHostAttributeHint, RequireHostAttributeSourceText);
+        context.AddSource(AcceptsAttributeHint, AcceptsAttributeSourceText);
         context.AddSource(DisableAntiforgeryAttributeHint, DisableAntiforgeryAttributeSourceText);
-        context.AddSource(ShortCircuitAttributeHint, ShortCircuitAttributeSourceText);
         context.AddSource(DisableRequestTimeoutAttributeHint, DisableRequestTimeoutAttributeSourceText);
         context.AddSource(DisableValidationAttributeHint, DisableValidationAttributeSourceText);
-        context.AddSource(RequestTimeoutAttributeHint, RequestTimeoutAttributeSourceText);
-        context.AddSource(OrderAttributeHint, OrderAttributeSourceText);
-        context.AddSource(MapGroupAttributeHint, MapGroupAttributeSourceText);
-        context.AddSource(SummaryAttributeHint, SummaryAttributeSourceText);
-        context.AddSource(AcceptsAttributeHint, AcceptsAttributeSourceText);
         context.AddSource(EndpointFilterAttributeHint, EndpointFilterAttributeSourceText);
-        context.AddSource(ProducesResponseAttributeHint, ProducesResponseAttributeSourceText);
+        context.AddSource(MapGroupAttributeHint, MapGroupAttributeSourceText);
+        context.AddSource(OrderAttributeHint, OrderAttributeSourceText);
         context.AddSource(ProducesProblemAttributeHint, ProducesProblemAttributeSourceText);
+        context.AddSource(ProducesResponseAttributeHint, ProducesResponseAttributeSourceText);
         context.AddSource(ProducesValidationProblemAttributeHint, ProducesValidationProblemAttributeSourceText);
+        context.AddSource(RequestTimeoutAttributeHint, RequestTimeoutAttributeSourceText);
+        context.AddSource(RequireAuthorizationAttributeHint, RequireAuthorizationAttributeSourceText);
+        context.AddSource(RequireCorsAttributeHint, RequireCorsAttributeSourceText);
+        context.AddSource(RequireHostAttributeHint, RequireHostAttributeSourceText);
+        context.AddSource(RequireRateLimitingAttributeHint, RequireRateLimitingAttributeSourceText);
+        context.AddSource(ShortCircuitAttributeHint, ShortCircuitAttributeSourceText);
+        context.AddSource(SummaryAttributeHint, SummaryAttributeSourceText);
     }
 
     private static bool RequestHandlerFilter(SyntaxNode syntaxNode, CancellationToken cancellationToken)
@@ -107,23 +107,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
-        var (displayName, description) = GetDisplayAndDescriptionAttributes(requestHandlerMethodSymbol);
-
-        name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
-
-        var methodConfiguration = EndpointConfigurationFactory.Create(requestHandlerMethodSymbol.GetAttributes(), name, displayName, description, true);
+        var methodConfiguration = EndpointConfigurationFactory.Create(requestHandlerMethodSymbol, name, true);
 
         var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
 
         return requestHandler;
-    }
-
-    private static string RemoveAsyncSuffix(string methodName)
-    {
-        if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
-            return methodName[..^AsyncSuffix.Length];
-
-        return methodName;
     }
 
     private static (string HttpMethod, string Pattern, string? Name) GetRequestHandlerAttribute(AttributeData attribute, CancellationToken cancellationToken)
@@ -137,8 +125,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
         string? name = null;
-        // ReSharper disable once ForCanBeConvertedToForeach
-        // Do not refactor, use for loop to avoid allocations.
         for (var index = 0; index < attribute.NamedArguments.Length; index++)
         {
             var namedArg = attribute.NamedArguments[index];
@@ -156,47 +142,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return (httpMethod, pattern, name);
     }
 
-    private static (string? DisplayName, string? Description) GetDisplayAndDescriptionAttributes(IMethodSymbol methodSymbol)
-    {
-        string? displayName = null;
-        string? description = null;
-
-        foreach (var attribute in methodSymbol.GetAttributes())
-        {
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass is null)
-                continue;
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DisplayNameAttribute), ComponentModelNamespaceParts))
-            {
-                displayName = EndpointConfigurationFactory.NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
-                    ? attribute.ConstructorArguments[0].Value as string
-                    : null
-                );
-
-                continue;
-            }
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DescriptionAttribute), ComponentModelNamespaceParts))
-                description = EndpointConfigurationFactory.NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
-                    ? attribute.ConstructorArguments[0].Value as string
-                    : null
-                );
-        }
-
-        return (displayName, description);
-    }
-
     private static RequestHandlerMethod GetRequestHandlerMethod(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var name = methodSymbol.Name;
         var isStatic = methodSymbol.IsStatic;
-        var isAwaitable = methodSymbol.ReturnType.IsAwaitable();
         var parameters = RequestHandlerParameterHelper.Build(methodSymbol, cancellationToken);
 
-        var requestHandlerMethod = new RequestHandlerMethod(name, isStatic, isAwaitable, parameters);
+        var requestHandlerMethod = new RequestHandlerMethod(name, isStatic, parameters);
 
         return requestHandlerMethod;
     }
@@ -331,7 +285,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         var className = requestHandler.Class.Name;
         if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
-            className = className.Substring(GlobalPrefix.Length);
+            className = className[GlobalPrefix.Length..];
 
         if (className.IndexOf('+') >= 0)
             className = className.Replace('+', '.');
@@ -389,9 +343,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.AddSource(AddEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
     }
 
-    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified by calling the \"Select\" LINQ method",
-        Justification = "Manual loops avoid repeated allocations in the source generator."
-    )]
     private static List<string> GetDistinctNonStaticClassNames(ImmutableArray<RequestHandler> requestHandlers)
     {
         var classNames = new List<string>();
@@ -399,8 +350,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return classNames;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var requestHandler in requestHandlers)
+        for (var index = 0; index < requestHandlers.Length; index++)
         {
+            var requestHandler = requestHandlers[index];
             if (requestHandler.Class.IsStatic)
                 continue;
 
@@ -415,8 +367,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static StringBuilder GetAddEndpointHandlersStringBuilder(List<string> nonStaticClassNames)
     {
         var estimate = 512L;
-        foreach (var className in nonStaticClassNames)
+        for (var index = 0; index < nonStaticClassNames.Count; index++)
+        {
+            var className = nonStaticClassNames[index];
             estimate += 36 + className.Length;
+        }
 
         estimate += Math.Max(256, nonStaticClassNames.Count * 12);
         estimate = (long)(estimate * 1.10);
@@ -467,8 +422,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var groupedClasses = GetClassesWithMapGroups(requestHandlers);
 
-        foreach (var groupedClass in groupedClasses)
+        for (var index = 0; index < groupedClasses.Count; index++)
         {
+            var groupedClass = groupedClasses[index];
             source.Append("        var ");
             source.Append(groupedClass.MapGroupBuilderIdentifier);
             source.Append(" = builder.MapGroup(");
@@ -504,8 +460,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static bool HasRateLimitedHandlers(ImmutableArray<RequestHandler> requestHandlers)
     {
-        foreach (var handler in requestHandlers)
+        for (var index = 0; index < requestHandlers.Length; index++)
         {
+            var handler = requestHandlers[index];
             if (handler.Configuration.RequireRateLimiting)
                 return true;
         }
@@ -513,9 +470,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return false;
     }
 
-    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified by calling the \"Select\" LINQ method",
-        Justification = "Manual loops avoid repeated allocations in the source generator."
-    )]
     private static List<RequestHandlerClass> GetClassesWithMapGroups(ImmutableArray<RequestHandler> requestHandlers)
     {
         var groupedClasses = new List<RequestHandlerClass>();
@@ -523,8 +477,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return groupedClasses;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var handler in requestHandlers)
+        for (var index = 0; index < requestHandlers.Length; index++)
         {
+            var handler = requestHandlers[index];
             var handlerClass = handler.Class;
             if (handlerClass.MapGroupPattern is null)
                 continue;
@@ -590,10 +545,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
         else
         {
-            source.Append("static ");
-            if (requestHandler.Method.IsAwaitable)
-                source.Append("async ");
-            source.Append("([FromServices] ");
+            source.Append("static ([FromServices] ");
             source.Append(requestHandler.Class.Name);
             source.Append(" handler");
             foreach (var parameter in requestHandler.Method.Parameters)
@@ -604,10 +556,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(' ');
                 source.Append(parameter.Name);
             }
-            source.Append(") => ");
-            if (requestHandler.Method.IsAwaitable)
-                source.Append("await ");
-            source.Append("handler.");
+            source.Append(") => handler.");
             source.Append(requestHandler.Method.Name);
             source.Append('(');
             for (var index = 0; index < requestHandler.Method.Parameters.Count; index++)

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Generated.Attributes;
@@ -31,11 +32,13 @@ internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
     [Description("Gets a user by ID when the ID is greater than zero.")]
     [Summary("Gets a user by ID.")]
     [MapGet("/users/{id:int}", Name = nameof(GetUser))]
-    public Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser(
+    public async ValueTask<Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult>> GetUser(
         [FromQuery] int id,
         [FromKeyedServices(ServiceLifetime.Scoped)] IServiceCollection services
     )
     {
+        await Task.Yield();
+
         if (id <= 0)
         {
             var errors = new Dictionary<string, string[]>

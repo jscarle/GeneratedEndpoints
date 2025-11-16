@@ -30,7 +30,7 @@ internal sealed class RequestHandlerClassCacheEntry
 
             var mapGroupPattern = GetMapGroupPattern(classSymbol);
             var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
-            var classConfiguration = EndpointConfigurationFactory.Create(classSymbol.GetAttributes(), null, null, null, false);
+            EndpointConfiguration classConfiguration = EndpointConfigurationFactory.Create(classSymbol, null, false);
 
             _value = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
                 configureMethodDetails.ConfigureMethodAcceptsServiceProvider, mapGroupPattern, mapGroupIdentifier, classConfiguration
@@ -202,7 +202,7 @@ internal sealed class RequestHandlerClassCacheEntry
     private static string GetMapGroupIdentifier(string className)
     {
         if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
-            className = className.Substring(GlobalPrefix.Length);
+            className = className[GlobalPrefix.Length..];
 
         var builder = StringBuilderPool.Get(className.Length + 8);
         builder.Append('_');

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
-using static GeneratedEndpoints.Common.AttributeSymbolMatcher;
+using System.ComponentModel;
 using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
@@ -16,13 +16,16 @@ internal static class EndpointConfigurationFactory
     private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
 
     public static EndpointConfiguration Create(
-        ImmutableArray<AttributeData> attributes,
+        ISymbol methodSymbol,
         string? name,
-        string? displayName,
-        string? description,
         bool enforceMethodRequireAuthorizationRules
     )
     {
+        var attributes = methodSymbol.GetAttributes();
+        var (displayName, description) = GetDisplayAndDescriptionAttributes(methodSymbol);
+
+        name ??= RemoveAsyncSuffix(methodSymbol.Name);
+
         var state = new EndpointAttributeState();
         PopulateAttributeState(attributes, ref state);
 
@@ -67,6 +70,43 @@ internal static class EndpointConfigurationFactory
         );
     }
 
+    private static string RemoveAsyncSuffix(string methodName)
+    {
+        if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
+            return methodName[..^AsyncSuffix.Length];
+
+        return methodName;
+    }
+
+    private static (string? DisplayName, string? Description) GetDisplayAndDescriptionAttributes(ISymbol methodSymbol)
+    {
+        string? displayName = null;
+        string? description = null;
+
+        foreach (var attribute in methodSymbol.GetAttributes())
+        {
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass is null)
+                continue;
+
+            if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DisplayNameAttribute), ComponentModelNamespaceParts))
+            {
+                displayName = attribute.ConstructorArguments.Length > 0
+                    ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
+                    : null;
+
+                continue;
+            }
+
+            if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DescriptionAttribute), ComponentModelNamespaceParts))
+                description = attribute.ConstructorArguments.Length > 0
+                    ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
+                    : null;
+        }
+
+        return (displayName, description);
+    }
+
     public static GeneratedAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
     {
         var definition = attributeClass.OriginalDefinition;
@@ -76,11 +116,6 @@ internal static class EndpointConfigurationFactory
         );
 
         return cacheEntry.Kind;
-    }
-
-    public static string? NormalizeOptionalString(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
     }
 
     private static void PopulateAttributeState(ImmutableArray<AttributeData> attributes, ref EndpointAttributeState state)
@@ -142,7 +177,7 @@ internal static class EndpointConfigurationFactory
                         policyName = attribute.ConstructorArguments[0].Value as string;
 
                     policyName ??= GetNamedStringValue(attribute, PolicyNameAttributeNamedParameter);
-                    requestTimeoutPolicyName = NormalizeOptionalString(policyName);
+                    requestTimeoutPolicyName = policyName.NormalizeOptionalString();
                     continue;
                 }
                 case GeneratedAttributeKind.Order:
@@ -159,7 +194,7 @@ internal static class EndpointConfigurationFactory
                 case GeneratedAttributeKind.Summary:
                     if (attribute.ConstructorArguments.Length > 0)
                     {
-                        var summaryValue = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
+                        var summaryValue = (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString();
                         if (!string.IsNullOrEmpty(summaryValue))
                             summary = summaryValue;
                     }
@@ -183,7 +218,7 @@ internal static class EndpointConfigurationFactory
                 case GeneratedAttributeKind.RequireCors:
                     requireCors = true;
                     corsPolicyName = attribute.ConstructorArguments.Length > 0
-                        ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
+                        ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
                         : null;
                     continue;
                 case GeneratedAttributeKind.RequireHost:
@@ -200,7 +235,7 @@ internal static class EndpointConfigurationFactory
                 case GeneratedAttributeKind.RequireRateLimiting:
                 {
                     var policyName = attribute.ConstructorArguments.Length > 0
-                        ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
+                        ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
                         : null;
 
                     if (!string.IsNullOrEmpty(policyName))
@@ -248,14 +283,14 @@ internal static class EndpointConfigurationFactory
                 }
             }
 
-            if (IsAttribute(attributeClass, AllowAnonymousAttributeName, AspNetCoreAuthorizationNamespaceParts))
+            if (AttributeSymbolMatcher.IsAttribute(attributeClass, AllowAnonymousAttributeName, AspNetCoreAuthorizationNamespaceParts))
             {
                 allowAnonymous = true;
                 hasAllowAnonymousAttribute = true;
                 continue;
             }
 
-            if (IsAttribute(attributeClass, "TagsAttribute", AspNetCoreHttpNamespaceParts))
+            if (AttributeSymbolMatcher.IsAttribute(attributeClass, "TagsAttribute", AspNetCoreHttpNamespaceParts))
             {
                 if (attribute.ConstructorArguments.Length > 0)
                 {
@@ -266,7 +301,7 @@ internal static class EndpointConfigurationFactory
                 continue;
             }
 
-            if (IsAttribute(attributeClass, "ExcludeFromDescriptionAttribute", AspNetCoreRoutingNamespaceParts))
+            if (AttributeSymbolMatcher.IsAttribute(attributeClass, "ExcludeFromDescriptionAttribute", AspNetCoreRoutingNamespaceParts))
                 excludeFromDescription = true;
         }
     }
@@ -288,7 +323,7 @@ internal static class EndpointConfigurationFactory
             if (value.Value is not string stringValue)
                 continue;
 
-            var trimmed = NormalizeOptionalString(stringValue);
+            var trimmed = stringValue.NormalizeOptionalString();
             if (trimmed is not { Length: > 0 })
                 continue;
 
@@ -315,7 +350,7 @@ internal static class EndpointConfigurationFactory
 
         foreach (var value in values)
         {
-            var normalized = NormalizeOptionalString(value);
+            var normalized = value.NormalizeOptionalString();
             if (normalized is not { Length: > 0 })
                 continue;
 
@@ -494,7 +529,7 @@ internal static class EndpointConfigurationFactory
         foreach (var namedArg in attribute.NamedArguments)
         {
             if (namedArg.Key == namedParameter && namedArg.Value.Value is string stringValue)
-                return NormalizeOptionalString(stringValue);
+                return stringValue.NormalizeOptionalString();
         }
 
         return null;
@@ -502,7 +537,7 @@ internal static class EndpointConfigurationFactory
 
     private static GeneratedAttributeKind GetGeneratedAttributeKindCore(INamedTypeSymbol definition)
     {
-        if (!IsInNamespace(definition.ContainingNamespace, AttributesNamespaceParts))
+        if (!AttributeSymbolMatcher.IsInNamespace(definition.ContainingNamespace, AttributesNamespaceParts))
             return GeneratedAttributeKind.None;
 
         return definition.Name switch

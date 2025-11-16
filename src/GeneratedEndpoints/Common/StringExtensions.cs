@@ -65,4 +65,9 @@ internal static class StringExtensions
         sb.Append('"');
         return StringBuilderPool.ToStringAndReturn(sb);
     }
+
+    public static string? NormalizeOptionalString(this string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+    }
 }
