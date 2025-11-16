@@ -35,12 +35,12 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
     }
 
-    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb, bool allowEmptyPattern = false)
+    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb, bool allowOptionalPattern = false)
     {
         var fullyQualifiedName = $"{AttributesNamespace}.{attributeName}";
         var hint = $"{fullyQualifiedName}.gs.cs";
         var summaryVerb = verb == FallbackHttpMethod ? "fallback" : verb;
-        var source = GenerateHttpAttributeSource(AttributesNamespace, attributeName, summaryVerb, allowEmptyPattern);
+        var source = GenerateHttpAttributeSource(AttributesNamespace, attributeName, summaryVerb, allowOptionalPattern);
         return new HttpAttributeDefinition(attributeName, fullyQualifiedName, hint, verb, SourceText.From(source, Encoding.UTF8));
     }
 
@@ -85,9 +85,8 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         context.AddSource(ProducesValidationProblemAttributeHint, ProducesValidationProblemAttributeSourceText);
     }
 
-    private static string GenerateHttpAttributeSource(string attributesNamespace, string attributeName, string summaryVerb, bool allowEmptyPattern)
+    private static string GenerateHttpAttributeSource(string attributesNamespace, string attributeName, string summaryVerb, bool allowOptionalPattern = false)
     {
-        var patternDefaultValue = allowEmptyPattern ? " = \"\"" : string.Empty;
         return $$"""
                  {{FileHeader}}
 
@@ -102,7 +101,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
                      /// <summary>
                      /// Gets the route pattern for the endpoint.
                      /// </summary>
-                     public string Pattern { get; }
+                     public string{{(allowOptionalPattern ? "?" : "")}} Pattern { get; }
 
                      /// <summary>
                      /// Gets or sets the endpoint name.
@@ -113,7 +112,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
                      /// Initializes a new instance of the <see cref="{{attributeName}}"/> class.
                      /// </summary>
                      /// <param name="pattern">The route pattern for the endpoint.</param>
-                     public {{attributeName}}([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string pattern{{patternDefaultValue}})
+                     public {{attributeName}}([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string{{(allowOptionalPattern ? "?" : "")}} pattern{{(allowOptionalPattern ? " = null" : "")}})
                       {
                           Pattern = pattern;
                       }
@@ -751,8 +750,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             if (!seen.Add(normalized))
                 continue;
 
-            if (list is null)
-                list = [];
+            list ??= [];
 
             list.Add(normalized);
         }

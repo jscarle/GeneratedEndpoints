@@ -21,7 +21,7 @@ internal sealed class MapFallbackAttribute : global::System.Attribute
     /// <summary>
     /// Gets the route pattern for the endpoint.
     /// </summary>
-    public string Pattern { get; }
+    public string? Pattern { get; }
 
     /// <summary>
     /// Gets or sets the endpoint name.
@@ -32,7 +32,7 @@ internal sealed class MapFallbackAttribute : global::System.Attribute
     /// Initializes a new instance of the <see cref="MapFallbackAttribute"/> class.
     /// </summary>
     /// <param name="pattern">The route pattern for the endpoint.</param>
-    public MapFallbackAttribute([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string pattern = "")
+    public MapFallbackAttribute([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string? pattern = null)
      {
          Pattern = pattern;
      }

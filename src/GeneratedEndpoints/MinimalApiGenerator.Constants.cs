@@ -139,7 +139,7 @@ public sealed partial class MinimalApiGenerator
         CreateHttpAttributeDefinition("MapQueryAttribute", "QUERY"),
         CreateHttpAttributeDefinition("MapTraceAttribute", "TRACE"),
         CreateHttpAttributeDefinition("MapConnectAttribute", "CONNECT"),
-        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod),
+        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod, true),
     ];
 
     private static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =
