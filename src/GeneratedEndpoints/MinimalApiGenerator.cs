@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
@@ -14,31 +15,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 {
     private const string BaseNamespace = "Microsoft.AspNetCore.Generated";
     private const string AttributesNamespace = $"{BaseNamespace}.Attributes";
-    private static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
-    private static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
-    private static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
-    private static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
-    private static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
 
     private const string FallbackHttpMethod = "__FALLBACK__";
-
-    private static readonly ImmutableArray<HttpAttributeDefinition> HttpAttributeDefinitions =
-    [
-        CreateHttpAttributeDefinition("MapGetAttribute", "GET"),
-        CreateHttpAttributeDefinition("MapPostAttribute", "POST"),
-        CreateHttpAttributeDefinition("MapPutAttribute", "PUT"),
-        CreateHttpAttributeDefinition("MapPatchAttribute", "PATCH"),
-        CreateHttpAttributeDefinition("MapDeleteAttribute", "DELETE"),
-        CreateHttpAttributeDefinition("MapOptionsAttribute", "OPTIONS"),
-        CreateHttpAttributeDefinition("MapHeadAttribute", "HEAD"),
-        CreateHttpAttributeDefinition("MapQueryAttribute", "QUERY"),
-        CreateHttpAttributeDefinition("MapTraceAttribute", "TRACE"),
-        CreateHttpAttributeDefinition("MapConnectAttribute", "CONNECT"),
-        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod, allowEmptyPattern: true),
-    ];
-
-    private static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =
-        HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
     private const string NameAttributeNamedParameter = "Name";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
@@ -109,8 +87,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string ProducesProblemAttributeHint = $"{ProducesProblemAttributeFullyQualifiedName}.gs.cs";
 
     private const string ProducesValidationProblemAttributeName = "ProducesValidationProblemAttribute";
-    private const string ProducesValidationProblemAttributeFullyQualifiedName =
-        $"{AttributesNamespace}.{ProducesValidationProblemAttributeName}";
+
+    private const string ProducesValidationProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesValidationProblemAttributeName}";
+
     private const string ProducesValidationProblemAttributeHint = $"{ProducesValidationProblemAttributeFullyQualifiedName}.gs.cs";
 
     private const string RoutingNamespace = $"{BaseNamespace}.Routing";
@@ -126,6 +105,29 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private const string ConfigureMethodName = "Configure";
     private const string AsyncSuffix = "Async";
     private const string GlobalPrefix = "global::";
+    private static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
+    private static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
+    private static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
+    private static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
+    private static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
+
+    private static readonly ImmutableArray<HttpAttributeDefinition> HttpAttributeDefinitions =
+    [
+        CreateHttpAttributeDefinition("MapGetAttribute", "GET"),
+        CreateHttpAttributeDefinition("MapPostAttribute", "POST"),
+        CreateHttpAttributeDefinition("MapPutAttribute", "PUT"),
+        CreateHttpAttributeDefinition("MapPatchAttribute", "PATCH"),
+        CreateHttpAttributeDefinition("MapDeleteAttribute", "DELETE"),
+        CreateHttpAttributeDefinition("MapOptionsAttribute", "OPTIONS"),
+        CreateHttpAttributeDefinition("MapHeadAttribute", "HEAD"),
+        CreateHttpAttributeDefinition("MapQueryAttribute", "QUERY"),
+        CreateHttpAttributeDefinition("MapTraceAttribute", "TRACE"),
+        CreateHttpAttributeDefinition("MapConnectAttribute", "CONNECT"),
+        CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod, true),
+    ];
+
+    private static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =
+        HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
     private static readonly string FileHeader = $"""
                                                  //-----------------------------------------------------------------------------
@@ -141,18 +143,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                                  #nullable enable
                                                  """;
 
-    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb, bool allowEmptyPattern = false)
-    {
-        var fullyQualifiedName = $"{AttributesNamespace}.{attributeName}";
-        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, $"{fullyQualifiedName}.gs.cs", verb, allowEmptyPattern);
-    }
-
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterPostInitializationOutput(RegisterAttributes);
 
-        var requestHandlerProviders = ImmutableArray.CreateBuilder<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(
-            HttpAttributeDefinitions.Length);
+        var requestHandlerProviders = ImmutableArray.CreateBuilder<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
 
         foreach (var definition in HttpAttributeDefinitions)
         {
@@ -169,17 +164,23 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
     }
 
+    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb, bool allowEmptyPattern = false)
+    {
+        var fullyQualifiedName = $"{AttributesNamespace}.{attributeName}";
+        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, $"{fullyQualifiedName}.gs.cs", verb, allowEmptyPattern);
+    }
+
     private static IncrementalValueProvider<ImmutableArray<RequestHandler>> CombineRequestHandlers(
-        ImmutableArray<IncrementalValueProvider<ImmutableArray<RequestHandler>>> handlerProviders)
+        ImmutableArray<IncrementalValueProvider<ImmutableArray<RequestHandler>>> handlerProviders
+    )
     {
         if (handlerProviders.IsDefaultOrEmpty)
             throw new InvalidOperationException("No HTTP attribute definitions were provided.");
 
         var combined = handlerProviders[0];
         for (var i = 1; i < handlerProviders.Length; i++)
-        {
-            combined = combined.Combine(handlerProviders[i]).Select(static (x, _) => x.Left.AddRange(x.Right));
-        }
+            combined = combined.Combine(handlerProviders[i])
+                .Select(static (x, _) => x.Left.AddRange(x.Right));
 
         return combined;
     }
@@ -189,8 +190,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         foreach (var definition in HttpAttributeDefinitions)
         {
             var summaryVerb = definition.Verb == FallbackHttpMethod ? "fallback" : definition.Verb;
-            var source = GenerateHttpAttributeSource(FileHeader, AttributesNamespace, definition.Name, summaryVerb,
-                definition.AllowEmptyPattern);
+            var source = GenerateHttpAttributeSource(FileHeader, AttributesNamespace, definition.Name, summaryVerb, definition.AllowEmptyPattern);
             context.AddSource(definition.Hint, SourceText.From(source, Encoding.UTF8));
         }
 
@@ -233,95 +233,95 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         // RequireCors
         var requireCorsSource = $$"""
-                                 {{FileHeader}}
+                                  {{FileHeader}}
 
-                                 namespace {{AttributesNamespace}};
+                                  namespace {{AttributesNamespace}};
 
-                                 /// <summary>
-                                 /// Specifies that the annotated endpoint requires a configured CORS policy.
-                                 /// </summary>
-                                 [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                 internal sealed class {{RequireCorsAttributeName}} : global::System.Attribute
-                                 {
-                                     /// <summary>
-                                     /// Gets the optional CORS policy name.
-                                     /// </summary>
-                                     public string? PolicyName { get; }
+                                  /// <summary>
+                                  /// Specifies that the annotated endpoint requires a configured CORS policy.
+                                  /// </summary>
+                                  [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                  internal sealed class {{RequireCorsAttributeName}} : global::System.Attribute
+                                  {
+                                      /// <summary>
+                                      /// Gets the optional CORS policy name.
+                                      /// </summary>
+                                      public string? PolicyName { get; }
 
-                                     /// <summary>
-                                     /// Marks the endpoint or class as requiring the default CORS policy.
-                                     /// </summary>
-                                     public {{RequireCorsAttributeName}}()
-                                     {
-                                     }
+                                      /// <summary>
+                                      /// Marks the endpoint or class as requiring the default CORS policy.
+                                      /// </summary>
+                                      public {{RequireCorsAttributeName}}()
+                                      {
+                                      }
 
-                                     /// <summary>
-                                     /// Marks the endpoint or class as requiring the specified named CORS policy.
-                                     /// </summary>
-                                     public {{RequireCorsAttributeName}}(string policyName)
-                                     {
-                                         PolicyName = policyName;
-                                     }
-                                 }
-                                 """;
+                                      /// <summary>
+                                      /// Marks the endpoint or class as requiring the specified named CORS policy.
+                                      /// </summary>
+                                      public {{RequireCorsAttributeName}}(string policyName)
+                                      {
+                                          PolicyName = policyName;
+                                      }
+                                  }
+                                  """;
         context.AddSource(RequireCorsAttributeHint, SourceText.From(requireCorsSource, Encoding.UTF8));
 
         // RequireRateLimiting
         var requireRateLimitingSource = $$"""
-                                        {{FileHeader}}
+                                          {{FileHeader}}
 
-                                        namespace {{AttributesNamespace}};
+                                          namespace {{AttributesNamespace}};
 
-                                        /// <summary>
-                                        /// Specifies that the annotated endpoint requires the provided rate limiting policy.
-                                        /// </summary>
-                                        [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                        internal sealed class {{RequireRateLimitingAttributeName}} : global::System.Attribute
-                                        {
-                                            /// <summary>
-                                            /// Initializes a new instance of the <see cref="{{RequireRateLimitingAttributeName}}"/> class.
-                                            /// </summary>
-                                            /// <param name="policyName">The rate limiting policy to apply.</param>
-                                            public {{RequireRateLimitingAttributeName}}(string policyName)
-                                            {
-                                                PolicyName = policyName;
-                                            }
+                                          /// <summary>
+                                          /// Specifies that the annotated endpoint requires the provided rate limiting policy.
+                                          /// </summary>
+                                          [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                          internal sealed class {{RequireRateLimitingAttributeName}} : global::System.Attribute
+                                          {
+                                              /// <summary>
+                                              /// Initializes a new instance of the <see cref="{{RequireRateLimitingAttributeName}}"/> class.
+                                              /// </summary>
+                                              /// <param name="policyName">The rate limiting policy to apply.</param>
+                                              public {{RequireRateLimitingAttributeName}}(string policyName)
+                                              {
+                                                  PolicyName = policyName;
+                                              }
 
-                                            /// <summary>
-                                            /// Gets the rate limiting policy name.
-                                            /// </summary>
-                                            public string PolicyName { get; }
-                                        }
-                                        """;
+                                              /// <summary>
+                                              /// Gets the rate limiting policy name.
+                                              /// </summary>
+                                              public string PolicyName { get; }
+                                          }
+                                          """;
         context.AddSource(RequireRateLimitingAttributeHint, SourceText.From(requireRateLimitingSource, Encoding.UTF8));
 
         // RequireHost
         var requireHostSource = $$"""
-                                {{FileHeader}}
+                                  {{FileHeader}}
 
-                                namespace {{AttributesNamespace}};
+                                  namespace {{AttributesNamespace}};
 
-                                /// <summary>
-                                /// Specifies the allowed hosts for the annotated endpoint or class.
-                                /// </summary>
-                                [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                internal sealed class {{RequireHostAttributeName}} : global::System.Attribute
-                                {
-                                    /// <summary>
-                                    /// Initializes a new instance of the <see cref="{{RequireHostAttributeName}}"/> class.
-                                    /// </summary>
-                                    /// <param name="hosts">The hosts that are allowed to access the endpoint.</param>
-                                    public {{RequireHostAttributeName}}(params string[] hosts)
-                                    {
-                                        Hosts = hosts ?? [];
-                                    }
+                                  /// <summary>
+                                  /// Specifies the allowed hosts for the annotated endpoint or class.
+                                  /// </summary>
+                                  [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                  internal sealed class {{RequireHostAttributeName}} : global::System.Attribute
+                                  {
+                                      /// <summary>
+                                      /// Initializes a new instance of the <see cref="{{RequireHostAttributeName}}"/> class.
+                                      /// </summary>
+                                      /// <param name="hosts">The hosts that are allowed to access the endpoint.</param>
+                                      public {{RequireHostAttributeName}}(params string[] hosts)
+                                      {
+                                          Hosts = hosts ?? [];
+                                      }
 
-                                    /// <summary>
-                                    /// Gets the allowed hosts.
-                                    /// </summary>
-                                    public string[] Hosts { get; }
-                                }
-                                """;
+                                      /// <summary>
+                                      /// Gets the allowed hosts.
+                                      /// </summary>
+                                      public string[] Hosts { get; }
+                                  }
+                                  """;
         context.AddSource(RequireHostAttributeHint, SourceText.From(requireHostSource, Encoding.UTF8));
 
         // DisableAntiforgery
@@ -360,232 +360,232 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         // DisableRequestTimeout
         var disableRequestTimeoutSource = $$"""
-                                           {{FileHeader}}
+                                            {{FileHeader}}
 
-                                           namespace {{AttributesNamespace}};
+                                            namespace {{AttributesNamespace}};
 
-                                           /// <summary>
-                                           /// Disables the request timeout for the annotated endpoint or class.
-                                           /// </summary>
-                                           [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                           internal sealed class {{DisableRequestTimeoutAttributeName}} : global::System.Attribute
-                                           {
-                                           }
+                                            /// <summary>
+                                            /// Disables the request timeout for the annotated endpoint or class.
+                                            /// </summary>
+                                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                            internal sealed class {{DisableRequestTimeoutAttributeName}} : global::System.Attribute
+                                            {
+                                            }
 
-                                           """;
+                                            """;
         context.AddSource(DisableRequestTimeoutAttributeHint, SourceText.From(disableRequestTimeoutSource, Encoding.UTF8));
 
         // RequestTimeout
         var requestTimeoutSource = $$"""
-                                        {{FileHeader}}
+                                         {{FileHeader}}
 
-                                        namespace {{AttributesNamespace}};
+                                         namespace {{AttributesNamespace}};
 
-                                         /// <summary>
-                                         /// Applies the request timeout metadata to the annotated endpoint or class.
-                                         /// </summary>
-                                         [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                                         internal sealed class {{RequestTimeoutAttributeName}} : global::System.Attribute
-                                         {
-                                             /// <summary>
-                                             /// Gets the optional request timeout policy name.
-                                             /// </summary>
-                                             public string? PolicyName { get; init; }
+                                          /// <summary>
+                                          /// Applies the request timeout metadata to the annotated endpoint or class.
+                                          /// </summary>
+                                          [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                          internal sealed class {{RequestTimeoutAttributeName}} : global::System.Attribute
+                                          {
+                                              /// <summary>
+                                              /// Gets the optional request timeout policy name.
+                                              /// </summary>
+                                              public string? PolicyName { get; init; }
 
-                                             /// <summary>
-                                             /// Applies the default request timeout behavior.
-                                             /// </summary>
-                                             public {{RequestTimeoutAttributeName}}()
-                                             {
-                                             }
+                                              /// <summary>
+                                              /// Applies the default request timeout behavior.
+                                              /// </summary>
+                                              public {{RequestTimeoutAttributeName}}()
+                                              {
+                                              }
 
-                                             /// <summary>
-                                             /// Applies the specified request timeout policy.
-                                             /// </summary>
-                                             /// <param name="policyName">The request timeout policy name.</param>
-                                             public {{RequestTimeoutAttributeName}}(string policyName)
-                                             {
-                                                 PolicyName = policyName;
-                                        }
-                                    }
+                                              /// <summary>
+                                              /// Applies the specified request timeout policy.
+                                              /// </summary>
+                                              /// <param name="policyName">The request timeout policy name.</param>
+                                              public {{RequestTimeoutAttributeName}}(string policyName)
+                                              {
+                                                  PolicyName = policyName;
+                                         }
+                                     }
 
-                                    """;
+                                     """;
         context.AddSource(RequestTimeoutAttributeHint, SourceText.From(requestTimeoutSource, Encoding.UTF8));
 
         // Order
         var orderSource = $$"""
-                         {{FileHeader}}
-
-                         namespace {{AttributesNamespace}};
-
-                         /// <summary>
-                         /// Specifies the order for the annotated endpoint when building conventions.
-                         /// </summary>
-                         [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                         internal sealed class {{OrderAttributeName}} : global::System.Attribute
-                         {
-                             /// <summary>
-                             /// Gets the order that will be applied to the endpoint.
-                             /// </summary>
-                             public int Order { get; }
-
-                             /// <summary>
-                             /// Initializes a new instance of the <see cref="{{OrderAttributeName}}"/> class.
-                             /// </summary>
-                             /// <param name="order">The order value to apply to the endpoint.</param>
-                             public {{OrderAttributeName}}(int order)
-                             {
-                                 Order = order;
-                             }
-                         }
-
-                         """;
-        context.AddSource(OrderAttributeHint, SourceText.From(orderSource, Encoding.UTF8));
-
-        // GroupName
-        var groupNameSource = $$"""
-                              {{FileHeader}}
-
-                              namespace {{AttributesNamespace}};
-
-                              /// <summary>
-                              /// Specifies the endpoint group name for the annotated class.
-                              /// </summary>
-                              [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-                              internal sealed class {{GroupNameAttributeName}} : global::System.Attribute
-                              {
-                                  /// <summary>
-                                  /// Gets the endpoint group name.
-                                  /// </summary>
-                                  public string GroupName { get; }
-
-                                  /// <summary>
-                                  /// Initializes a new instance of the <see cref="{{GroupNameAttributeName}}"/> class.
-                                  /// </summary>
-                                  /// <param name="groupName">The endpoint group name to apply.</param>
-                                  public {{GroupNameAttributeName}}(string groupName)
-                                  {
-                                      GroupName = groupName;
-                                  }
-                              }
-
-                              """;
-        context.AddSource(GroupNameAttributeHint, SourceText.From(groupNameSource, Encoding.UTF8));
-
-        // Summary
-        var summarySource = $$"""
                             {{FileHeader}}
 
                             namespace {{AttributesNamespace}};
 
                             /// <summary>
-                            /// Specifies the summary metadata for the annotated endpoint.
+                            /// Specifies the order for the annotated endpoint when building conventions.
                             /// </summary>
-                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-                            internal sealed class {{SummaryAttributeName}} : global::System.Attribute
+                            [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                            internal sealed class {{OrderAttributeName}} : global::System.Attribute
                             {
                                 /// <summary>
-                                /// Gets the summary value for the endpoint.
+                                /// Gets the order that will be applied to the endpoint.
                                 /// </summary>
-                                public string Summary { get; }
+                                public int Order { get; }
 
                                 /// <summary>
-                                /// Initializes a new instance of the <see cref="{{SummaryAttributeName}}"/> class.
+                                /// Initializes a new instance of the <see cref="{{OrderAttributeName}}"/> class.
                                 /// </summary>
-                                /// <param name="summary">The summary to apply to the endpoint.</param>
-                                public {{SummaryAttributeName}}(string summary)
+                                /// <param name="order">The order value to apply to the endpoint.</param>
+                                public {{OrderAttributeName}}(int order)
                                 {
-                                    Summary = summary;
+                                    Order = order;
                                 }
                             }
 
                             """;
+        context.AddSource(OrderAttributeHint, SourceText.From(orderSource, Encoding.UTF8));
+
+        // GroupName
+        var groupNameSource = $$"""
+                                {{FileHeader}}
+
+                                namespace {{AttributesNamespace}};
+
+                                /// <summary>
+                                /// Specifies the endpoint group name for the annotated class.
+                                /// </summary>
+                                [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+                                internal sealed class {{GroupNameAttributeName}} : global::System.Attribute
+                                {
+                                    /// <summary>
+                                    /// Gets the endpoint group name.
+                                    /// </summary>
+                                    public string GroupName { get; }
+
+                                    /// <summary>
+                                    /// Initializes a new instance of the <see cref="{{GroupNameAttributeName}}"/> class.
+                                    /// </summary>
+                                    /// <param name="groupName">The endpoint group name to apply.</param>
+                                    public {{GroupNameAttributeName}}(string groupName)
+                                    {
+                                        GroupName = groupName;
+                                    }
+                                }
+
+                                """;
+        context.AddSource(GroupNameAttributeHint, SourceText.From(groupNameSource, Encoding.UTF8));
+
+        // Summary
+        var summarySource = $$"""
+                              {{FileHeader}}
+
+                              namespace {{AttributesNamespace}};
+
+                              /// <summary>
+                              /// Specifies the summary metadata for the annotated endpoint.
+                              /// </summary>
+                              [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                              internal sealed class {{SummaryAttributeName}} : global::System.Attribute
+                              {
+                                  /// <summary>
+                                  /// Gets the summary value for the endpoint.
+                                  /// </summary>
+                                  public string Summary { get; }
+
+                                  /// <summary>
+                                  /// Initializes a new instance of the <see cref="{{SummaryAttributeName}}"/> class.
+                                  /// </summary>
+                                  /// <param name="summary">The summary to apply to the endpoint.</param>
+                                  public {{SummaryAttributeName}}(string summary)
+                                  {
+                                      Summary = summary;
+                                  }
+                              }
+
+                              """;
         context.AddSource(SummaryAttributeHint, SourceText.From(summarySource, Encoding.UTF8));
 
         // Accepts
         var acceptsSource = $$"""
-                                {{FileHeader}}
+                               {{FileHeader}}
 
-                               namespace {{AttributesNamespace}};
+                              namespace {{AttributesNamespace}};
 
-                               /// <summary>
-                               /// Specifies the request type and content types accepted by the annotated endpoint or class.
-                               /// </summary>
-                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                               internal sealed class {{AcceptsAttributeName}} : global::System.Attribute
-                               {
-                                   /// <summary>
-                                   /// Gets the request type accepted by the endpoint.
-                                   /// </summary>
-                                   public global::System.Type RequestType { get; init; } = default!;
+                              /// <summary>
+                              /// Specifies the request type and content types accepted by the annotated endpoint or class.
+                              /// </summary>
+                              [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                              internal sealed class {{AcceptsAttributeName}} : global::System.Attribute
+                              {
+                                  /// <summary>
+                                  /// Gets the request type accepted by the endpoint.
+                                  /// </summary>
+                                  public global::System.Type? RequestType { get; init; }
 
-                                   /// <summary>
-                                   /// Gets a value indicating whether the request body is optional.
-                                   /// </summary>
-                                   public bool IsOptional { get; init; }
+                                  /// <summary>
+                                  /// Gets a value indicating whether the request body is optional.
+                                  /// </summary>
+                                  public bool IsOptional { get; init; }
 
-                                   /// <summary>
-                                   /// Gets the primary content type accepted by the endpoint.
-                                   /// </summary>
-                                   public string ContentType { get; }
+                                  /// <summary>
+                                  /// Gets the primary content type accepted by the endpoint.
+                                  /// </summary>
+                                  public string ContentType { get; }
 
-                                   /// <summary>
-                                   /// Gets the additional content types accepted by the endpoint.
-                                   /// </summary>
-                                   public string[] AdditionalContentTypes { get; }
+                                  /// <summary>
+                                  /// Gets the additional content types accepted by the endpoint.
+                                  /// </summary>
+                                  public string[] AdditionalContentTypes { get; }
 
-                                   /// <summary>
-                                   /// Initializes a new instance of the <see cref="{{AcceptsAttributeName}}"/> class.
-                                   /// </summary>
-                                   /// <param name="contentType">The primary content type accepted by the endpoint.</param>
-                                   /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
-                                   public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
-                                   {
-                                       ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
-                                       AdditionalContentTypes = additionalContentTypes ?? [];
-                                   }
-                               }
+                                  /// <summary>
+                                  /// Initializes a new instance of the <see cref="{{AcceptsAttributeName}}"/> class.
+                                  /// </summary>
+                                  /// <param name="contentType">The primary content type accepted by the endpoint.</param>
+                                  /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
+                                  public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
+                                  {
+                                      ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
+                                      AdditionalContentTypes = additionalContentTypes ?? [];
+                                  }
+                              }
 
-                               /// <summary>
-                               /// Specifies the request type using a generic argument and the content types accepted by the annotated endpoint or class.
-                               /// </summary>
-                               /// <typeparam name="TRequest">The CLR type of the request body.</typeparam>
-                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                               internal sealed class {{AcceptsAttributeName}}<TRequest> : global::System.Attribute
-                               {
-                                   /// <summary>
-                                   /// Gets the request type accepted by the endpoint.
-                                   /// </summary>
-                                   public global::System.Type RequestType => typeof(TRequest);
+                              /// <summary>
+                              /// Specifies the request type using a generic argument and the content types accepted by the annotated endpoint or class.
+                              /// </summary>
+                              /// <typeparam name="TRequest">The CLR type of the request body.</typeparam>
+                              [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                              internal sealed class {{AcceptsAttributeName}}<TRequest> : global::System.Attribute
+                              {
+                                  /// <summary>
+                                  /// Gets the request type accepted by the endpoint.
+                                  /// </summary>
+                                  public global::System.Type RequestType => typeof(TRequest);
 
-                                   /// <summary>
-                                   /// Gets a value indicating whether the request body is optional.
-                                   /// </summary>
-                                   public bool IsOptional { get; init; }
+                                  /// <summary>
+                                  /// Gets a value indicating whether the request body is optional.
+                                  /// </summary>
+                                  public bool IsOptional { get; init; }
 
-                                   /// <summary>
-                                   /// Gets the primary content type accepted by the endpoint.
-                                   /// </summary>
-                                   public string ContentType { get; }
+                                  /// <summary>
+                                  /// Gets the primary content type accepted by the endpoint.
+                                  /// </summary>
+                                  public string ContentType { get; }
 
-                                   /// <summary>
-                                   /// Gets the additional content types accepted by the endpoint.
-                                   /// </summary>
-                                   public string[] AdditionalContentTypes { get; }
+                                  /// <summary>
+                                  /// Gets the additional content types accepted by the endpoint.
+                                  /// </summary>
+                                  public string[] AdditionalContentTypes { get; }
 
-                                   /// <summary>
-                                   /// Initializes a new instance of the generic Accepts attribute class.
-                                   /// </summary>
-                                   /// <param name="contentType">The primary content type accepted by the endpoint.</param>
-                                   /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
-                                   public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
-                                   {
-                                       ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
-                                       AdditionalContentTypes = additionalContentTypes ?? [];
-                                   }
-                               }
+                                  /// <summary>
+                                  /// Initializes a new instance of the generic Accepts attribute class.
+                                  /// </summary>
+                                  /// <param name="contentType">The primary content type accepted by the endpoint.</param>
+                                  /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
+                                  public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
+                                  {
+                                      ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
+                                      AdditionalContentTypes = additionalContentTypes ?? [];
+                                  }
+                              }
 
-                               """;
+                              """;
         context.AddSource(AcceptsAttributeHint, SourceText.From(acceptsSource, Encoding.UTF8));
 
         // EndpointFilter
@@ -633,136 +633,136 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         // Produces
         var producesSource = $$"""
-                                {{FileHeader}}
+                               {{FileHeader}}
 
-                                namespace {{AttributesNamespace}};
+                               namespace {{AttributesNamespace}};
 
-                                /// <summary>
-                                /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
-                                /// </summary>
-                                [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                                internal sealed class {{ProducesResponseAttributeName}} : global::System.Attribute
-                                {
-                                /// <summary>
-                                /// Gets the response type produced by the endpoint.
-                                /// </summary>
-                                public global::System.Type? ResponseType { get; init; } = null;
+                               /// <summary>
+                               /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
+                               /// </summary>
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                               internal sealed class {{ProducesResponseAttributeName}} : global::System.Attribute
+                               {
+                               /// <summary>
+                               /// Gets the response type produced by the endpoint.
+                               /// </summary>
+                               public global::System.Type? ResponseType { get; init; }
 
-                                    /// <summary>
-                                    /// Gets the HTTP status code returned by the endpoint.
-                                    /// </summary>
-                                    public int StatusCode { get; }
+                                   /// <summary>
+                                   /// Gets the HTTP status code returned by the endpoint.
+                                   /// </summary>
+                                   public int StatusCode { get; }
 
-                                    /// <summary>
-                                    /// Gets the primary content type produced by the endpoint.
-                                    /// </summary>
-                                    public string? ContentType { get; }
+                                   /// <summary>
+                                   /// Gets the primary content type produced by the endpoint.
+                                   /// </summary>
+                                   public string? ContentType { get; }
 
-                                    /// <summary>
-                                    /// Gets the additional content types produced by the endpoint.
-                                    /// </summary>
-                                    public string[] AdditionalContentTypes { get; }
+                                   /// <summary>
+                                   /// Gets the additional content types produced by the endpoint.
+                                   /// </summary>
+                                   public string[] AdditionalContentTypes { get; }
 
-                                    /// <summary>
-                                    /// Initializes a new instance of the <see cref="{{ProducesResponseAttributeName}}"/> class.
-                                    /// </summary>
-                                    /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
-                                    /// <param name="contentType">The primary content type produced by the endpoint.</param>
-                                    /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                    public {{ProducesResponseAttributeName}}(int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
-                                    {
-                                        StatusCode = statusCode;
-                                        ContentType = contentType;
-                                        AdditionalContentTypes = additionalContentTypes ?? [];
-                                    }
-                                }
+                                   /// <summary>
+                                   /// Initializes a new instance of the <see cref="{{ProducesResponseAttributeName}}"/> class.
+                                   /// </summary>
+                                   /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                   /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                   /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                   public {{ProducesResponseAttributeName}}(int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status200OK, string? contentType = null, params string[] additionalContentTypes)
+                                   {
+                                       StatusCode = statusCode;
+                                       ContentType = contentType;
+                                       AdditionalContentTypes = additionalContentTypes ?? [];
+                                   }
+                               }
 
-                                /// <summary>
-                                /// Specifies a response type using a generic argument along with status code and content types produced by the annotated endpoint or class.
-                                /// </summary>
-                                /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
-                                [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                                internal sealed class {{ProducesResponseAttributeName}}<TResponse> : global::System.Attribute
-                                {
-                                    /// <summary>
-                                    /// Gets the response type produced by the endpoint.
-                                    /// </summary>
-                                    public global::System.Type ResponseType => typeof(TResponse);
+                               /// <summary>
+                               /// Specifies a response type using a generic argument along with status code and content types produced by the annotated endpoint or class.
+                               /// </summary>
+                               /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
+                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                               internal sealed class {{ProducesResponseAttributeName}}<TResponse> : global::System.Attribute
+                               {
+                                   /// <summary>
+                                   /// Gets the response type produced by the endpoint.
+                                   /// </summary>
+                                   public global::System.Type ResponseType => typeof(TResponse);
 
-                                    /// <summary>
-                                    /// Gets the HTTP status code returned by the endpoint.
-                                    /// </summary>
-                                    public int StatusCode { get; }
+                                   /// <summary>
+                                   /// Gets the HTTP status code returned by the endpoint.
+                                   /// </summary>
+                                   public int StatusCode { get; }
 
-                                    /// <summary>
-                                    /// Gets the primary content type produced by the endpoint.
-                                    /// </summary>
-                                    public string? ContentType { get; }
+                                   /// <summary>
+                                   /// Gets the primary content type produced by the endpoint.
+                                   /// </summary>
+                                   public string? ContentType { get; }
 
-                                    /// <summary>
-                                    /// Gets the additional content types produced by the endpoint.
-                                    /// </summary>
-                                    public string[] AdditionalContentTypes { get; }
+                                   /// <summary>
+                                   /// Gets the additional content types produced by the endpoint.
+                                   /// </summary>
+                                   public string[] AdditionalContentTypes { get; }
 
-                                    /// <summary>
-                                    /// Initializes a new instance of the generic Produces attribute class.
-                                    /// </summary>
-                                    /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
-                                    /// <param name="contentType">The primary content type produced by the endpoint.</param>
-                                    /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                    public {{ProducesResponseAttributeName}}(int statusCode = 200, string? contentType = null, params string[] additionalContentTypes)
-                                    {
-                                        StatusCode = statusCode;
-                                        ContentType = contentType;
-                                        AdditionalContentTypes = additionalContentTypes ?? [];
-                                    }
-                                }
+                                   /// <summary>
+                                   /// Initializes a new instance of the generic Produces attribute class.
+                                   /// </summary>
+                                   /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                   /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                   /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                   public {{ProducesResponseAttributeName}}(int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status200OK, string? contentType = null, params string[] additionalContentTypes)
+                                   {
+                                       StatusCode = statusCode;
+                                       ContentType = contentType;
+                                       AdditionalContentTypes = additionalContentTypes ?? [];
+                                   }
+                               }
 
-                                """;
+                               """;
         context.AddSource(ProducesResponseAttributeHint, SourceText.From(producesSource, Encoding.UTF8));
 
         // ProducesProblem
         var producesProblemSource = $$"""
-                                        {{FileHeader}}
+                                      {{FileHeader}}
 
-                                        namespace {{AttributesNamespace}};
+                                      namespace {{AttributesNamespace}};
 
-                                        /// <summary>
-                                        /// Specifies that the endpoint produces a problem details payload.
-                                        /// </summary>
-                                        [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-                                        internal sealed class {{ProducesProblemAttributeName}} : global::System.Attribute
-                                        {
-                                            /// <summary>
-                                            /// Gets the HTTP status code returned by the endpoint.
-                                            /// </summary>
-                                            public int StatusCode { get; }
+                                      /// <summary>
+                                      /// Specifies that the endpoint produces a problem details payload.
+                                      /// </summary>
+                                      [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                      internal sealed class {{ProducesProblemAttributeName}} : global::System.Attribute
+                                      {
+                                          /// <summary>
+                                          /// Gets the HTTP status code returned by the endpoint.
+                                          /// </summary>
+                                          public int StatusCode { get; }
 
-                                            /// <summary>
-                                            /// Gets the primary content type produced by the endpoint.
-                                            /// </summary>
-                                            public string? ContentType { get; }
+                                          /// <summary>
+                                          /// Gets the primary content type produced by the endpoint.
+                                          /// </summary>
+                                          public string? ContentType { get; }
 
-                                            /// <summary>
-                                            /// Gets the additional content types produced by the endpoint.
-                                            /// </summary>
-                                            public string[] AdditionalContentTypes { get; }
+                                          /// <summary>
+                                          /// Gets the additional content types produced by the endpoint.
+                                          /// </summary>
+                                          public string[] AdditionalContentTypes { get; }
 
-                                            /// <summary>
-                                            /// Initializes a new instance of the <see cref="{{ProducesProblemAttributeName}}"/> class.
-                                            /// </summary>
-                                            /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
-                                            /// <param name="contentType">The primary content type produced by the endpoint.</param>
-                                            /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                            public {{ProducesProblemAttributeName}}(int statusCode = 500, string? contentType = null, params string[] additionalContentTypes)
-                                            {
-                                                StatusCode = statusCode;
-                                                ContentType = contentType;
-                                                AdditionalContentTypes = additionalContentTypes ?? [];
-                                            }
-                                        }
+                                          /// <summary>
+                                          /// Initializes a new instance of the <see cref="{{ProducesProblemAttributeName}}"/> class.
+                                          /// </summary>
+                                          /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                          /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                          /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                          public {{ProducesProblemAttributeName}}(int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status500InternalServerError, string? contentType = null, params string[] additionalContentTypes)
+                                          {
+                                              StatusCode = statusCode;
+                                              ContentType = contentType;
+                                              AdditionalContentTypes = additionalContentTypes ?? [];
+                                          }
+                                      }
 
-                                        """;
+                                      """;
         context.AddSource(ProducesProblemAttributeHint, SourceText.From(producesProblemSource, Encoding.UTF8));
 
         // ProducesValidationProblem
@@ -798,7 +798,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                                                     /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
                                                     /// <param name="contentType">The primary content type produced by the endpoint.</param>
                                                     /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                                    public {{ProducesValidationProblemAttributeName}}(int statusCode = 400, string? contentType = null, params string[] additionalContentTypes)
+                                                    public {{ProducesValidationProblemAttributeName}}(int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest, string? contentType = null, params string[] additionalContentTypes)
                                                     {
                                                         StatusCode = statusCode;
                                                         ContentType = contentType;
@@ -815,7 +815,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string attributesNamespace,
         string attributeName,
         string summaryVerb,
-        bool allowEmptyPattern)
+        bool allowEmptyPattern
+    )
     {
         var patternDefaultValue = allowEmptyPattern ? " = \"\"" : string.Empty;
         return $$"""
@@ -837,7 +838,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      /// <summary>
                      /// Gets or sets the endpoint name.
                      /// </summary>
-                     public string Name { get; set; } = "";
+                     public string? Name { get; init; }
 
                      /// <summary>
                      /// Initializes a new instance of the <see cref="{{attributeName}}"/> class.
@@ -878,31 +879,20 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (displayName, description) = GetDisplayAndDescriptionAttributes(requestHandlerMethodSymbol);
 
-        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
-                accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
-                rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-                requestTimeoutPolicyName, order, endpointGroupName, summary)
-            = GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
+        var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription, accepts, produces, producesProblem,
+                producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes,
+                shortCircuit, disableRequestTimeout, withRequestTimeout, requestTimeoutPolicyName, order, endpointGroupName, summary) =
+            GetAdditionalRequestHandlerAttributes(requestHandlerClassSymbol, requestHandlerMethodSymbol, cancellationToken);
 
         name ??= RemoveAsyncSuffix(requestHandlerMethod.Name);
 
-        var metadata = new RequestHandlerMetadata(
-            name,
-            displayName,
-            summary,
-            description,
-            tags,
-            accepts,
-            produces,
-            producesProblem,
-            producesValidationProblem,
+        var metadata = new RequestHandlerMetadata(name, displayName, summary, description, tags, accepts, produces, producesProblem, producesValidationProblem,
             excludeFromDescription
         );
 
         var requestHandler = new RequestHandler(requestHandlerClass, requestHandlerMethod, httpMethod, pattern, metadata, requireAuthorization,
-            authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
-            rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout,
-            requestTimeoutPolicyName, order, endpointGroupName
+            authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts, requireRateLimiting, rateLimitingPolicyName,
+            endpointFilterTypes, shortCircuit, disableRequestTimeout, withRequestTimeout, requestTimeoutPolicyName, order, endpointGroupName
         );
 
         return requestHandler;
@@ -916,22 +906,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return methodName;
     }
 
-    private static (
-        string HttpMethod,
-        string Pattern,
-        string? Name
-    ) GetRequestHandlerAttribute(
-        AttributeData attribute,
-        CancellationToken cancellationToken
-    )
+    private static ( string HttpMethod, string Pattern, string? Name ) GetRequestHandlerAttribute(AttributeData attribute, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var attributeName = attribute.AttributeClass?.Name ?? "";
 
-        var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition)
-            ? definition.Verb
-            : "";
+        var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : "";
 
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
@@ -963,51 +944,31 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (attributeClass is null)
                 continue;
 
-            if (IsAttribute(attributeClass, nameof(System.ComponentModel.DisplayNameAttribute), ComponentModelNamespaceParts))
+            if (IsAttribute(attributeClass, nameof(DisplayNameAttribute), ComponentModelNamespaceParts))
             {
-                displayName = NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
-                    ? attribute.ConstructorArguments[0].Value as string
-                    : null);
+                displayName = NormalizeOptionalString(attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : null);
 
                 continue;
             }
 
-            if (IsAttribute(attributeClass, nameof(System.ComponentModel.DescriptionAttribute), ComponentModelNamespaceParts))
-            {
-                description = NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
-                    ? attribute.ConstructorArguments[0].Value as string
-                    : null);
-            }
+            if (IsAttribute(attributeClass, nameof(DescriptionAttribute), ComponentModelNamespaceParts))
+                description = NormalizeOptionalString(attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : null);
         }
 
         return (displayName, description);
     }
 
-    private static (
-        EquatableImmutableArray<string>? tags,
-        bool requireAuthorization,
-        EquatableImmutableArray<string>? authorizationPolicies,
-        bool disableAntiforgery,
-        bool allowAnonymous,
-        bool excludeFromDescription,
-        EquatableImmutableArray<AcceptsMetadata>? accepts,
-        EquatableImmutableArray<ProducesMetadata>? produces,
-        EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
-        EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem,
-        bool requireCors,
-        string? corsPolicyName,
-        EquatableImmutableArray<string>? requiredHosts,
-        bool requireRateLimiting,
-        string? rateLimitingPolicyName,
-        EquatableImmutableArray<string>? endpointFilterTypes,
-        bool shortCircuit,
-        bool disableRequestTimeout,
-        bool withRequestTimeout,
-        string? requestTimeoutPolicyName,
-        int? order,
-        string? endpointGroupName,
-        string? summary
-    ) GetAdditionalRequestHandlerAttributes(INamedTypeSymbol classSymbol, IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    private static ( EquatableImmutableArray<string>? tags, bool requireAuthorization, EquatableImmutableArray<string>? authorizationPolicies, bool
+        disableAntiforgery, bool allowAnonymous, bool excludeFromDescription, EquatableImmutableArray<AcceptsMetadata>? accepts,
+        EquatableImmutableArray<ProducesMetadata>? produces, EquatableImmutableArray<ProducesProblemMetadata>? producesProblem,
+        EquatableImmutableArray<ProducesValidationProblemMetadata>? producesValidationProblem, bool requireCors, string? corsPolicyName,
+        EquatableImmutableArray<string>? requiredHosts, bool requireRateLimiting, string? rateLimitingPolicyName, EquatableImmutableArray<string>?
+        endpointFilterTypes, bool shortCircuit, bool disableRequestTimeout, bool withRequestTimeout, string? requestTimeoutPolicyName, int? order, string?
+        endpointGroupName, string? summary ) GetAdditionalRequestHandlerAttributes(
+            INamedTypeSymbol classSymbol,
+            IMethodSymbol methodSymbol,
+            CancellationToken cancellationToken
+        )
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1039,95 +1000,31 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var classAttributes = classSymbol.GetAttributes();
         var classHasAllowAnonymousAttribute = false;
         var classHasRequireAuthorizationAttribute = false;
-        GetAdditionalRequestHandlerAttributeValues(
-            classAttributes,
-            ref tags,
-            ref requireAuthorization,
-            ref authorizationPolicies,
-            ref disableAntiforgery,
-            ref allowAnonymous,
-            ref excludeFromDescription,
-            ref accepts,
-            ref produces,
-            ref producesProblem,
-            ref producesValidationProblem,
-            ref requireCors,
-            ref corsPolicyName,
-            ref requiredHosts,
-            ref requireRateLimiting,
-            ref rateLimitingPolicyName,
-            ref endpointFilters,
-            ref classHasAllowAnonymousAttribute,
-            ref classHasRequireAuthorizationAttribute,
-            ref shortCircuit,
-            ref disableRequestTimeout,
-            ref withRequestTimeout,
-            ref requestTimeoutPolicyName,
-            ref order,
-            ref endpointGroupName,
-            ref summary
+        GetAdditionalRequestHandlerAttributeValues(classAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery,
+            ref allowAnonymous, ref excludeFromDescription, ref accepts, ref produces, ref producesProblem, ref producesValidationProblem, ref requireCors,
+            ref corsPolicyName, ref requiredHosts, ref requireRateLimiting, ref rateLimitingPolicyName, ref endpointFilters,
+            ref classHasAllowAnonymousAttribute, ref classHasRequireAuthorizationAttribute, ref shortCircuit, ref disableRequestTimeout, ref withRequestTimeout,
+            ref requestTimeoutPolicyName, ref order, ref endpointGroupName, ref summary
         );
 
         var methodAttributes = methodSymbol.GetAttributes();
         var methodHasAllowAnonymousAttribute = false;
         var methodHasRequireAuthorizationAttribute = false;
-        GetAdditionalRequestHandlerAttributeValues(
-            methodAttributes,
-            ref tags,
-            ref requireAuthorization,
-            ref authorizationPolicies,
-            ref disableAntiforgery,
-            ref allowAnonymous,
-            ref excludeFromDescription,
-            ref accepts,
-            ref produces,
-            ref producesProblem,
-            ref producesValidationProblem,
-            ref requireCors,
-            ref corsPolicyName,
-            ref requiredHosts,
-            ref requireRateLimiting,
-            ref rateLimitingPolicyName,
-            ref endpointFilters,
-            ref methodHasAllowAnonymousAttribute,
-            ref methodHasRequireAuthorizationAttribute,
-            ref shortCircuit,
-            ref disableRequestTimeout,
-            ref withRequestTimeout,
-            ref requestTimeoutPolicyName,
-            ref order,
-            ref endpointGroupName,
-            ref summary
+        GetAdditionalRequestHandlerAttributeValues(methodAttributes, ref tags, ref requireAuthorization, ref authorizationPolicies, ref disableAntiforgery,
+            ref allowAnonymous, ref excludeFromDescription, ref accepts, ref produces, ref producesProblem, ref producesValidationProblem, ref requireCors,
+            ref corsPolicyName, ref requiredHosts, ref requireRateLimiting, ref rateLimitingPolicyName, ref endpointFilters,
+            ref methodHasAllowAnonymousAttribute, ref methodHasRequireAuthorizationAttribute, ref shortCircuit, ref disableRequestTimeout,
+            ref withRequestTimeout, ref requestTimeoutPolicyName, ref order, ref endpointGroupName, ref summary
         );
 
         if (methodHasRequireAuthorizationAttribute && !methodHasAllowAnonymousAttribute)
             allowAnonymous = false;
 
-        return (
-            tags,
-            requireAuthorization ?? false,
-            authorizationPolicies,
-            disableAntiforgery ?? false,
-            allowAnonymous ?? false,
-            excludeFromDescription ?? false,
-            ToEquatableOrNull(accepts),
-            ToEquatableOrNull(produces),
-            ToEquatableOrNull(producesProblem),
-            ToEquatableOrNull(producesValidationProblem),
-            requireCors ?? false,
-            corsPolicyName,
-            requiredHosts,
-            requireRateLimiting ?? false,
-            rateLimitingPolicyName,
-            ToEquatableOrNull(endpointFilters),
-            shortCircuit ?? false,
-            disableRequestTimeout ?? false,
-            withRequestTimeout ?? false,
-            (withRequestTimeout ?? false) ? requestTimeoutPolicyName : null,
-            order,
-            endpointGroupName,
-            summary
-        );
+        return (tags, requireAuthorization ?? false, authorizationPolicies, disableAntiforgery ?? false, allowAnonymous ?? false,
+            excludeFromDescription ?? false, ToEquatableOrNull(accepts), ToEquatableOrNull(produces), ToEquatableOrNull(producesProblem),
+            ToEquatableOrNull(producesValidationProblem), requireCors ?? false, corsPolicyName, requiredHosts, requireRateLimiting ?? false,
+            rateLimitingPolicyName, ToEquatableOrNull(endpointFilters), shortCircuit ?? false, disableRequestTimeout ?? false, withRequestTimeout ?? false,
+            withRequestTimeout ?? false ? requestTimeoutPolicyName : null, order, endpointGroupName, summary);
     }
 
     private static void GetAdditionalRequestHandlerAttributeValues(
@@ -1281,9 +1178,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (IsGeneratedAttribute(attributeClass, RequireCorsAttributeName))
             {
                 requireCors = true;
-                corsPolicyName = attribute.ConstructorArguments.Length > 0
-                    ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
-                    : null;
+                corsPolicyName = attribute.ConstructorArguments.Length > 0 ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string) : null;
                 continue;
             }
 
@@ -1312,9 +1207,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
             if (IsGeneratedAttribute(attributeClass, RequireRateLimitingAttributeName))
             {
-                var policyName = attribute.ConstructorArguments.Length > 0
-                    ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string)
-                    : null;
+                var policyName = attribute.ConstructorArguments.Length > 0 ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string) : null;
 
                 if (!string.IsNullOrEmpty(policyName))
                 {
@@ -1358,9 +1251,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 var contentType = attribute.ConstructorArguments.Length > 1
                     ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
                     : null;
-                var additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                    ? GetStringArrayValues(attribute.ConstructorArguments[2])
-                    : null;
+                var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
 
                 var producesProblemList = producesProblem ??= [];
                 producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
@@ -1375,9 +1266,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 var contentType = attribute.ConstructorArguments.Length > 1
                     ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
                     : null;
-                var additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                    ? GetStringArrayValues(attribute.ConstructorArguments[2])
-                    : null;
+                var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
 
                 var producesValidationProblemList = producesValidationProblem ??= [];
                 producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
@@ -1451,10 +1340,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return namespaceSymbol is null || namespaceSymbol.IsGlobalNamespace;
     }
 
-    private static void TryAddAcceptsMetadata(
-        AttributeData attribute,
-        INamedTypeSymbol attributeClass,
-        ref List<AcceptsMetadata>? accepts)
+    private static void TryAddAcceptsMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<AcceptsMetadata>? accepts)
     {
         string? requestType;
         string contentType;
@@ -1463,13 +1349,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
-            requestType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            requestType = attributeClass.TypeArguments[0]
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             contentType = attribute.ConstructorArguments.Length > 0
                 ? NormalizeRequiredContentType(attribute.ConstructorArguments[0].Value as string, "application/json")
                 : "application/json";
-            additionalContentTypes = attribute.ConstructorArguments.Length > 1
-                ? GetStringArrayValues(attribute.ConstructorArguments[1])
-                : null;
+            additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
         }
         else if (GetNamedTypeSymbol(attribute, RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
         {
@@ -1477,9 +1362,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             contentType = attribute.ConstructorArguments.Length > 0
                 ? NormalizeRequiredContentType(attribute.ConstructorArguments[0].Value as string, "application/json")
                 : "application/json";
-            additionalContentTypes = attribute.ConstructorArguments.Length > 1
-                ? GetStringArrayValues(attribute.ConstructorArguments[1])
-                : null;
+            additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
         }
         else
         {
@@ -1490,10 +1373,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         acceptsList.Add(new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional));
     }
 
-    private static void TryAddProducesMetadata(
-        AttributeData attribute,
-        INamedTypeSymbol attributeClass,
-        ref List<ProducesMetadata>? produces)
+    private static void TryAddProducesMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<ProducesMetadata>? produces)
     {
         string? responseType;
         int statusCode;
@@ -1502,16 +1382,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
-            responseType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            responseType = attributeClass.TypeArguments[0]
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
                 ? producesStatusCode
                 : 200;
-            contentType = attribute.ConstructorArguments.Length > 1
-                ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
-                : null;
-            additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                ? GetStringArrayValues(attribute.ConstructorArguments[2])
-                : null;
+            contentType = attribute.ConstructorArguments.Length > 1 ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string) : null;
+            additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
         }
         else if (GetNamedTypeSymbol(attribute, ResponseTypeAttributeNamedParameter) is { } responseTypeSymbol)
         {
@@ -1519,12 +1396,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
                 ? producesStatusCode
                 : 200;
-            contentType = attribute.ConstructorArguments.Length > 1
-                ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
-                : null;
-            additionalContentTypes = attribute.ConstructorArguments.Length > 2
-                ? GetStringArrayValues(attribute.ConstructorArguments[2])
-                : null;
+            contentType = attribute.ConstructorArguments.Length > 1 ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string) : null;
+            additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
         }
         else
         {
@@ -1535,10 +1408,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         producesList.Add(new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes));
     }
 
-    private static void TryAddEndpointFilter(
-        AttributeData attribute,
-        INamedTypeSymbol attributeClass,
-        ref List<string>? endpointFilters)
+    private static void TryAddEndpointFilter(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<string>? endpointFilters)
     {
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
@@ -1649,17 +1519,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var isStatic = classSymbol.IsStatic;
         var endpointConventionBuilderSymbol = compilation.GetTypeByMetadataName("Microsoft.AspNetCore.Builder.IEndpointConventionBuilder");
         var serviceProviderSymbol = compilation.GetTypeByMetadataName("System.IServiceProvider");
-        var configureMethodDetails = GetConfigureMethodDetails(
-            classSymbol,
-            endpointConventionBuilderSymbol,
-            serviceProviderSymbol,
-            cancellationToken
-        );
+        var configureMethodDetails = GetConfigureMethodDetails(classSymbol, endpointConventionBuilderSymbol, serviceProviderSymbol, cancellationToken);
 
-        var requestHandlerClass = new RequestHandlerClass(
-            name,
-            isStatic,
-            configureMethodDetails.HasConfigureMethod,
+        var requestHandlerClass = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
             configureMethodDetails.ConfigureMethodAcceptsServiceProvider
         );
 
@@ -1873,8 +1735,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         foreach (var namedArg in attribute.NamedArguments)
         {
-            if (string.Equals(namedArg.Key, NameAttributeNamedParameter, StringComparison.Ordinal)
-                && namedArg.Value.Value is string namedValue)
+            if (string.Equals(namedArg.Key, NameAttributeNamedParameter, StringComparison.Ordinal) && namedArg.Value.Value is string namedValue)
             {
                 var normalized = NormalizeBindingName(namedValue);
                 if (normalized is not null)
@@ -1921,8 +1782,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         foreach (var index in collidingHandlers)
         {
             var handler = builder[index];
-            var metadata = handler.Metadata with { Name = GetFullyQualifiedMethodDisplayName(handler) };
-            builder[index] = handler with { Metadata = metadata };
+            var metadata = handler.Metadata with
+            {
+                Name = GetFullyQualifiedMethodDisplayName(handler),
+            };
+            builder[index] = handler with
+            {
+                Metadata = metadata,
+            };
         }
 
         return builder.MoveToImmutable();
@@ -1932,8 +1799,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         var collidingIndices = ImmutableHashSet.CreateBuilder<int>();
 
-        var groups = requestHandlers
-            .Select((handler, index) => (handler, index))
+        var groups = requestHandlers.Select((handler, index) => (handler, index))
             .Where(static tuple => !string.IsNullOrEmpty(tuple.handler.Metadata.Name))
             .GroupBy(static tuple => tuple.handler.Metadata.Name!, StringComparer.Ordinal);
 
@@ -1942,9 +1808,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (group.Count() <= 1)
                 continue;
 
-            var collidingMethodGroups = group
-                .GroupBy(static tuple => tuple.handler.Method.Name, StringComparer.Ordinal)
-                .Where(static methodGroup => methodGroup.Skip(1).Any());
+            var collidingMethodGroups = group.GroupBy(static tuple => tuple.handler.Method.Name, StringComparer.Ordinal)
+                .Where(static methodGroup => methodGroup.Skip(1)
+                    .Any()
+                );
 
             foreach (var methodGroup in collidingMethodGroups)
             {
@@ -2245,7 +2112,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         if (requestHandler.Metadata.Accepts is { Count: > 0 })
-        {
             foreach (var accepts in requestHandler.Metadata.Accepts.Value)
             {
                 source.AppendLine();
@@ -2255,17 +2121,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append('>');
                 source.Append('(');
                 if (accepts.IsOptional)
-                {
                     source.Append("isOptional: true, ");
-                }
                 source.Append(StringLiteral(accepts.ContentType));
                 AppendAdditionalContentTypes(source, accepts.AdditionalContentTypes);
                 source.Append(')');
             }
-        }
 
         if (requestHandler.Metadata.Produces is { Count: > 0 })
-        {
             foreach (var produces in requestHandler.Metadata.Produces.Value)
             {
                 source.AppendLine();
@@ -2278,10 +2140,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 AppendOptionalContentTypes(source, produces.ContentType, produces.AdditionalContentTypes);
                 source.Append(')');
             }
-        }
 
         if (requestHandler.Metadata.ProducesProblem is { Count: > 0 })
-        {
             foreach (var producesProblem in requestHandler.Metadata.ProducesProblem.Value)
             {
                 source.AppendLine();
@@ -2291,10 +2151,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 AppendOptionalContentTypes(source, producesProblem.ContentType, producesProblem.AdditionalContentTypes);
                 source.Append(')');
             }
-        }
 
         if (requestHandler.Metadata.ProducesValidationProblem is { Count: > 0 })
-        {
             foreach (var producesValidationProblem in requestHandler.Metadata.ProducesValidationProblem.Value)
             {
                 source.AppendLine();
@@ -2304,7 +2162,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 AppendOptionalContentTypes(source, producesValidationProblem.ContentType, producesValidationProblem.AdditionalContentTypes);
                 source.Append(')');
             }
-        }
 
         if (requestHandler.RequireAuthorization)
         {
@@ -2401,7 +2258,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         if (requestHandler.EndpointFilterTypes is { Count: > 0 })
-        {
             foreach (var filterType in requestHandler.EndpointFilterTypes.Value)
             {
                 source.AppendLine();
@@ -2410,7 +2266,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(filterType);
                 source.Append(">()");
             }
-        }
 
         if (wrapWithConfigure && configureAcceptsServiceProvider)
         {
@@ -2474,7 +2329,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         const int baseSize = 4096;
         const int perHandler = 512;
 
-        var estimate = baseSize + (requestHandlers.Length * perHandler);
+        var estimate = baseSize + requestHandlers.Length * perHandler;
 
         if (estimate > 65536)
             estimate = 65536;
@@ -2620,12 +2475,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         };
     }
 
-    private readonly record struct HttpAttributeDefinition(
-        string Name,
-        string FullyQualifiedName,
-        string Hint,
-        string Verb,
-        bool AllowEmptyPattern);
+    private readonly record struct HttpAttributeDefinition(string Name, string FullyQualifiedName, string Hint, string Verb, bool AllowEmptyPattern);
 
     private readonly record struct RequestHandler(
         RequestHandlerClass Class,
@@ -2651,12 +2501,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string? EndpointGroupName
     );
 
-    private readonly record struct RequestHandlerClass(
-        string Name,
-        bool IsStatic,
-        bool HasConfigureMethod,
-        bool ConfigureMethodAcceptsServiceProvider
-    );
+    private readonly record struct RequestHandlerClass(string Name, bool IsStatic, bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
     private readonly record struct RequestHandlerMethod(string Name, bool IsStatic, bool IsAwaitable, EquatableImmutableArray<Parameter> Parameters);
 
@@ -2677,7 +2522,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string RequestType,
         string ContentType,
         EquatableImmutableArray<string>? AdditionalContentTypes,
-        bool IsOptional);
+        bool IsOptional
+    );
 
     private readonly record struct ProducesMetadata(
         string ResponseType,
@@ -2688,14 +2534,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private readonly record struct ProducesProblemMetadata(int StatusCode, string? ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
 
-    private readonly record struct ProducesValidationProblemMetadata(int StatusCode, string? ContentType, EquatableImmutableArray<string>? AdditionalContentTypes);
+    private readonly record struct ProducesValidationProblemMetadata(
+        int StatusCode,
+        string? ContentType,
+        EquatableImmutableArray<string>? AdditionalContentTypes
+    );
 
     private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key, string? BindingName);
 
-    private readonly record struct ConfigureMethodDetails(
-        bool HasConfigureMethod,
-        bool ConfigureMethodAcceptsServiceProvider
-    );
+    private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
     private enum BindingSource
     {
