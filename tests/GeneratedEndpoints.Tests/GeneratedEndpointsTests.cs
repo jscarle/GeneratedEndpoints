@@ -249,7 +249,7 @@ public class GeneratedEndpointsTests
     {
         var sources = TestHelpers.GetSources("""
                                              [ShortCircuit]
-                                             [WithRequestTimeout]
+                                             [RequestTimeout]
                                              internal static class ClassLevelTimeoutEndpoints
                                              {
                                                  [MapGet("/timeouts/class-default")]
@@ -257,7 +257,7 @@ public class GeneratedEndpointsTests
                                                      => TypedResults.Ok();
 
                                                  [MapGet("/timeouts/class-override")]
-                                                 [WithRequestTimeout("ClassPolicy")]
+                                                 [RequestTimeout("ClassPolicy")]
                                                  public static Ok ClassOverride()
                                                      => TypedResults.Ok();
                                              }
@@ -278,12 +278,12 @@ public class GeneratedEndpointsTests
                                                      => TypedResults.Ok();
 
                                                  [MapGet("/timeouts/method-default")]
-                                                 [WithRequestTimeout]
+                                                 [RequestTimeout]
                                                  public static Ok MethodWithDefault()
                                                      => TypedResults.Ok();
 
                                                  [MapGet("/timeouts/method-policy")]
-                                                 [WithRequestTimeout("MethodPolicy")]
+                                                 [RequestTimeout("MethodPolicy")]
                                                  public static Ok MethodWithPolicy()
                                                      => TypedResults.Ok();
 
@@ -307,18 +307,18 @@ public class GeneratedEndpointsTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task WithOrderAttribute(bool withNamespace)
+    public async Task EndpointOrderAttribute(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
                                              internal sealed class OrderedEndpoints
                                              {
                                                  [MapGet("/ordered/low")]
-                                                 [WithOrder(-1)]
+                                                 [EndpointOrder(-1)]
                                                  public static Ok Low()
                                                      => TypedResults.Ok();
 
                                                  [MapGet("/ordered/high")]
-                                                 [WithOrder(5)]
+                                                 [EndpointOrder(5)]
                                                  public static Ok High()
                                                      => TypedResults.Ok();
                                              }
@@ -328,19 +328,19 @@ public class GeneratedEndpointsTests
         var result = TestHelpers.RunGenerator(sources);
 
         await result.VerifyAsync("AddEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(WithOrderAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(EndpointOrderAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(WithOrderAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(EndpointOrderAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task WithGroupNameAttribute(bool withNamespace)
+    public async Task EndpointGroupMetadataAttribute(bool withNamespace)
     {
         var sources = TestHelpers.GetSources("""
-                                             [WithGroupName("SampleGroup")]
+                                             [EndpointGroupMetadata("SampleGroup")]
                                              internal static class GroupedEndpoints
                                              {
                                                  [MapGet("/grouped/first")]
@@ -357,10 +357,10 @@ public class GeneratedEndpointsTests
         var result = TestHelpers.RunGenerator(sources);
 
         await result.VerifyAsync("AddEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(WithGroupNameAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(EndpointGroupMetadataAttribute)}_AddEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
-            .UseMethodName($"{nameof(WithGroupNameAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
+            .UseMethodName($"{nameof(EndpointGroupMetadataAttribute)}_MapEndpointHandlers_With{(withNamespace ? "" : "out")}Namespace");
     }
 
     [Theory]
