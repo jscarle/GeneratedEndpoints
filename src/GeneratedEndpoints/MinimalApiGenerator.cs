@@ -19,6 +19,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     private static readonly string[] AspNetCoreHttpNamespaceParts = new[] { "Microsoft", "AspNetCore", "Http" };
     private static readonly string[] AspNetCoreAuthorizationNamespaceParts = new[] { "Microsoft", "AspNetCore", "Authorization" };
     private static readonly string[] AspNetCoreRoutingNamespaceParts = new[] { "Microsoft", "AspNetCore", "Routing" };
+    private static readonly string[] ComponentModelNamespaceParts = new[] { "System", "ComponentModel" };
 
     private const string FallbackHttpMethod = "__FALLBACK__";
 
@@ -41,9 +42,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
     private const string NameAttributeNamedParameter = "Name";
-    private const string DisplayNameAttributeNamedParameter = "DisplayName";
     private const string SummaryAttributeNamedParameter = "Summary";
-    private const string DescriptionAttributeNamedParameter = "Description";
     private const string ResponseTypeAttributeNamedParameter = "ResponseType";
     private const string RequestTypeAttributeNamedParameter = "RequestType";
     private const string IsOptionalAttributeNamedParameter = "IsOptional";
@@ -808,19 +807,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                      public string Name { get; set; } = "";
 
                      /// <summary>
-                     /// Gets or sets the endpoint display name.
-                     /// </summary>
-                     public string DisplayName { get; set; } = "";
-
-                     /// <summary>
                      /// Gets or sets the endpoint summary.
                      /// </summary>
                      public string Summary { get; set; } = "";
-
-                     /// <summary>
-                     /// Gets or sets the endpoint description.
-                     /// </summary>
-                     public string Description { get; set; } = "";
 
                      /// <summary>
                      /// Initializes a new instance of the <see cref="{{attributeName}}"/> class.
@@ -857,7 +846,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
-        var (httpMethod, pattern, name, displayName, summary, description) = GetRequestHandlerAttribute(attribute, cancellationToken);
+        var (httpMethod, pattern, name, summary) = GetRequestHandlerAttribute(attribute, cancellationToken);
+
+        var (displayName, description) = GetDisplayAndDescriptionAttributes(requestHandlerMethodSymbol);
 
         var (tags, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, excludeFromDescription,
                 accepts, produces, producesProblem, producesValidationProblem, requireCors, corsPolicyName, requiredHosts, requireRateLimiting,
@@ -901,9 +892,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         string HttpMethod,
         string Pattern,
         string? Name,
-        string? DisplayName,
-        string? Summary,
-        string? Description
+        string? Summary
     ) GetRequestHandlerAttribute(
         AttributeData attribute,
         CancellationToken cancellationToken
@@ -920,9 +909,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
         string? name = null;
-        string? displayName = null;
         string? summary = null;
-        string? description = null;
         foreach (var namedArg in attribute.NamedArguments)
         {
             switch (namedArg.Key)
@@ -933,28 +920,47 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                     name = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
                     break;
                 }
-                case DisplayNameAttributeNamedParameter:
-                {
-                    var value = namedArg.Value.Value as string;
-                    displayName = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
-                    break;
-                }
                 case SummaryAttributeNamedParameter:
                 {
                     var value = namedArg.Value.Value as string;
                     summary = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
                     break;
                 }
-                case DescriptionAttributeNamedParameter:
-                {
-                    var value = namedArg.Value.Value as string;
-                    description = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
-                    break;
-                }
             }
         }
 
-        return (httpMethod, pattern, name, displayName, summary, description);
+        return (httpMethod, pattern, name, summary);
+    }
+
+    private static (string? DisplayName, string? Description) GetDisplayAndDescriptionAttributes(IMethodSymbol methodSymbol)
+    {
+        string? displayName = null;
+        string? description = null;
+
+        foreach (var attribute in methodSymbol.GetAttributes())
+        {
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass is null)
+                continue;
+
+            if (IsAttribute(attributeClass, nameof(System.ComponentModel.DisplayNameAttribute), ComponentModelNamespaceParts))
+            {
+                displayName = NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null);
+
+                continue;
+            }
+
+            if (IsAttribute(attributeClass, nameof(System.ComponentModel.DescriptionAttribute), ComponentModelNamespaceParts))
+            {
+                description = NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null);
+            }
+        }
+
+        return (displayName, description);
     }
 
     private static (
