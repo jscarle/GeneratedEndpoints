@@ -65,7 +65,8 @@ public sealed class GetTodo
 
     [DisplayName("Retrieve a todo")]
     [Description("Returns the todo matching the provided identifier.")]
-    [MapGet("/todos/{id}", Summary = "Retrieve a todo")]
+    [Summary("Retrieve a todo")]
+    [MapGet("/todos/{id}")]
     [Tags("Todos")]
     [RequireAuthorization("Todos.Read")]
     public async Task<Results<Ok<Todo>, NotFound>> HandleAsync(Guid id, CancellationToken cancellationToken)
@@ -79,7 +80,7 @@ public sealed class GetTodo
 Key ideas:
 
 * Choose the attribute that matches the verb (`[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]`).
-* Named arguments like `Summary` and `Name`, plus `[DisplayName]` and `[Description]`, are translated into `.WithSummary`, `.WithName`, `.WithDisplayName`, and `.WithDescription` calls.
+* Named arguments like `Name`, plus `[Summary]`, `[DisplayName]`, and `[Description]`, are translated into `.WithName`, `.WithSummary`, `.WithDisplayName`, and `.WithDescription` calls.
 * Use existing ASP.NET Core binding attributes (`[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]`, `[FromServices]`, `[FromKeyedServices]`, `[AsParameters]`, etc.). The generator preserves them in the produced delegate.
 * Metadata attributes (`[Tags]`, `[RequireAuthorization]`, `[AllowAnonymous]`, `[DisableAntiforgery]`, `[ExcludeFromDescription]`) can be placed on the class, on a method, or on both. Class-level metadata is merged with method-level metadata. Request/response attributes (`[Accepts]`, `[ProducesResponse]`, `[ProducesProblem]`, `[ProducesValidationProblem]`) must be applied directly to the method they describe.
 
@@ -231,7 +232,8 @@ GeneratedEndpoints ships with attribute helpers for request/response metadata. T
 ```csharp
 public sealed class CreateTodo
 {
-    [MapPost("/todos", Summary = "Create a todo")]
+    [Summary("Create a todo")]
+    [MapPost("/todos")]
     [Accepts<CreateTodoRequest>("application/json", "application/xml")]
     [ProducesResponse<Todo>(StatusCodes.Status201Created)]
     [ProducesProblem(StatusCodes.Status500InternalServerError)]
@@ -251,7 +253,8 @@ public sealed class CreateTodo
 
 | Attribute | Scope | Purpose |
 | --- | --- | --- |
-| `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]` | Method | Declares an endpoint and its route pattern. Named arguments fill the generated `.WithName` and `.WithSummary` calls while `[DisplayName]`/`[Description]` add `.WithDisplayName`/`.WithDescription`. |
+| `[MapGet]`, `[MapPost]`, `[MapPut]`, `[MapDelete]`, `[MapPatch]`, `[MapHead]`, `[MapOptions]`, `[MapTrace]`, `[MapConnect]`, `[MapQuery]` | Method | Declares an endpoint and its route pattern. Named arguments fill the generated `.WithName` calls while `[Summary]`/`[DisplayName]`/`[Description]` add `.WithSummary`/`.WithDisplayName`/`.WithDescription`. |
+| `[Summary]` | Class or method | Adds `.WithSummary("...")` to every annotated endpoint. Method-level summaries override class-level ones. |
 | `[Tags]` | Class or method | Adds tags to one or more endpoints. Multiple attributes merge without duplication. |
 | `[RequireAuthorization]` | Class or method | Requires authorization for the endpoint. Passing policies (`[RequireAuthorization("Todos.Read", "Todos.Write")]`) emits `.RequireAuthorization("Todos.Read", "Todos.Write")`. |
 | `[AllowAnonymous]` | Class or method | Explicitly opts an endpoint into anonymous access, overriding `[RequireAuthorization]`. |
@@ -341,14 +344,16 @@ public sealed class TodoFeature
 
     public TodoFeature(TodoDbContext db) => _db = db;
 
-    [MapGet("/todos/{id}", Summary = "Retrieve a todo")]
+    [Summary("Retrieve a todo")]
+    [MapGet("/todos/{id}")]
     public async Task<Results<Ok<Todo>, NotFound>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var entity = await _db.Todos.FindAsync(new object?[] { id }, cancellationToken);
         return entity is null ? TypedResults.NotFound() : TypedResults.Ok(entity);
     }
 
-    [MapPost("/todos", Summary = "Create a todo")]
+    [Summary("Create a todo")]
+    [MapPost("/todos")]
     [ProducesResponse<Todo>(StatusCodes.Status201Created)]
     public async Task<Created<Todo>> CreateAsync([FromBody] CreateTodoRequest request, CancellationToken cancellationToken)
     {

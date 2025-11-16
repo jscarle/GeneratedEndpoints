@@ -29,7 +29,8 @@ internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
     [ProducesValidationProblem(StatusCodes.Status400BadRequest, "application/problem+json")]
     [DisplayName("User lookup endpoint")]
     [Description("Gets a user by ID when the ID is greater than zero.")]
-    [MapGet("/users/{id:int}", Name = nameof(GetUser), Summary = "Gets a user by ID.")]
+    [Summary("Gets a user by ID.")]
+    [MapGet("/users/{id:int}", Name = nameof(GetUser))]
     public Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult> GetUser(
         [FromQuery] int id,
         [FromKeyedServices(ServiceLifetime.Scoped)] IServiceCollection services
