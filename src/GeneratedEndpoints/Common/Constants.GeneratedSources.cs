@@ -1,122 +1,13 @@
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using GeneratedEndpoints;
 
-namespace GeneratedEndpoints;
+namespace GeneratedEndpoints.Common;
 
-public sealed partial class MinimalApiGenerator
+internal static partial class Constants
 {
-    private const string BaseNamespace = "Microsoft.AspNetCore.Generated";
-    private const string AttributesNamespace = $"{BaseNamespace}.Attributes";
-
-    private const string FallbackHttpMethod = "__FALLBACK__";
-
-    private const string NameAttributeNamedParameter = "Name";
-    private const string ResponseTypeAttributeNamedParameter = "ResponseType";
-    private const string RequestTypeAttributeNamedParameter = "RequestType";
-    private const string IsOptionalAttributeNamedParameter = "IsOptional";
-    private const string PolicyNameAttributeNamedParameter = "PolicyName";
-
-    private const string RequireAuthorizationAttributeName = "RequireAuthorizationAttribute";
-    private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";
-    private const string RequireAuthorizationAttributeHint = $"{RequireAuthorizationAttributeFullyQualifiedName}.gs.cs";
-
-    private const string RequireCorsAttributeName = "RequireCorsAttribute";
-    private const string RequireCorsAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireCorsAttributeName}";
-    private const string RequireCorsAttributeHint = $"{RequireCorsAttributeFullyQualifiedName}.gs.cs";
-
-    private const string RequireRateLimitingAttributeName = "RequireRateLimitingAttribute";
-    private const string RequireRateLimitingAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireRateLimitingAttributeName}";
-    private const string RequireRateLimitingAttributeHint = $"{RequireRateLimitingAttributeFullyQualifiedName}.gs.cs";
-
-    private const string RequireHostAttributeName = "RequireHostAttribute";
-    private const string RequireHostAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireHostAttributeName}";
-    private const string RequireHostAttributeHint = $"{RequireHostAttributeFullyQualifiedName}.gs.cs";
-
-    private const string DisableAntiforgeryAttributeName = "DisableAntiforgeryAttribute";
-    private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
-    private const string DisableAntiforgeryAttributeHint = $"{DisableAntiforgeryAttributeFullyQualifiedName}.gs.cs";
-
-    private const string ShortCircuitAttributeName = "ShortCircuitAttribute";
-    private const string ShortCircuitAttributeFullyQualifiedName = $"{AttributesNamespace}.{ShortCircuitAttributeName}";
-    private const string ShortCircuitAttributeHint = $"{ShortCircuitAttributeFullyQualifiedName}.gs.cs";
-
-    private const string DisableRequestTimeoutAttributeName = "DisableRequestTimeoutAttribute";
-    private const string DisableRequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableRequestTimeoutAttributeName}";
-    private const string DisableRequestTimeoutAttributeHint = $"{DisableRequestTimeoutAttributeFullyQualifiedName}.gs.cs";
-
-    private const string DisableValidationAttributeName = "DisableValidationAttribute";
-    private const string DisableValidationAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableValidationAttributeName}";
-    private const string DisableValidationAttributeHint = $"{DisableValidationAttributeFullyQualifiedName}.gs.cs";
-
-    private const string RequestTimeoutAttributeName = "RequestTimeoutAttribute";
-    private const string RequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequestTimeoutAttributeName}";
-    private const string RequestTimeoutAttributeHint = $"{RequestTimeoutAttributeFullyQualifiedName}.gs.cs";
-
-    private const string OrderAttributeName = "OrderAttribute";
-    private const string OrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{OrderAttributeName}";
-    private const string OrderAttributeHint = $"{OrderAttributeFullyQualifiedName}.gs.cs";
-
-    private const string MapGroupAttributeName = "MapGroupAttribute";
-    private const string MapGroupAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapGroupAttributeName}";
-    private const string MapGroupAttributeHint = $"{MapGroupAttributeFullyQualifiedName}.gs.cs";
-
-    private const string SummaryAttributeName = "SummaryAttribute";
-    private const string SummaryAttributeFullyQualifiedName = $"{AttributesNamespace}.{SummaryAttributeName}";
-    private const string SummaryAttributeHint = $"{SummaryAttributeFullyQualifiedName}.gs.cs";
-
-    private const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
-
-    private const string EndpointFilterAttributeName = "EndpointFilterAttribute";
-    private const string EndpointFilterAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointFilterAttributeName}";
-    private const string EndpointFilterAttributeHint = $"{EndpointFilterAttributeFullyQualifiedName}.gs.cs";
-
-    private const string AcceptsAttributeName = "AcceptsAttribute";
-    private const string AcceptsAttributeFullyQualifiedName = $"{AttributesNamespace}.{AcceptsAttributeName}";
-    private const string AcceptsAttributeHint = $"{AcceptsAttributeFullyQualifiedName}.gs.cs";
-
-    private const string ProducesResponseAttributeName = "ProducesResponseAttribute";
-    private const string ProducesResponseAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesResponseAttributeName}";
-    private const string ProducesResponseAttributeHint = $"{ProducesResponseAttributeFullyQualifiedName}.gs.cs";
-
-    private const string ProducesProblemAttributeName = "ProducesProblemAttribute";
-    private const string ProducesProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesProblemAttributeName}";
-    private const string ProducesProblemAttributeHint = $"{ProducesProblemAttributeFullyQualifiedName}.gs.cs";
-
-    private const string ProducesValidationProblemAttributeName = "ProducesValidationProblemAttribute";
-
-    private const string ProducesValidationProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesValidationProblemAttributeName}";
-
-    private const string ProducesValidationProblemAttributeHint = $"{ProducesValidationProblemAttributeFullyQualifiedName}.gs.cs";
-
-    private const string RoutingNamespace = $"{BaseNamespace}.Routing";
-
-    private const string AddEndpointHandlersClassName = "EndpointServicesExtensions";
-    private const string AddEndpointHandlersMethodName = "AddEndpointHandlers";
-    private const string AddEndpointHandlersMethodHint = $"{RoutingNamespace}.{AddEndpointHandlersMethodName}.g.cs";
-
-    private const string UseEndpointHandlersClassName = "EndpointRouteBuilderExtensions";
-    private const string UseEndpointHandlersMethodName = "MapEndpointHandlers";
-    private const string UseEndpointHandlersMethodHint = $"{RoutingNamespace}.{UseEndpointHandlersMethodName}.g.cs";
-
-    private const string ConfigureMethodName = "Configure";
-    private const string AsyncSuffix = "Async";
-    private const string GlobalPrefix = "global::";
-    private static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
-    private static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
-    private static readonly string[] AspNetCoreMvcNamespaceParts = ["Microsoft", "AspNetCore", "Mvc"];
-    private static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
-    private static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
-    private static readonly string[] ExtensionsDependencyInjectionNamespaceParts =
-        ["Microsoft", "Extensions", "DependencyInjection"];
-    private static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
-    private static readonly ConditionalWeakTable<Compilation, CompilationTypeCache> CompilationTypeCaches = new();
-    private static readonly ConditionalWeakTable<INamedTypeSymbol, RequestHandlerClassCacheEntry> RequestHandlerClassCache = new();
-    private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
-
-    private static readonly string FileHeader = $"""
+    internal static readonly string FileHeader = $"""
                                                  //-----------------------------------------------------------------------------
                                                  // <auto-generated>
                                                  // This code was generated by {nameof(MinimalApiGenerator)} which can be found
@@ -130,7 +21,7 @@ public sealed partial class MinimalApiGenerator
                                                  #nullable enable
                                                  """;
 
-    private static readonly ImmutableArray<HttpAttributeDefinition> HttpAttributeDefinitions =
+    internal static readonly ImmutableArray<HttpAttributeDefinition> HttpAttributeDefinitions =
     [
         CreateHttpAttributeDefinition("MapGetAttribute", "GET"),
         CreateHttpAttributeDefinition("MapPostAttribute", "POST"),
@@ -145,10 +36,10 @@ public sealed partial class MinimalApiGenerator
         CreateHttpAttributeDefinition("MapFallbackAttribute", FallbackHttpMethod, true),
     ];
 
-    private static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =
+    internal static readonly ImmutableDictionary<string, HttpAttributeDefinition> HttpAttributeDefinitionsByName =
         HttpAttributeDefinitions.ToImmutableDictionary(static definition => definition.Name);
 
-    private static readonly SourceText RequireAuthorizationAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText RequireAuthorizationAttributeSourceText = SourceText.From($$"""
                                                                                                    {{FileHeader}}
 
                                                                                                    namespace {{AttributesNamespace}};
@@ -184,7 +75,7 @@ public sealed partial class MinimalApiGenerator
                                                                                                    """, Encoding.UTF8
     );
 
-    private static readonly SourceText RequireCorsAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText RequireCorsAttributeSourceText = SourceText.From($$"""
                                                                                           {{FileHeader}}
 
                                                                                           namespace {{AttributesNamespace}};
@@ -218,7 +109,7 @@ public sealed partial class MinimalApiGenerator
                                                                                           """, Encoding.UTF8
     );
 
-    private static readonly SourceText RequireRateLimitingAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText RequireRateLimitingAttributeSourceText = SourceText.From($$"""
                                                                                                   {{FileHeader}}
 
                                                                                                   namespace {{AttributesNamespace}};
@@ -246,7 +137,7 @@ public sealed partial class MinimalApiGenerator
                                                                                                   """, Encoding.UTF8
     );
 
-    private static readonly SourceText RequireHostAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText RequireHostAttributeSourceText = SourceText.From($$"""
                                                                                           {{FileHeader}}
 
                                                                                           namespace {{AttributesNamespace}};
@@ -274,7 +165,7 @@ public sealed partial class MinimalApiGenerator
                                                                                           """, Encoding.UTF8
     );
 
-    private static readonly SourceText DisableAntiforgeryAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText DisableAntiforgeryAttributeSourceText = SourceText.From($$"""
                                                                                                  {{FileHeader}}
 
                                                                                                  namespace {{AttributesNamespace}};
@@ -290,7 +181,7 @@ public sealed partial class MinimalApiGenerator
                                                                                                  """, Encoding.UTF8
     );
 
-    private static readonly SourceText ShortCircuitAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText ShortCircuitAttributeSourceText = SourceText.From($$"""
                                                                                            {{FileHeader}}
 
                                                                                            namespace {{AttributesNamespace}};
@@ -306,7 +197,7 @@ public sealed partial class MinimalApiGenerator
                                                                                            """, Encoding.UTF8
     );
 
-    private static readonly SourceText DisableRequestTimeoutAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText DisableRequestTimeoutAttributeSourceText = SourceText.From($$"""
                                                                                                     {{FileHeader}}
 
                                                                                                     namespace {{AttributesNamespace}};
@@ -322,7 +213,7 @@ public sealed partial class MinimalApiGenerator
                                                                                                     """, Encoding.UTF8
     );
 
-    private static readonly SourceText DisableValidationAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText DisableValidationAttributeSourceText = SourceText.From($$"""
                                                                                                 #if NET10_0_OR_GREATER
                                                                                                 {{FileHeader}}
 
@@ -340,7 +231,7 @@ public sealed partial class MinimalApiGenerator
                                                                                                 """, Encoding.UTF8
     );
 
-    private static readonly SourceText RequestTimeoutAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText RequestTimeoutAttributeSourceText = SourceText.From($$"""
                                                                                              {{FileHeader}}
 
                                                                                              namespace {{AttributesNamespace}};
@@ -376,7 +267,7 @@ public sealed partial class MinimalApiGenerator
                                                                                              """, Encoding.UTF8
     );
 
-    private static readonly SourceText OrderAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText OrderAttributeSourceText = SourceText.From($$"""
                                                                                     {{FileHeader}}
 
                                                                                     namespace {{AttributesNamespace}};
@@ -405,7 +296,7 @@ public sealed partial class MinimalApiGenerator
                                                                                     """, Encoding.UTF8
     );
 
-    private static readonly SourceText MapGroupAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText MapGroupAttributeSourceText = SourceText.From($$"""
                                                                                        {{FileHeader}}
 
                                                                                        namespace {{AttributesNamespace}};
@@ -439,7 +330,7 @@ public sealed partial class MinimalApiGenerator
                                                                                        """, Encoding.UTF8
     );
 
-    private static readonly SourceText SummaryAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText SummaryAttributeSourceText = SourceText.From($$"""
                                                                                       {{FileHeader}}
 
                                                                                       namespace {{AttributesNamespace}};
@@ -468,7 +359,7 @@ public sealed partial class MinimalApiGenerator
                                                                                       """, Encoding.UTF8
     );
 
-    private static readonly SourceText AcceptsAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText AcceptsAttributeSourceText = SourceText.From($$"""
                                                                                       {{FileHeader}}
 
                                                                                       namespace {{AttributesNamespace}};
@@ -553,7 +444,7 @@ public sealed partial class MinimalApiGenerator
                                                                                       """, Encoding.UTF8
     );
 
-    private static readonly SourceText EndpointFilterAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText EndpointFilterAttributeSourceText = SourceText.From($$"""
                                                                                              {{FileHeader}}
 
                                                                                              namespace {{AttributesNamespace}};
@@ -595,7 +486,7 @@ public sealed partial class MinimalApiGenerator
                                                                                              """, Encoding.UTF8
     );
 
-    private static readonly SourceText ProducesResponseAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText ProducesResponseAttributeSourceText = SourceText.From($$"""
                                                                                                {{FileHeader}}
 
                                                                                                namespace {{AttributesNamespace}};
@@ -684,7 +575,7 @@ public sealed partial class MinimalApiGenerator
                                                                                                """, Encoding.UTF8
     );
 
-    private static readonly SourceText ProducesProblemAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText ProducesProblemAttributeSourceText = SourceText.From($$"""
                                                                                               {{FileHeader}}
 
                                                                                               namespace {{AttributesNamespace}};
@@ -727,7 +618,7 @@ public sealed partial class MinimalApiGenerator
                                                                                               """, Encoding.UTF8
     );
 
-    private static readonly SourceText ProducesValidationProblemAttributeSourceText = SourceText.From($$"""
+    internal static readonly SourceText ProducesValidationProblemAttributeSourceText = SourceText.From($$"""
                                                                                                         {{FileHeader}}
 
                                                                                                         namespace {{AttributesNamespace}};
@@ -770,4 +661,47 @@ public sealed partial class MinimalApiGenerator
                                                                                                         """, Encoding.UTF8
     );
 
+    private static HttpAttributeDefinition CreateHttpAttributeDefinition(string attributeName, string verb, bool allowOptionalPattern = false)
+    {
+        var fullyQualifiedName = $"{AttributesNamespace}.{attributeName}";
+        var hint = $"{fullyQualifiedName}.gs.cs";
+        var summaryVerb = verb == FallbackHttpMethod ? "fallback" : verb;
+        var source = GenerateHttpAttributeSource(AttributesNamespace, attributeName, summaryVerb, allowOptionalPattern);
+        return new HttpAttributeDefinition(attributeName, fullyQualifiedName, hint, verb, SourceText.From(source, Encoding.UTF8));
+    }
+
+    private static string GenerateHttpAttributeSource(string attributesNamespace, string attributeName, string summaryVerb, bool allowOptionalPattern = false)
+    {
+        return $$"""
+                 {{FileHeader}}
+
+                 namespace {{attributesNamespace}};
+
+                 /// <summary>
+                 /// Identifies a method as an HTTP {{summaryVerb}} minimal API endpoint with the specified route pattern.
+                 /// </summary>
+                 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                 internal sealed class {{attributeName}} : global::System.Attribute
+                 {
+                     /// <summary>
+                     /// Gets the route pattern for the endpoint.
+                     /// </summary>
+                     public string{{(allowOptionalPattern ? "?" : "")}} Pattern { get; }
+
+                     /// <summary>
+                     /// Gets or sets the endpoint name.
+                     /// </summary>
+                     public string? Name { get; init; }
+
+                     /// <summary>
+                     /// Initializes a new instance of the <see cref="{{attributeName}}"/> class.
+                     /// </summary>
+                     /// <param name="pattern">The route pattern for the endpoint.</param>
+                     public {{attributeName}}([global::System.Diagnostics.CodeAnalysis.StringSyntax("Route")] string{{(allowOptionalPattern ? "?" : "")}} pattern{{(allowOptionalPattern ? " = null" : "")}})
+                      {
+                          Pattern = pattern;
+                      }
+                 }
+                 """;
+    }
 }
