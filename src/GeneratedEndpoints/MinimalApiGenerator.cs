@@ -1700,7 +1700,7 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var methodParameters = new List<Parameter>();
+        var methodParameters = new List<Parameter>(methodSymbol.Parameters.Length);
         foreach (var parameter in methodSymbol.Parameters)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1752,7 +1752,8 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
             var parameterName = parameter.Name;
             var parameterType = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var key = typedKey.HasValue ? ConstLiteral(typedKey.Value) : null;
-            methodParameters.Add(new Parameter(parameterName, parameterType, source, key, bindingName));
+            var bindingPrefix = GetBindingSourceAttribute(source, key, bindingName);
+            methodParameters.Add(new Parameter(parameterName, parameterType, bindingPrefix));
         }
 
         return methodParameters.ToEquatableImmutableArray();
@@ -1826,13 +1827,13 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
         return builder.MoveToImmutable();
     }
 
-    private static ImmutableHashSet<int> GetRequestHandlersWithNameCollisions(ImmutableArray<RequestHandler> requestHandlers)
+    private static ImmutableArray<int> GetRequestHandlersWithNameCollisions(ImmutableArray<RequestHandler> requestHandlers)
     {
-        var collidingIndices = ImmutableHashSet.CreateBuilder<int>();
         if (requestHandlers.IsDefaultOrEmpty)
-            return collidingIndices.ToImmutable();
+            return ImmutableArray<int>.Empty;
 
-        var nameToMethodMap = new Dictionary<HandlerNameKey, List<int>>(requestHandlers.Length);
+        Dictionary<HandlerNameKey, int>? nameToFirstIndex = null;
+        HashSet<int>? collidingIndices = null;
 
         for (var index = 0; index < requestHandlers.Length; index++)
         {
@@ -1841,26 +1842,28 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
             if (string.IsNullOrEmpty(name))
                 continue;
 
+            nameToFirstIndex ??= new Dictionary<HandlerNameKey, int>(requestHandlers.Length);
             var key = new HandlerNameKey(name!, handler.Method.Name);
-            if (!nameToMethodMap.TryGetValue(key, out var indices))
+
+            if (nameToFirstIndex.TryGetValue(key, out var firstIndex))
             {
-                indices = new List<int>();
-                nameToMethodMap.Add(key, indices);
-            }
-
-            indices.Add(index);
-        }
-
-        foreach (var indices in nameToMethodMap.Values)
-        {
-            if (indices.Count <= 1)
-                continue;
-
-            foreach (var index in indices)
+                collidingIndices ??= new HashSet<int>();
+                collidingIndices.Add(firstIndex);
                 collidingIndices.Add(index);
+            }
+            else
+            {
+                nameToFirstIndex.Add(key, index);
+            }
         }
 
-        return collidingIndices.ToImmutable();
+        if (collidingIndices is null || collidingIndices.Count == 0)
+            return ImmutableArray<int>.Empty;
+
+        var builder = ImmutableArray.CreateBuilder<int>(collidingIndices.Count);
+        builder.AddRange(collidingIndices);
+        builder.Sort();
+        return builder.MoveToImmutable();
     }
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
@@ -1946,21 +1949,19 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
 
     private static StringBuilder GetAddEndpointHandlersStringBuilder(List<string> nonStaticClassNames)
     {
-        var estimate = 512;
+        var estimate = 512L;
         foreach (var className in nonStaticClassNames)
             estimate += 36 + className.Length;
 
         estimate += Math.Max(256, nonStaticClassNames.Count * 12);
-        estimate = (int)(estimate * 1.10);
+        estimate = (long)(estimate * 1.10);
 
-        estimate = estimate switch
-        {
-            < 512 => 512,
-            > 8192 => 8192,
-            _ => estimate,
-        };
+        if (estimate < 512)
+            estimate = 512;
+        else if (estimate > int.MaxValue)
+            estimate = int.MaxValue;
 
-        return StringBuilderPool.Get(estimate);
+        return StringBuilderPool.Get((int)estimate);
     }
 
     private static void GenerateUseEndpointHandlersClass(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
@@ -1974,7 +1975,7 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
         source.AppendLine("using Microsoft.AspNetCore.Http;");
         source.AppendLine("using Microsoft.AspNetCore.Mvc;");
         source.AppendLine("using Microsoft.AspNetCore.Routing;");
-        if (requestHandlers.Any(static handler => handler.Configuration.RequireRateLimiting))
+        if (HasRateLimitedHandlers(requestHandlers))
             source.AppendLine("using Microsoft.AspNetCore.RateLimiting;");
         source.AppendLine("using Microsoft.Extensions.DependencyInjection;");
         source.AppendLine();
@@ -2032,6 +2033,17 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
 
         var sourceText = StringBuilderPool.ToStringAndReturn(source);
         context.AddSource(UseEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
+    }
+
+    private static bool HasRateLimitedHandlers(ImmutableArray<RequestHandler> requestHandlers)
+    {
+        foreach (var handler in requestHandlers)
+        {
+            if (handler.Configuration.RequireRateLimiting)
+                return true;
+        }
+
+        return false;
     }
 
     [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified by calling the \"Select\" LINQ method", Justification = "Manual loops avoid repeated allocations in the source generator.")]
@@ -2118,7 +2130,7 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
             foreach (var parameter in requestHandler.Method.Parameters)
             {
                 source.Append(", ");
-                source.Append(GetBindingSourceAttribute(parameter.Source, parameter.Key, parameter.BindingName));
+                source.Append(parameter.BindingPrefix);
                 source.Append(parameter.Type);
                 source.Append(' ');
                 source.Append(parameter.Name);
@@ -2524,12 +2536,14 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
         const int baseSize = 4096;
         const int perHandler = 512;
 
-        var estimate = baseSize + requestHandlers.Length * perHandler;
+        var handlerCount = Math.Max(requestHandlers.Length, 0);
+        var estimate = baseSize + (long)perHandler * handlerCount;
+        estimate = (long)(estimate * 1.10);
 
-        if (estimate > 65536)
-            estimate = 65536;
+        if (estimate > int.MaxValue)
+            estimate = int.MaxValue;
 
-        return StringBuilderPool.Get(estimate);
+        return StringBuilderPool.Get((int)Math.Max(baseSize, estimate));
     }
 
     [SuppressMessage("Globalization", "CA1308: Normalize strings to uppercase", Justification = "C# boolean literals must be lowercase.")]
@@ -2596,10 +2610,28 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
         if (value is null)
             return "null";
 
+        var firstEscapeIndex = -1;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (c == '\"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\0' || char.IsControl(c))
+            {
+                firstEscapeIndex = i;
+                break;
+            }
+        }
+
+        if (firstEscapeIndex < 0)
+            return string.Concat("\"", value, "\"");
+
         var sb = StringBuilderPool.Get(value.Length + 2);
         sb.Append('"');
-        foreach (var c in value)
+        if (firstEscapeIndex > 0)
+            sb.Append(value, 0, firstEscapeIndex);
+
+        for (var i = firstEscapeIndex; i < value.Length; i++)
         {
+            var c = value[i];
             switch (c)
             {
                 case '\"':
@@ -2622,13 +2654,19 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
                     break;
                 default:
                     if (char.IsControl(c))
+                    {
                         sb.Append("\\u")
                             .Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                    }
                     else
+                    {
                         sb.Append(c);
+                    }
+
                     break;
             }
         }
+
         sb.Append('"');
         return StringBuilderPool.ToStringAndReturn(sb);
     }
@@ -2761,7 +2799,7 @@ internal sealed class {{DisableValidationAttributeName}} : global::System.Attrib
         EquatableImmutableArray<string>? AdditionalContentTypes
     );
 
-    private readonly record struct Parameter(string Name, string Type, BindingSource Source, string? Key, string? BindingName);
+    private readonly record struct Parameter(string Name, string Type, string BindingPrefix);
 
     private readonly record struct ConfigureMethodDetails(bool HasConfigureMethod, bool ConfigureMethodAcceptsServiceProvider);
 
