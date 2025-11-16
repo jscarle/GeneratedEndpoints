@@ -1044,79 +1044,138 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (attributeClass is null)
                 continue;
 
-            if (IsGeneratedAttribute(attributeClass, ShortCircuitAttributeName))
+            switch (GetGeneratedAttributeKind(attributeClass))
             {
-                shortCircuit = true;
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, DisableValidationAttributeName))
-            {
-                disableValidation = true;
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, DisableRequestTimeoutAttributeName))
-            {
-                disableRequestTimeout = true;
-                withRequestTimeout = false;
-                requestTimeoutPolicyName = null;
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, RequestTimeoutAttributeName))
-            {
-                disableRequestTimeout = false;
-                withRequestTimeout = true;
-
-                string? policyName = null;
-                if (attribute.ConstructorArguments.Length > 0)
-                    policyName = attribute.ConstructorArguments[0].Value as string;
-
-                policyName ??= GetNamedStringValue(attribute, PolicyNameAttributeNamedParameter);
-
-                requestTimeoutPolicyName = NormalizeOptionalString(policyName);
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, OrderAttributeName))
-            {
-                if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
-                    order = orderValue;
-
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, MapGroupAttributeName))
-            {
-                var groupName = GetNamedStringValue(attribute, NameAttributeNamedParameter);
-                if (!string.IsNullOrEmpty(groupName))
-                    endpointGroupName = groupName;
-
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, SummaryAttributeName))
-            {
-                if (attribute.ConstructorArguments.Length > 0)
+                case GeneratedAttributeKind.ShortCircuit:
+                    shortCircuit = true;
+                    continue;
+                case GeneratedAttributeKind.DisableValidation:
+                    disableValidation = true;
+                    continue;
+                case GeneratedAttributeKind.DisableRequestTimeout:
+                    disableRequestTimeout = true;
+                    withRequestTimeout = false;
+                    requestTimeoutPolicyName = null;
+                    continue;
+                case GeneratedAttributeKind.RequestTimeout:
                 {
-                    var summaryValue = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
-                    if (!string.IsNullOrEmpty(summaryValue))
-                        summary = summaryValue;
+                    disableRequestTimeout = false;
+                    withRequestTimeout = true;
+
+                    string? policyName = null;
+                    if (attribute.ConstructorArguments.Length > 0)
+                        policyName = attribute.ConstructorArguments[0].Value as string;
+
+                    policyName ??= GetNamedStringValue(attribute, PolicyNameAttributeNamedParameter);
+                    requestTimeoutPolicyName = NormalizeOptionalString(policyName);
+                    continue;
                 }
+                case GeneratedAttributeKind.Order:
+                    if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
+                        order = orderValue;
+                    continue;
+                case GeneratedAttributeKind.MapGroup:
+                {
+                    var groupName = GetNamedStringValue(attribute, NameAttributeNamedParameter);
+                    if (!string.IsNullOrEmpty(groupName))
+                        endpointGroupName = groupName;
+                    continue;
+                }
+                case GeneratedAttributeKind.Summary:
+                    if (attribute.ConstructorArguments.Length > 0)
+                    {
+                        var summaryValue = NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string);
+                        if (!string.IsNullOrEmpty(summaryValue))
+                            summary = summaryValue;
+                    }
+                    continue;
+                case GeneratedAttributeKind.Accepts:
+                    TryAddAcceptsMetadata(attribute, attributeClass, ref accepts);
+                    continue;
+                case GeneratedAttributeKind.ProducesResponse:
+                    TryAddProducesMetadata(attribute, attributeClass, ref produces);
+                    continue;
+                case GeneratedAttributeKind.RequireAuthorization:
+                    requireAuthorization = true;
+                    hasRequireAuthorizationAttribute = true;
+                    if (attribute.ConstructorArguments.Length == 1)
+                    {
+                        var arg = attribute.ConstructorArguments[0];
+                        MergeInto(ref authorizationPolicies, arg.Values);
+                    }
 
-                continue;
+                    continue;
+                case GeneratedAttributeKind.RequireCors:
+                    requireCors = true;
+                    corsPolicyName = attribute.ConstructorArguments.Length > 0 ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string) : null;
+                    continue;
+                case GeneratedAttributeKind.RequireHost:
+                    if (attribute.ConstructorArguments.Length == 1)
+                    {
+                        var arg = attribute.ConstructorArguments[0];
+                        if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
+                        {
+                            MergeInto(ref requiredHosts, arg.Values);
+                        }
+                        else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
+                        {
+                            MergeInto(ref requiredHosts, new[] { singleHost.Trim() });
+                        }
+                    }
+
+                    continue;
+                case GeneratedAttributeKind.RequireRateLimiting:
+                {
+                    var policyName = attribute.ConstructorArguments.Length > 0 ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string) : null;
+
+                    if (!string.IsNullOrEmpty(policyName))
+                    {
+                        requireRateLimiting = true;
+                        rateLimitingPolicyName = policyName;
+                    }
+
+                    continue;
+                }
+                case GeneratedAttributeKind.EndpointFilter:
+                    TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters);
+                    continue;
+                case GeneratedAttributeKind.DisableAntiforgery:
+                    disableAntiforgery = true;
+                    continue;
+                case GeneratedAttributeKind.ProducesProblem:
+                {
+                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
+                        ? producesProblemStatusCode
+                        : 500;
+                    var contentType = attribute.ConstructorArguments.Length > 1
+                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                        : null;
+                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
+
+                    var producesProblemList = producesProblem ??= [];
+                    producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    continue;
+                }
+                case GeneratedAttributeKind.ProducesValidationProblem:
+                {
+                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
+                        ? producesValidationProblemStatusCode
+                        : 400;
+                    var contentType = attribute.ConstructorArguments.Length > 1
+                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                        : null;
+                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
+
+                    var producesValidationProblemList = producesValidationProblem ??= [];
+                    producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    continue;
+                }
             }
 
-            if (IsGeneratedAttribute(attributeClass, AcceptsAttributeName))
+            if (IsAttribute(attributeClass, AllowAnonymousAttributeName, AspNetCoreAuthorizationNamespaceParts))
             {
-                TryAddAcceptsMetadata(attribute, attributeClass, ref accepts);
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, ProducesResponseAttributeName))
-            {
-                TryAddProducesMetadata(attribute, attributeClass, ref produces);
+                allowAnonymous = true;
+                hasAllowAnonymousAttribute = true;
                 continue;
             }
 
@@ -1131,109 +1190,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (IsGeneratedAttribute(attributeClass, RequireAuthorizationAttributeName))
-            {
-                requireAuthorization = true;
-                hasRequireAuthorizationAttribute = true;
-                if (attribute.ConstructorArguments.Length == 1)
-                {
-                    var arg = attribute.ConstructorArguments[0];
-                    MergeInto(ref authorizationPolicies, arg.Values);
-                }
-
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, RequireCorsAttributeName))
-            {
-                requireCors = true;
-                corsPolicyName = attribute.ConstructorArguments.Length > 0 ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string) : null;
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, RequireHostAttributeName))
-            {
-                if (attribute.ConstructorArguments.Length == 1)
-                {
-                    var arg = attribute.ConstructorArguments[0];
-                    if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
-                    {
-                        MergeInto(ref requiredHosts, arg.Values);
-                    }
-                    else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
-                    {
-                        MergeInto(ref requiredHosts, new[] { singleHost.Trim() });
-                    }
-                }
-
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, RequireRateLimitingAttributeName))
-            {
-                var policyName = attribute.ConstructorArguments.Length > 0 ? NormalizeOptionalString(attribute.ConstructorArguments[0].Value as string) : null;
-
-                if (!string.IsNullOrEmpty(policyName))
-                {
-                    requireRateLimiting = true;
-                    rateLimitingPolicyName = policyName;
-                }
-
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, EndpointFilterAttributeName))
-            {
-                TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters);
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, DisableAntiforgeryAttributeName))
-            {
-                disableAntiforgery = true;
-                continue;
-            }
-
-            if (IsAttribute(attributeClass, AllowAnonymousAttributeName, AspNetCoreAuthorizationNamespaceParts))
-            {
-                allowAnonymous = true;
-                hasAllowAnonymousAttribute = true;
-                continue;
-            }
-
             if (IsAttribute(attributeClass, "ExcludeFromDescriptionAttribute", AspNetCoreRoutingNamespaceParts))
             {
                 excludeFromDescription = true;
                 continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, ProducesProblemAttributeName))
-            {
-                var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
-                    ? producesProblemStatusCode
-                    : 500;
-                var contentType = attribute.ConstructorArguments.Length > 1
-                    ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
-                    : null;
-                var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
-
-                var producesProblemList = producesProblem ??= [];
-                producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
-                continue;
-            }
-
-            if (IsGeneratedAttribute(attributeClass, ProducesValidationProblemAttributeName))
-            {
-                var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
-                    ? producesValidationProblemStatusCode
-                    : 400;
-                var contentType = attribute.ConstructorArguments.Length > 1
-                    ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
-                    : null;
-                var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
-
-                var producesValidationProblemList = producesValidationProblem ??= [];
-                producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
             }
         }
     }
@@ -1295,7 +1255,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             if (attributeClass is null)
                 continue;
 
-            if (!IsGeneratedAttribute(attributeClass, MapGroupAttributeName))
+            if (GetGeneratedAttributeKind(attributeClass) != GeneratedAttributeKind.MapGroup)
                 continue;
 
             if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string pattern)
@@ -1337,10 +1297,33 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return builder.Count > 0 ? builder.ToEquatableImmutable() : null;
     }
 
-    private static bool IsGeneratedAttribute(INamedTypeSymbol attributeClass, string attributeName)
+    private static GeneratedAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
     {
         var definition = attributeClass.OriginalDefinition;
-        return definition.Name == attributeName && IsInNamespace(definition.ContainingNamespace, AttributesNamespaceParts);
+        if (!IsInNamespace(definition.ContainingNamespace, AttributesNamespaceParts))
+            return GeneratedAttributeKind.None;
+
+        return definition.Name switch
+        {
+            ShortCircuitAttributeName => GeneratedAttributeKind.ShortCircuit,
+            DisableValidationAttributeName => GeneratedAttributeKind.DisableValidation,
+            DisableRequestTimeoutAttributeName => GeneratedAttributeKind.DisableRequestTimeout,
+            RequestTimeoutAttributeName => GeneratedAttributeKind.RequestTimeout,
+            OrderAttributeName => GeneratedAttributeKind.Order,
+            MapGroupAttributeName => GeneratedAttributeKind.MapGroup,
+            SummaryAttributeName => GeneratedAttributeKind.Summary,
+            AcceptsAttributeName => GeneratedAttributeKind.Accepts,
+            ProducesResponseAttributeName => GeneratedAttributeKind.ProducesResponse,
+            RequireAuthorizationAttributeName => GeneratedAttributeKind.RequireAuthorization,
+            RequireCorsAttributeName => GeneratedAttributeKind.RequireCors,
+            RequireHostAttributeName => GeneratedAttributeKind.RequireHost,
+            RequireRateLimitingAttributeName => GeneratedAttributeKind.RequireRateLimiting,
+            EndpointFilterAttributeName => GeneratedAttributeKind.EndpointFilter,
+            DisableAntiforgeryAttributeName => GeneratedAttributeKind.DisableAntiforgery,
+            ProducesProblemAttributeName => GeneratedAttributeKind.ProducesProblem,
+            ProducesValidationProblemAttributeName => GeneratedAttributeKind.ProducesValidationProblem,
+            _ => GeneratedAttributeKind.None,
+        };
     }
 
     private static bool IsAttribute(INamedTypeSymbol attributeClass, string attributeName, string[] namespaceParts)
@@ -2256,7 +2239,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithTags(");
-            source.Append(string.Join(", ", metadata.Tags.Value.Select(StringLiteral)));
+            AppendCommaSeparatedLiterals(source, metadata.Tags.Value);
             source.Append(')');
         }
 
@@ -2319,7 +2302,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             {
                 source.Append(indent);
                 source.Append(".RequireAuthorization(");
-                source.Append(string.Join(", ", configuration.AuthorizationPolicies.Value.Select(StringLiteral)));
+                AppendCommaSeparatedLiterals(source, configuration.AuthorizationPolicies.Value);
                 source.Append(')');
             }
             else
@@ -2350,7 +2333,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".RequireHost(");
-            source.Append(string.Join(", ", configuration.RequiredHosts.Value.Select(StringLiteral)));
+            AppendCommaSeparatedLiterals(source, configuration.RequiredHosts.Value);
             source.Append(')');
         }
 
@@ -2666,6 +2649,19 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
     }
 
+    private static void AppendCommaSeparatedLiterals(StringBuilder source, EquatableImmutableArray<string> values)
+    {
+        if (values.Count == 0)
+            return;
+
+        source.Append(StringLiteral(values[0]));
+        for (var i = 1; i < values.Count; i++)
+        {
+            source.Append(", ");
+            source.Append(StringLiteral(values[i]));
+        }
+    }
+
     private static void AppendOptionalContentTypes(StringBuilder source, string? contentType, EquatableImmutableArray<string>? additionalContentTypes)
     {
         if (string.IsNullOrEmpty(contentType) && additionalContentTypes is not { Count: > 0 })
@@ -2803,6 +2799,28 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         public int? Order;
         public string? EndpointGroupName;
         public string? Summary;
+    }
+
+    private enum GeneratedAttributeKind
+    {
+        None = 0,
+        ShortCircuit,
+        DisableValidation,
+        DisableRequestTimeout,
+        RequestTimeout,
+        Order,
+        MapGroup,
+        Summary,
+        Accepts,
+        ProducesResponse,
+        RequireAuthorization,
+        RequireCors,
+        RequireHost,
+        RequireRateLimiting,
+        EndpointFilter,
+        DisableAntiforgery,
+        ProducesProblem,
+        ProducesValidationProblem,
     }
 
     private enum BindingSource
