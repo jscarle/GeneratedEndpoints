@@ -1,9 +1,7 @@
 using System.Collections.Immutable;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using static GeneratedEndpoints.Common.AttributeSymbolMatcher;
 using static GeneratedEndpoints.Common.Constants;
-using static GeneratedEndpoints.MinimalApiGenerator;
 
 namespace GeneratedEndpoints.Common;
 
@@ -49,7 +47,7 @@ internal static class RequestHandlerParameterHelper
 
             var parameterName = parameter.Name;
             var parameterType = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var key = typedKey.HasValue ? ConstLiteral(typedKey.Value) : null;
+            var key = typedKey?.ToConstLiteral();
             var bindingPrefix = GetBindingSourceAttribute(source, key, bindingName);
             methodParameters.Add(new Parameter(parameterName, parameterType, bindingPrefix));
         }
@@ -126,6 +124,6 @@ internal static class RequestHandlerParameterHelper
         if (bindingName is null)
             return $"[{attributeName}] ";
 
-        return $"[{attributeName}(Name = {StringLiteral(bindingName)})] ";
+        return $"[{attributeName}(Name = {bindingName.ToStringLiteral()})] ";
     }
 }

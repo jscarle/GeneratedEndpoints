@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.Text;
-using GeneratedEndpoints;
 
 namespace GeneratedEndpoints.Common;
 

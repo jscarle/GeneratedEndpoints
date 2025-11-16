@@ -2,7 +2,6 @@
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using GeneratedEndpoints.Common;
@@ -14,7 +13,7 @@ using static GeneratedEndpoints.Common.Constants;
 namespace GeneratedEndpoints;
 
 [Generator]
-public sealed partial class MinimalApiGenerator : IIncrementalGenerator
+public sealed class MinimalApiGenerator : IIncrementalGenerator
 {
     private static readonly ConditionalWeakTable<Compilation, CompilationTypeCache> CompilationTypeCaches = new();
     private static readonly ConditionalWeakTable<INamedTypeSymbol, RequestHandlerClassCacheEntry> RequestHandlerClassCache = new();
@@ -25,8 +24,11 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerProviders = ImmutableArray.CreateBuilder<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
 
-        foreach (var definition in HttpAttributeDefinitions)
+        // ReSharper disable once ForCanBeConvertedToForeach
+        // Do not refactor, use for loop to avoid allocations.
+        for (var index = 0; index < HttpAttributeDefinitions.Length; index++)
         {
+            var definition = HttpAttributeDefinitions[index];
             var handlers = context.SyntaxProvider
                 .ForAttributeWithMetadataName(definition.FullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
                 .WhereNotNull()
@@ -39,6 +41,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
     }
+
 
     private static IncrementalValueProvider<ImmutableArray<RequestHandler>> CombineRequestHandlers(
         ImmutableArray<IncrementalValueProvider<ImmutableArray<RequestHandler>>> handlerProviders
@@ -123,7 +126,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return methodName;
     }
 
-    private static ( string HttpMethod, string Pattern, string? Name ) GetRequestHandlerAttribute(AttributeData attribute, CancellationToken cancellationToken)
+    private static (string HttpMethod, string Pattern, string? Name) GetRequestHandlerAttribute(AttributeData attribute, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -134,8 +137,11 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
 
         string? name = null;
-        foreach (var namedArg in attribute.NamedArguments)
+        // ReSharper disable once ForCanBeConvertedToForeach
+        // Do not refactor, use for loop to avoid allocations.
+        for (var index = 0; index < attribute.NamedArguments.Length; index++)
         {
+            var namedArg = attribute.NamedArguments[index];
             switch (namedArg.Key)
             {
                 case NameAttributeNamedParameter:
@@ -163,55 +169,23 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
             if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DisplayNameAttribute), ComponentModelNamespaceParts))
             {
-                displayName = EndpointConfigurationFactory.NormalizeOptionalString(attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : null);
+                displayName = EndpointConfigurationFactory.NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null
+                );
 
                 continue;
             }
 
             if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DescriptionAttribute), ComponentModelNamespaceParts))
-                description = EndpointConfigurationFactory.NormalizeOptionalString(attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : null);
+                description = EndpointConfigurationFactory.NormalizeOptionalString(attribute.ConstructorArguments.Length > 0
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null
+                );
         }
 
         return (displayName, description);
     }
-
-
-
-    [SuppressMessage("Major Code Smell", "S3398:Move this method into a class of its own", Justification = "Shared helper for multiple caching paths.")]
-    internal static string? GetMapGroupPattern(INamedTypeSymbol classSymbol)
-    {
-        foreach (var attribute in classSymbol.GetAttributes())
-        {
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass is null)
-                continue;
-
-            if (EndpointConfigurationFactory.GetGeneratedAttributeKind(attributeClass) != GeneratedAttributeKind.MapGroup)
-                continue;
-
-            if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string pattern)
-                return pattern.Trim();
-        }
-
-        return null;
-    }
-
-    [SuppressMessage("Major Code Smell", "S3398:Move this method into a class of its own", Justification = "Shared helper for multiple caching paths.")]
-    internal static string GetMapGroupIdentifier(string className)
-    {
-        if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
-            className = className.Substring(GlobalPrefix.Length);
-
-        var builder = StringBuilderPool.Get(className.Length + 8);
-        builder.Append('_');
-
-        foreach (var character in className)
-            builder.Append(char.IsLetterOrDigit(character) ? character : '_');
-
-        builder.Append("_Group");
-        return StringBuilderPool.ToStringAndReturn(builder);
-    }
-
 
     private static RequestHandlerMethod GetRequestHandlerMethod(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
@@ -219,7 +193,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
 
         var name = methodSymbol.Name;
         var isStatic = methodSymbol.IsStatic;
-        var isAwaitable = methodSymbol.ReturnType.IsTask(out _) || methodSymbol.ReturnType.IsValueTask(out _);
+        var isAwaitable = methodSymbol.ReturnType.IsAwaitable();
         var parameters = RequestHandlerParameterHelper.Build(methodSymbol, cancellationToken);
 
         var requestHandlerMethod = new RequestHandlerMethod(name, isStatic, isAwaitable, parameters);
@@ -238,154 +212,13 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         var typeCache = GetCompilationTypeCache(compilation);
         var cacheEntry = RequestHandlerClassCache.GetValue(classSymbol, static _ => new RequestHandlerClassCacheEntry());
         var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, typeCache, cancellationToken);
+
         return requestHandlerClass;
     }
 
     private static CompilationTypeCache GetCompilationTypeCache(Compilation compilation)
     {
         return CompilationTypeCaches.GetValue(compilation, static c => new CompilationTypeCache(c));
-    }
-
-    [SuppressMessage("Major Code Smell", "S3398:Move this method into a class of its own", Justification = "Shared helper reused by caching infrastructure.")]
-    internal static ConfigureMethodDetails GetConfigureMethodDetails(
-        INamedTypeSymbol classSymbol,
-        INamedTypeSymbol? endpointConventionBuilderSymbol,
-        INamedTypeSymbol? serviceProviderSymbol,
-        CancellationToken cancellationToken
-    )
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var hasConfigureMethod = false;
-        var acceptsServiceProvider = false;
-        foreach (var member in classSymbol.GetMembers(ConfigureMethodName))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (member is not IMethodSymbol methodSymbol)
-                continue;
-
-            if (IsConfigureMethod(methodSymbol, endpointConventionBuilderSymbol, serviceProviderSymbol, out var methodAcceptsServiceProvider))
-            {
-                hasConfigureMethod = true;
-                if (methodAcceptsServiceProvider)
-                {
-                    acceptsServiceProvider = true;
-                    break;
-                }
-            }
-        }
-
-        return new ConfigureMethodDetails(hasConfigureMethod, acceptsServiceProvider);
-    }
-
-    private static bool IsConfigureMethod(
-        IMethodSymbol methodSymbol,
-        INamedTypeSymbol? endpointConventionBuilderSymbol,
-        INamedTypeSymbol? serviceProviderSymbol,
-        out bool acceptsServiceProvider
-    )
-    {
-        acceptsServiceProvider = false;
-
-        if (!methodSymbol.IsStatic)
-            return false;
-
-        if (methodSymbol.TypeParameters.Length != 1)
-            return false;
-
-        if (methodSymbol.Parameters.Length is < 1 or > 2)
-            return false;
-
-        var builderTypeParameter = methodSymbol.TypeParameters[0];
-        var builderParameter = methodSymbol.Parameters[0];
-
-        if (!SymbolEqualityComparer.Default.Equals(builderParameter.Type, builderTypeParameter))
-            return false;
-
-        if (methodSymbol.Parameters.Length == 2)
-        {
-            var serviceProviderParameter = methodSymbol.Parameters[1];
-            if (!IsServiceProviderParameter(serviceProviderParameter.Type, serviceProviderSymbol))
-                return false;
-
-            acceptsServiceProvider = true;
-        }
-
-        if (!methodSymbol.ReturnsVoid)
-            return false;
-
-        if (!HasEndpointConventionBuilderConstraint(builderTypeParameter, methodSymbol, endpointConventionBuilderSymbol))
-            return false;
-
-        return true;
-    }
-
-    private static bool IsServiceProviderParameter(ITypeSymbol typeSymbol, INamedTypeSymbol? serviceProviderSymbol)
-    {
-        if (serviceProviderSymbol is not null)
-            return SymbolEqualityComparer.Default.Equals(typeSymbol, serviceProviderSymbol);
-
-        return MatchesServiceProvider(typeSymbol);
-    }
-
-    private static bool HasEndpointConventionBuilderConstraint(
-        ITypeParameterSymbol builderTypeParameter,
-        IMethodSymbol methodSymbol,
-        INamedTypeSymbol? endpointConventionBuilderSymbol
-    )
-    {
-        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(constraint =>
-            endpointConventionBuilderSymbol is not null
-                ? SymbolEqualityComparer.Default.Equals(constraint, endpointConventionBuilderSymbol)
-                : MatchesEndpointConventionBuilder(constraint)
-        );
-
-        if (symbolMatches)
-            return true;
-
-        return methodSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax())
-            .OfType<MethodDeclarationSyntax>()
-            .SelectMany(methodSyntax => methodSyntax.ConstraintClauses)
-            .Where(clause => string.Equals(clause.Name.Identifier.ValueText, builderTypeParameter.Name, StringComparison.Ordinal))
-            .SelectMany(clause => clause.Constraints.OfType<TypeConstraintSyntax>())
-            .Any(constraint => IsEndpointConventionBuilderIdentifier(constraint.Type));
-    }
-
-    private static bool IsEndpointConventionBuilderIdentifier(TypeSyntax typeSyntax)
-    {
-        return typeSyntax switch
-        {
-            QualifiedNameSyntax qualified => IsEndpointConventionBuilderIdentifier(qualified.Right),
-            AliasQualifiedNameSyntax alias => IsEndpointConventionBuilderIdentifier(alias.Name),
-            SimpleNameSyntax simple => string.Equals(simple.Identifier.ValueText, "IEndpointConventionBuilder", StringComparison.Ordinal),
-            _ => false,
-        };
-    }
-
-    private static bool MatchesEndpointConventionBuilder(ITypeSymbol typeSymbol)
-    {
-        if (typeSymbol is not INamedTypeSymbol namedType)
-            return false;
-
-        if (!string.Equals(namedType.Name, "IEndpointConventionBuilder", StringComparison.Ordinal))
-            return false;
-
-        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
-        return string.Equals(containingNamespace, "Microsoft.AspNetCore.Builder", StringComparison.Ordinal);
-    }
-
-    private static bool MatchesServiceProvider(ITypeSymbol typeSymbol)
-    {
-        if (typeSymbol is not INamedTypeSymbol namedType)
-            return false;
-
-        if (!string.Equals(namedType.Name, "IServiceProvider", StringComparison.Ordinal))
-            return false;
-
-        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
-        return string.Equals(containingNamespace, "System", StringComparison.Ordinal);
     }
 
     private static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
@@ -639,7 +472,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.Append("        var ");
             source.Append(groupedClass.MapGroupBuilderIdentifier);
             source.Append(" = builder.MapGroup(");
-            source.Append(StringLiteral(groupedClass.MapGroupPattern!));
+            source.Append(groupedClass.MapGroupPattern!.ToStringLiteral());
             source.Append(')');
             AppendEndpointConfiguration(source, "            ", groupedClass.Configuration, false);
             source.AppendLine(";");
@@ -730,7 +563,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.Append(".MapFallback(");
             if (!string.IsNullOrEmpty(requestHandler.Pattern))
             {
-                source.Append(StringLiteral(requestHandler.Pattern));
+                source.Append(requestHandler.Pattern.ToStringLiteral());
                 source.Append(", ");
             }
         }
@@ -740,7 +573,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.Append(".Map");
             source.Append(mapMethodSuffix ?? "Methods");
             source.Append('(');
-            source.Append(StringLiteral(requestHandler.Pattern));
+            source.Append(requestHandler.Pattern.ToStringLiteral());
             source.Append(", ");
             if (mapMethodSuffix is null)
             {
@@ -822,7 +655,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithName(");
-            source.Append(StringLiteral(metadata.Name));
+            source.Append(metadata.Name.ToStringLiteral());
             source.Append(')');
         }
 
@@ -831,7 +664,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithDisplayName(");
-            source.Append(StringLiteral(metadata.DisplayName));
+            source.Append(metadata.DisplayName.ToStringLiteral());
             source.Append(')');
         }
 
@@ -840,7 +673,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithSummary(");
-            source.Append(StringLiteral(metadata.Summary));
+            source.Append(metadata.Summary.ToStringLiteral());
             source.Append(')');
         }
 
@@ -849,7 +682,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithDescription(");
-            source.Append(StringLiteral(metadata.Description));
+            source.Append(metadata.Description.ToStringLiteral());
             source.Append(')');
         }
 
@@ -858,7 +691,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithGroupName(");
-            source.Append(StringLiteral(configuration.EndpointGroupName));
+            source.Append(configuration.EndpointGroupName.ToStringLiteral());
             source.Append(')');
         }
 
@@ -898,7 +731,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
                 source.Append('(');
                 if (accepts.IsOptional)
                     source.Append("isOptional: true, ");
-                source.Append(StringLiteral(accepts.ContentType));
+                source.Append(accepts.ContentType.ToStringLiteral());
                 AppendAdditionalContentTypes(source, accepts.AdditionalContentTypes);
                 source.Append(')');
             }
@@ -963,7 +796,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             if (!string.IsNullOrEmpty(configuration.CorsPolicyName))
             {
                 source.Append(".RequireCors(");
-                source.Append(StringLiteral(configuration.CorsPolicyName));
+                source.Append(configuration.CorsPolicyName.ToStringLiteral());
                 source.Append(')');
             }
             else
@@ -986,7 +819,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             source.AppendLine();
             source.Append(indent);
             source.Append(".RequireRateLimiting(");
-            source.Append(StringLiteral(configuration.RateLimitingPolicyName));
+            source.Append(configuration.RateLimitingPolicyName.ToStringLiteral());
             source.Append(')');
         }
 
@@ -1032,7 +865,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             if (!string.IsNullOrEmpty(configuration.RequestTimeoutPolicyName))
             {
                 source.Append(".WithRequestTimeout(");
-                source.Append(StringLiteral(configuration.RequestTimeoutPolicyName));
+                source.Append(configuration.RequestTimeoutPolicyName.ToStringLiteral());
                 source.Append(')');
             }
             else
@@ -1153,127 +986,6 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         return StringBuilderPool.Get((int)Math.Max(baseSize, estimate));
     }
 
-    [SuppressMessage("Globalization", "CA1308: Normalize strings to uppercase", Justification = "C# boolean literals must be lowercase.")]
-    internal static string ConstLiteral(TypedConstant tc)
-    {
-        if (tc.IsNull)
-            return "null";
-        var v = tc.Value;
-        var t = tc.Type;
-        if (t is null)
-            return "null";
-
-        if (t.TypeKind != TypeKind.Enum)
-            return t.SpecialType switch
-            {
-                SpecialType.System_String => StringLiteral((string?)v),
-                SpecialType.System_Char => $"'{EscapeChar((char)v!)}'",
-                SpecialType.System_Boolean => ((bool)v!).ToString()
-                    .ToLowerInvariant(),
-                SpecialType.System_Double => ((double)v!).ToString("R", CultureInfo.InvariantCulture),
-                SpecialType.System_Single => ((float)v!).ToString("R", CultureInfo.InvariantCulture) + "f",
-                SpecialType.System_Decimal => ((decimal)v!).ToString(CultureInfo.InvariantCulture) + "m",
-                SpecialType.System_SByte => ((sbyte)v!).ToString(CultureInfo.InvariantCulture),
-                SpecialType.System_Byte => ((byte)v!).ToString(CultureInfo.InvariantCulture),
-                SpecialType.System_Int16 => ((short)v!).ToString(CultureInfo.InvariantCulture),
-                SpecialType.System_UInt16 => ((ushort)v!).ToString(CultureInfo.InvariantCulture),
-                SpecialType.System_Int32 => ((int)v!).ToString(CultureInfo.InvariantCulture),
-                SpecialType.System_UInt32 => ((uint)v!).ToString(CultureInfo.InvariantCulture) + "u",
-                SpecialType.System_Int64 => ((long)v!).ToString(CultureInfo.InvariantCulture) + "L",
-                SpecialType.System_UInt64 => ((ulong)v!).ToString(CultureInfo.InvariantCulture) + "UL",
-                _ => StringLiteral(v?.ToString()),
-            };
-
-        var field = t.GetMembers()
-            .OfType<IFieldSymbol>()
-            .FirstOrDefault(f => f.HasConstantValue && Equals(f.ConstantValue, v));
-
-        if (field is not null)
-            return $"{t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{field.Name}";
-
-        var underlying = ((INamedTypeSymbol)t).EnumUnderlyingType!;
-        var num = IntegralLiteral(v, underlying.SpecialType);
-        return $"({t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}){num}";
-    }
-
-    private static string IntegralLiteral(object? value, SpecialType underlying)
-    {
-        return underlying switch
-        {
-            SpecialType.System_SByte => ((sbyte)value!).ToString(CultureInfo.InvariantCulture),
-            SpecialType.System_Byte => ((byte)value!).ToString(CultureInfo.InvariantCulture),
-            SpecialType.System_Int16 => ((short)value!).ToString(CultureInfo.InvariantCulture),
-            SpecialType.System_UInt16 => ((ushort)value!).ToString(CultureInfo.InvariantCulture),
-            SpecialType.System_Int32 => ((int)value!).ToString(CultureInfo.InvariantCulture),
-            SpecialType.System_UInt32 => ((uint)value!).ToString(CultureInfo.InvariantCulture) + "u",
-            SpecialType.System_Int64 => ((long)value!).ToString(CultureInfo.InvariantCulture) + "L",
-            SpecialType.System_UInt64 => ((ulong)value!).ToString(CultureInfo.InvariantCulture) + "UL",
-            _ => "0",
-        };
-    }
-
-    internal static string StringLiteral(string? value)
-    {
-        if (value is null)
-            return "null";
-
-        var firstEscapeIndex = -1;
-        for (var i = 0; i < value.Length; i++)
-        {
-            var c = value[i];
-            if (c == '\"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\0' || char.IsControl(c))
-            {
-                firstEscapeIndex = i;
-                break;
-            }
-        }
-
-        if (firstEscapeIndex < 0)
-            return string.Concat("\"", value, "\"");
-
-        var sb = StringBuilderPool.Get(value.Length + 2);
-        sb.Append('"');
-        if (firstEscapeIndex > 0)
-            sb.Append(value, 0, firstEscapeIndex);
-
-        for (var i = firstEscapeIndex; i < value.Length; i++)
-        {
-            var c = value[i];
-            switch (c)
-            {
-                case '\"':
-                    sb.Append("\\\"");
-                    break;
-                case '\\':
-                    sb.Append("\\\\");
-                    break;
-                case '\n':
-                    sb.Append("\\n");
-                    break;
-                case '\r':
-                    sb.Append("\\r");
-                    break;
-                case '\t':
-                    sb.Append("\\t");
-                    break;
-                case '\0':
-                    sb.Append("\\0");
-                    break;
-                default:
-                    if (char.IsControl(c))
-                        sb.Append("\\u")
-                            .Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
-                    else
-                        sb.Append(c);
-
-                    break;
-            }
-        }
-
-        sb.Append('"');
-        return StringBuilderPool.ToStringAndReturn(sb);
-    }
-
     private static void AppendAdditionalContentTypes(StringBuilder source, EquatableImmutableArray<string>? additionalContentTypes)
     {
         if (additionalContentTypes is not { Count: > 0 })
@@ -1282,7 +994,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         foreach (var additional in additionalContentTypes.Value)
         {
             source.Append(", ");
-            source.Append(StringLiteral(additional));
+            source.Append(additional.ToStringLiteral());
         }
     }
 
@@ -1291,11 +1003,11 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
         if (values.Count == 0)
             return;
 
-        source.Append(StringLiteral(values[0]));
+        source.Append(values[0].ToStringLiteral());
         for (var i = 1; i < values.Count; i++)
         {
             source.Append(", ");
-            source.Append(StringLiteral(values[i]));
+            source.Append(values[i].ToStringLiteral());
         }
     }
 
@@ -1305,22 +1017,7 @@ public sealed partial class MinimalApiGenerator : IIncrementalGenerator
             return;
 
         source.Append(", ");
-        source.Append(contentType is { Length: > 0 } ? StringLiteral(contentType) : "null");
+        source.Append(contentType is { Length: > 0 } ? contentType.ToStringLiteral() : "null");
         AppendAdditionalContentTypes(source, additionalContentTypes);
-    }
-
-    private static string EscapeChar(char c)
-    {
-        return c switch
-        {
-            '\'' => "\\'",
-            '\\' => "\\\\",
-            '\n' => "\\n",
-            '\r' => "\\r",
-            '\t' => "\\t",
-            '\0' => "\\0",
-            _ when char.IsControl(c) => "\\u" + ((int)c).ToString("x4", CultureInfo.InvariantCulture),
-            _ => c.ToString(),
-        };
     }
 }

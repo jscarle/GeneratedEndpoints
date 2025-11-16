@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace GeneratedEndpoints.Common;
 
 internal sealed class RequestHandlerComparer : IComparer<RequestHandler>

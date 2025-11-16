@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace GeneratedEndpoints.Common;
 
 internal struct EndpointAttributeState
