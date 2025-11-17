@@ -85,7 +85,7 @@ public static class SourceFactory
 
         if (!string.IsNullOrWhiteSpace(groupName) && mapGroupPattern is null)
         {
-            mapGroupPattern = string.Empty;
+            mapGroupPattern = "";
         }
 
         if (mapGroupPattern is not null)
@@ -114,7 +114,7 @@ public static class SourceFactory
         if (applyRequestTimeout)
         {
             var timeoutArgument = string.IsNullOrWhiteSpace(requestTimeoutPolicy)
-                ? string.Empty
+                ? ""
                 : $"(\"{requestTimeoutPolicy}\")";
             builder.AppendLine($"[RequestTimeout{timeoutArgument}]");
         }
@@ -160,13 +160,13 @@ public static class SourceFactory
 
         if (methodRequireCors)
         {
-            var methodCors = string.IsNullOrWhiteSpace(methodCorsPolicy) ? string.Empty : $"(\"{methodCorsPolicy}\")";
+            var methodCors = string.IsNullOrWhiteSpace(methodCorsPolicy) ? "" : $"(\"{methodCorsPolicy}\")";
             builder.AppendLine($"    [RequireCors{methodCors}]");
         }
 
         if (requireRateLimiting)
         {
-            var rateLimit = string.IsNullOrWhiteSpace(rateLimitingPolicy) ? string.Empty : $"(\"{rateLimitingPolicy}\")";
+            var rateLimit = string.IsNullOrWhiteSpace(rateLimitingPolicy) ? "" : $"(\"{rateLimitingPolicy}\")";
             builder.AppendLine($"    [RequireRateLimiting{rateLimit}]");
         }
 
@@ -223,7 +223,7 @@ public static class SourceFactory
 
         builder.AppendLine("    public static Ok Handle() => TypedResults.Ok();");
         builder.AppendLine();
-        builder.AppendLine("    public static void Configure<TBuilder>(TBuilder builder" + (configureWithServiceProvider ? ", IServiceProvider services" : string.Empty) + ")");
+        builder.AppendLine("    public static void Configure<TBuilder>(TBuilder builder" + (configureWithServiceProvider ? ", IServiceProvider services" : "") + ")");
         builder.AppendLine("        where TBuilder : IEndpointConventionBuilder");
         builder.AppendLine("    {");
         builder.AppendLine("        _ = builder;");
@@ -406,7 +406,7 @@ public static class SourceFactory
 
         if (includeAccepts)
         {
-            var secondContentType = string.IsNullOrWhiteSpace(acceptsContentType2) ? string.Empty : $", \"{acceptsContentType2}\"";
+            var secondContentType = string.IsNullOrWhiteSpace(acceptsContentType2) ? "" : $", \"{acceptsContentType2}\"";
             builder.AppendLine($"    [Accepts(\"{acceptsContentType1 ?? "application/json"}\"{secondContentType})]");
         }
 
@@ -417,7 +417,7 @@ public static class SourceFactory
 
         if (includeProducesResponse)
         {
-            var secondProduces = string.IsNullOrWhiteSpace(producesContentType2) ? string.Empty : $", \"{producesContentType2}\"";
+            var secondProduces = string.IsNullOrWhiteSpace(producesContentType2) ? "" : $", \"{producesContentType2}\"";
             builder.AppendLine($"    [ProducesResponse(200, \"{producesContentType1 ?? "application/json"}\"{secondProduces}, ResponseType = typeof(ResponseRecord))]");
         }
 

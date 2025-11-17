@@ -165,7 +165,7 @@ internal sealed class RequestHandlerClassCacheEntry
         if (!string.Equals(namedType.Name, "IEndpointConventionBuilder", StringComparison.Ordinal))
             return false;
 
-        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? "";
         return string.Equals(containingNamespace, "Microsoft.AspNetCore.Builder", StringComparison.Ordinal);
     }
 
@@ -177,7 +177,7 @@ internal sealed class RequestHandlerClassCacheEntry
         if (!string.Equals(namedType.Name, "IServiceProvider", StringComparison.Ordinal))
             return false;
 
-        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? "";
         return string.Equals(containingNamespace, "System", StringComparison.Ordinal);
     }
 

@@ -171,13 +171,10 @@ internal static class EndpointConfigurationFactory
                 {
                     disableRequestTimeout = false;
                     withRequestTimeout = true;
-
                     string? policyName = null;
                     if (attribute.ConstructorArguments.Length > 0)
-                        policyName = attribute.ConstructorArguments[0].Value as string;
-
-                    policyName ??= GetNamedStringValue(attribute, PolicyNameAttributeNamedParameter);
-                    requestTimeoutPolicyName = policyName.NormalizeOptionalString();
+                        policyName = (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString();
+                    requestTimeoutPolicyName = policyName;
                     continue;
                 }
                 case GeneratedAttributeKind.Order:
@@ -186,7 +183,7 @@ internal static class EndpointConfigurationFactory
                     continue;
                 case GeneratedAttributeKind.MapGroup:
                 {
-                    var groupName = GetNamedStringValue(attribute, NameAttributeNamedParameter);
+                    var groupName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
                     if (!string.IsNullOrEmpty(groupName))
                         endpointGroupName = groupName;
                     continue;
@@ -258,7 +255,7 @@ internal static class EndpointConfigurationFactory
                         ? producesProblemStatusCode
                         : 500;
                     var contentType = attribute.ConstructorArguments.Length > 1
-                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                        ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString()
                         : null;
                     var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
 
@@ -273,7 +270,7 @@ internal static class EndpointConfigurationFactory
                             ? producesValidationProblemStatusCode
                             : 400;
                     var contentType = attribute.ConstructorArguments.Length > 1
-                        ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string)
+                        ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString()
                         : null;
                     var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
 
@@ -375,11 +372,6 @@ internal static class EndpointConfigurationFactory
         return string.IsNullOrWhiteSpace(contentType) ? defaultValue : contentType!.Trim();
     }
 
-    private static string? NormalizeOptionalContentType(string? contentType)
-    {
-        return string.IsNullOrWhiteSpace(contentType) ? null : contentType!.Trim();
-    }
-
     private static EquatableImmutableArray<string>? GetStringArrayValues(TypedConstant typedConstant)
     {
         if (typedConstant.Kind != TypedConstantKind.Array || typedConstant.Values.IsDefaultOrEmpty)
@@ -400,7 +392,7 @@ internal static class EndpointConfigurationFactory
         string? requestType;
         string contentType;
         EquatableImmutableArray<string>? additionalContentTypes;
-        var isOptional = GetNamedBoolValue(attribute, IsOptionalAttributeNamedParameter);
+        var isOptional = attribute.GetNamedBoolValue(IsOptionalAttributeNamedParameter);
 
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
@@ -411,7 +403,7 @@ internal static class EndpointConfigurationFactory
                 : "application/json";
             additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
         }
-        else if (GetNamedTypeSymbol(attribute, RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
+        else if (attribute.GetNamedTypeSymbol(RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
         {
             requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             contentType = attribute.ConstructorArguments.Length > 0
@@ -442,16 +434,16 @@ internal static class EndpointConfigurationFactory
             statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
                 ? producesStatusCode
                 : 200;
-            contentType = attribute.ConstructorArguments.Length > 1 ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string) : null;
+            contentType = attribute.ConstructorArguments.Length > 1 ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString() : null;
             additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
         }
-        else if (GetNamedTypeSymbol(attribute, ResponseTypeAttributeNamedParameter) is { } responseTypeSymbol)
+        else if (attribute.GetNamedTypeSymbol(ResponseTypeAttributeNamedParameter) is { } responseTypeSymbol)
         {
             responseType = responseTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
                 ? producesStatusCode
                 : 200;
-            contentType = attribute.ConstructorArguments.Length > 1 ? NormalizeOptionalContentType(attribute.ConstructorArguments[1].Value as string) : null;
+            contentType = attribute.ConstructorArguments.Length > 1 ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString() : null;
             additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
         }
         else
@@ -500,39 +492,6 @@ internal static class EndpointConfigurationFactory
 
         endpointFilters ??= [];
         endpointFilters.Add(displayString);
-    }
-
-    private static ITypeSymbol? GetNamedTypeSymbol(AttributeData attribute, string namedParameter)
-    {
-        foreach (var namedArg in attribute.NamedArguments)
-        {
-            if (namedArg.Key == namedParameter && namedArg.Value.Value is ITypeSymbol typeSymbol)
-                return typeSymbol;
-        }
-
-        return null;
-    }
-
-    private static bool GetNamedBoolValue(AttributeData attribute, string namedParameter, bool defaultValue = false)
-    {
-        foreach (var namedArg in attribute.NamedArguments)
-        {
-            if (namedArg.Key == namedParameter && namedArg.Value.Value is bool boolValue)
-                return boolValue;
-        }
-
-        return defaultValue;
-    }
-
-    private static string? GetNamedStringValue(AttributeData attribute, string namedParameter)
-    {
-        foreach (var namedArg in attribute.NamedArguments)
-        {
-            if (namedArg.Key == namedParameter && namedArg.Value.Value is string stringValue)
-                return stringValue.NormalizeOptionalString();
-        }
-
-        return null;
     }
 
     private static GeneratedAttributeKind GetGeneratedAttributeKindCore(INamedTypeSymbol definition)

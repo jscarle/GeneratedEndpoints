@@ -5,6 +5,10 @@ using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
 
+// ReSharper disable ForCanBeConvertedToForeach
+// ReSharper disable LoopCanBeConvertedToQuery
+// Do not refactor, use for loop to avoid allocations.
+
 internal static class RequestHandlerParameterHelper
 {
     public static EquatableImmutableArray<Parameter> Build(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
@@ -12,74 +16,57 @@ internal static class RequestHandlerParameterHelper
         cancellationToken.ThrowIfCancellationRequested();
 
         var methodParameters = ImmutableArray.CreateBuilder<Parameter>(methodSymbol.Parameters.Length);
-        foreach (var parameter in methodSymbol.Parameters)
+
+        for (var index = 0; index < methodSymbol.Parameters.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var source = BindingSource.None;
-            TypedConstant? typedKey = null;
-            string? bindingName = null;
+            var parameterSymbol = methodSymbol.Parameters[index];
+            var parameterName = parameterSymbol.Name;
+            var parameterType = parameterSymbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var bindingPrefix = GetBindingPrefix(parameterSymbol);
+            var parameter = new Parameter(parameterName, parameterType, bindingPrefix);
 
-            foreach (var attribute in parameter.GetAttributes())
-            {
-                var attributeClass = attribute.AttributeClass;
-                if (attributeClass is null)
-                    continue;
-
-                var attributeSource = GetBindingSourceFromAttributeClass(attributeClass);
-                if (attributeSource == BindingSource.None)
-                    continue;
-
-                source = attributeSource;
-                switch (attributeSource)
-                {
-                    case BindingSource.FromRoute:
-                    case BindingSource.FromQuery:
-                    case BindingSource.FromHeader:
-                    case BindingSource.FromForm:
-                        bindingName = GetBindingAttributeName(attribute) ?? bindingName;
-                        break;
-                    case BindingSource.FromKeyedServices:
-                        typedKey = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0] : null;
-                        break;
-                }
-            }
-
-            var parameterName = parameter.Name;
-            var parameterType = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var key = typedKey?.ToConstLiteral();
-            var bindingPrefix = GetBindingSourceAttribute(source, key, bindingName);
-            methodParameters.Add(new Parameter(parameterName, parameterType, bindingPrefix));
+            methodParameters.Add(parameter);
         }
 
         return methodParameters.ToEquatableImmutable();
     }
 
-    private static string? GetBindingAttributeName(AttributeData attribute)
+    private static string GetBindingPrefix(IParameterSymbol parameter)
     {
-        foreach (var namedArg in attribute.NamedArguments)
+        var source = BindingSource.None;
+        TypedConstant? typedKey = null;
+        string? bindingName = null;
+
+        foreach (var attribute in parameter.GetAttributes())
         {
-            if (string.Equals(namedArg.Key, NameAttributeNamedParameter, StringComparison.Ordinal) && namedArg.Value.Value is string namedValue)
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass is null)
+                continue;
+
+            var attributeSource = GetBindingSourceFromAttributeClass(attributeClass);
+            if (attributeSource == BindingSource.None)
+                continue;
+
+            source = attributeSource;
+            switch (attributeSource)
             {
-                var normalized = NormalizeBindingName(namedValue);
-                if (normalized is not null)
-                    return normalized;
+                case BindingSource.FromRoute:
+                case BindingSource.FromQuery:
+                case BindingSource.FromHeader:
+                case BindingSource.FromForm:
+                    bindingName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
+                    break;
+                case BindingSource.FromKeyedServices:
+                    typedKey = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0] : null;
+                    break;
             }
         }
 
-        if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string constructorName)
-            return NormalizeBindingName(constructorName);
+        var bindingPrefix = GetBindingSourceAttribute(source, typedKey, bindingName);
 
-        return null;
-    }
-
-    private static string? NormalizeBindingName(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        var trimmed = value!.Trim();
-        return trimmed.Length > 0 ? trimmed : null;
+        return bindingPrefix;
     }
 
     private static BindingSource GetBindingSourceFromAttributeClass(INamedTypeSymbol attributeClass)
@@ -102,21 +89,32 @@ internal static class RequestHandlerParameterHelper
         };
     }
 
-    private static string GetBindingSourceAttribute(BindingSource source, string? key, string? bindingName)
+    private static string GetBindingSourceAttribute(BindingSource source, TypedConstant? typedKey, string? bindingName)
     {
-        return source switch
+        switch (source)
         {
-            BindingSource.None => string.Empty,
-            BindingSource.FromRoute => FormatBindingAttribute("FromRoute", bindingName),
-            BindingSource.FromQuery => FormatBindingAttribute("FromQuery", bindingName),
-            BindingSource.FromHeader => FormatBindingAttribute("FromHeader", bindingName),
-            BindingSource.FromBody => FormatBindingAttribute("FromBody", bindingName),
-            BindingSource.FromForm => FormatBindingAttribute("FromForm", bindingName),
-            BindingSource.FromServices => "[FromServices] ",
-            BindingSource.FromKeyedServices => $"[FromKeyedServices({key})] ",
-            BindingSource.AsParameters => "[AsParameters] ",
-            _ => string.Empty,
-        };
+            case BindingSource.None:
+                return "";
+            case BindingSource.FromRoute:
+                return FormatBindingAttribute("FromRoute", bindingName);
+            case BindingSource.FromQuery:
+                return FormatBindingAttribute("FromQuery", bindingName);
+            case BindingSource.FromHeader:
+                return FormatBindingAttribute("FromHeader", bindingName);
+            case BindingSource.FromBody:
+                return FormatBindingAttribute("FromBody", bindingName);
+            case BindingSource.FromForm:
+                return FormatBindingAttribute("FromForm", bindingName);
+            case BindingSource.FromServices:
+                return "[FromServices] ";
+            case BindingSource.FromKeyedServices:
+                var key = typedKey?.ToConstLiteral();
+                return $"[FromKeyedServices({key})] ";
+            case BindingSource.AsParameters:
+                return "[AsParameters] ";
+            default:
+                return "";
+        }
     }
 
     private static string FormatBindingAttribute(string attributeName, string? bindingName)

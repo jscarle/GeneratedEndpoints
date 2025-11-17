@@ -33,7 +33,7 @@ internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
     [Summary("Gets a user by ID.")]
     [MapGet("/users/{id:int}", Name = nameof(GetUser))]
     public async ValueTask<Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult>> GetUser(
-        [FromQuery] int id,
+        [FromHeader(Name = "4")] int id,
         [FromKeyedServices(ServiceLifetime.Scoped)] IServiceCollection services
     )
     {
