@@ -102,8 +102,9 @@ internal static partial class Constants
 
     internal const string ConfigureMethodName = "Configure";
     internal const string AsyncSuffix = "Async";
-    internal const string GlobalPrefix = "global::";
     internal const string ApplicationJsonContentType = "application/json";
+    internal const string GlobalPrefix = "global::";
+    internal const string Dot = ".";
 
     internal static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
     internal static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];

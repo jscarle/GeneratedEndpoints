@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using GeneratedEndpoints.Common;
@@ -104,7 +103,14 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(methodSymbol, attribute, cancellationToken);
 
-        var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, name);
+        var requestHandler = new RequestHandler
+        {
+            Class = requestHandlerClass.Value,
+            Method = requestHandlerMethod,
+            HttpMethod = httpMethod,
+            Pattern = pattern,
+            Name = name,
+        };
 
         return requestHandler;
     }
@@ -206,59 +212,26 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            builder ??= requestHandlers.AsImmutableArray().ToBuilder();
+            builder ??= requestHandlers.AsImmutableArray()
+                .ToBuilder();
             handler = builder[index];
             if (!collision.FirstHandlerRenamed)
             {
                 var firstHandler = builder[collision.FirstIndex];
                 builder[collision.FirstIndex] = firstHandler with
                 {
-                    Name = GetFullyQualifiedMethodDisplayName(firstHandler),
+                    Name = firstHandler.GetFullyQualifiedMethodDisplayName(),
                 };
                 collision = collision.WithFirstHandlerRenamed();
             }
 
             builder[index] = handler with
             {
-                Name = GetFullyQualifiedMethodDisplayName(handler),
+                Name = handler.GetFullyQualifiedMethodDisplayName(),
             };
             nameToCollision[key] = collision;
         }
 
         return builder?.ToEquatableImmutable() ?? requestHandlers;
-    }
-
-    private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
-    {
-        var className = requestHandler.Class.Name;
-        var methodName = requestHandler.Method.Name;
-
-        var startIndex = className.StartsWith(GlobalPrefix, StringComparison.Ordinal) ? GlobalPrefix.Length : 0;
-        var length = className.Length - startIndex;
-        var containsNestedTypeSeparator = className.IndexOf('+', startIndex, length) >= 0;
-
-        if (length == 0)
-            return string.Concat(".", methodName);
-
-        var totalLength = length + 1 + methodName.Length;
-        var buffer = ArrayPool<char>.Shared.Rent(totalLength);
-        try
-        {
-            var destinationIndex = 0;
-            for (var i = 0; i < length; i++)
-            {
-                var character = className[startIndex + i];
-                buffer[destinationIndex++] = containsNestedTypeSeparator && character == '+' ? '.' : character;
-            }
-
-            buffer[destinationIndex++] = '.';
-            methodName.CopyTo(0, buffer, destinationIndex, methodName.Length);
-
-            return new string(buffer, 0, totalLength);
-        }
-        finally
-        {
-            ArrayPool<char>.Shared.Return(buffer);
-        }
     }
 }
