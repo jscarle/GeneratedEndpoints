@@ -22,37 +22,38 @@ public readonly struct EquatableImmutableArray<T> : IEquatable<EquatableImmutabl
     private ImmutableArray<T> Array => _array ?? ImmutableArray<T>.Empty;
     private readonly ImmutableArray<T>? _array;
 
-    internal ImmutableArray<T> AsImmutableArray()
-    {
-        return Array;
-    }
-
     internal EquatableImmutableArray(ImmutableArray<T>? array)
     {
         _array = array;
     }
 
     /// <summary>
-    /// Sorts the underlying array in place using the specified comparer.
-    /// WARNING: This mutates the underlying storage of the ImmutableArray and
+    /// Gets the underlying array, or <see langword="null"/> if the array is empty. WARNING: This returns the underlying storage of the ImmutableArray and
     /// must only be used when you can guarantee no other code observes it as immutable.
     /// </summary>
-    internal EquatableImmutableArray<T> SortInPlace(IComparer<T>? comparer = null)
+    internal T[]? AsArray()
+    {
+        return ImmutableCollectionsMarshal.AsArray(Array);
+    }
+
+    /// <summary>
+    /// Sorts the underlying array in place using the specified comparer. WARNING: This mutates the underlying storage of the ImmutableArray and must only be
+    /// used when you can guarantee no other code observes it as immutable.
+    /// </summary>
+    internal void SortInPlace(IComparer<T>? comparer = null)
     {
         if (_array is null)
-            return this;
+            return;
 
         var array = _array.Value;
         if (array.Length <= 1)
-            return this;
+            return;
 
         comparer ??= Comparer<T>.Default;
 
         var raw = ImmutableCollectionsMarshal.AsArray(array);
         if (raw is not null)
             System.Array.Sort(raw, comparer);
-
-        return this;
     }
 
     /// <inheritdoc/>

@@ -4,13 +4,19 @@ namespace GeneratedEndpoints.Common;
 
 internal record struct RequestHandler
 {
+    private string? _name;
     public required RequestHandlerClass Class { get; init; }
     public required RequestHandlerMethod Method { get; init; }
     public required string HttpMethod { get; init; }
     public required string Pattern { get; init; }
-    public required string? Name { get; set; }
 
-    public string GetFullyQualifiedMethodDisplayName()
+    public required string? Name
+    {
+        readonly get => _name;
+        init => _name = value;
+    }
+
+    public void SetFullyQualifiedName()
     {
         ReadOnlySpan<char> className = Class.Name;
         ReadOnlySpan<char> methodName = Method.Name;
@@ -29,6 +35,6 @@ internal record struct RequestHandler
 
         methodName.CopyTo(buffer[(classLen + 1)..]);
 
-        return buffer.ToString();
+        _name = buffer.ToString();
     }
 }

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -183,25 +182,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (requestHandlers.Count <= 1)
             return requestHandlers;
 
-        var sorted = requestHandlers.SortInPlace(RequestHandlerComparer.Instance);
-        var unique = EnsureUniqueEndpointNames(sorted);
-
-        return unique;
-    }
-
-    private static EquatableImmutableArray<RequestHandler> EnsureUniqueEndpointNames(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
+        requestHandlers.SortInPlace(RequestHandlerComparer.Instance);
         ResolveEndpointNameCollisions(requestHandlers);
+
         return requestHandlers;
     }
 
     private static void ResolveEndpointNameCollisions(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        if (requestHandlers.Count == 0)
-            return;
-
-        var handlers = requestHandlers.AsImmutableArray();
-        var raw = ImmutableCollectionsMarshal.AsArray(handlers);
+        var raw = requestHandlers.AsArray();
         if (raw is null)
             return;
 
@@ -227,11 +216,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
                 if (!collisionHandled)
                 {
-                    outer.Name = outer.GetFullyQualifiedMethodDisplayName();
+                    outer.SetFullyQualifiedName();
                     collisionHandled = true;
                 }
 
-                inner.Name = inner.GetFullyQualifiedMethodDisplayName();
+                inner.SetFullyQualifiedName();
             }
         }
     }
