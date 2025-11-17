@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -190,48 +191,48 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static EquatableImmutableArray<RequestHandler> EnsureUniqueEndpointNames(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
+        ResolveEndpointNameCollisions(requestHandlers);
+        return requestHandlers;
+    }
+
+    private static void ResolveEndpointNameCollisions(EquatableImmutableArray<RequestHandler> requestHandlers)
+    {
         if (requestHandlers.Count == 0)
-            return requestHandlers;
+            return;
 
-        var handlerCount = requestHandlers.Count;
-        Dictionary<HandlerNameKey, CollisionInfo>? nameToCollision = null;
-        ImmutableArray<RequestHandler>.Builder? builder = null;
+        var handlers = requestHandlers.AsImmutableArray();
+        var raw = ImmutableCollectionsMarshal.AsArray(handlers);
+        if (raw is null)
+            return;
 
-        for (var index = 0; index < handlerCount; index++)
+        var span = raw.AsSpan();
+
+        for (var outerIndex = 0; outerIndex < span.Length - 1; outerIndex++)
         {
-            var handler = builder is null ? requestHandlers[index] : builder[index];
-            var name = handler.Name;
-            if (string.IsNullOrEmpty(name))
+            ref var outer = ref span[outerIndex];
+            var outerName = outer.Name;
+            if (string.IsNullOrEmpty(outerName))
                 continue;
 
-            nameToCollision ??= new Dictionary<HandlerNameKey, CollisionInfo>(handlerCount);
-            var key = new HandlerNameKey(name!, handler.Method.Name);
-            if (!nameToCollision.TryGetValue(key, out var collision))
+            var collisionHandled = false;
+            for (var innerIndex = outerIndex + 1; innerIndex < span.Length; innerIndex++)
             {
-                nameToCollision.Add(key, new CollisionInfo(index, false));
-                continue;
-            }
+                ref var inner = ref span[innerIndex];
+                var innerName = inner.Name;
+                if (innerName is null)
+                    continue;
 
-            builder ??= requestHandlers.AsImmutableArray()
-                .ToBuilder();
-            handler = builder[index];
-            if (!collision.FirstHandlerRenamed)
-            {
-                var firstHandler = builder[collision.FirstIndex];
-                builder[collision.FirstIndex] = firstHandler with
+                if (!string.Equals(outerName, innerName, StringComparison.Ordinal))
+                    continue;
+
+                if (!collisionHandled)
                 {
-                    Name = firstHandler.GetFullyQualifiedMethodDisplayName(),
-                };
-                collision = collision.WithFirstHandlerRenamed();
+                    outer.Name = outer.GetFullyQualifiedMethodDisplayName();
+                    collisionHandled = true;
+                }
+
+                inner.Name = inner.GetFullyQualifiedMethodDisplayName();
             }
-
-            builder[index] = handler with
-            {
-                Name = handler.GetFullyQualifiedMethodDisplayName(),
-            };
-            nameToCollision[key] = collision;
         }
-
-        return builder?.ToEquatableImmutable() ?? requestHandlers;
     }
 }

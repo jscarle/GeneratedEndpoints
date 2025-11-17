@@ -2,13 +2,13 @@ using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
 
-internal readonly record struct RequestHandler
+internal record struct RequestHandler
 {
     public required RequestHandlerClass Class { get; init; }
     public required RequestHandlerMethod Method { get; init; }
     public required string HttpMethod { get; init; }
     public required string Pattern { get; init; }
-    public required string? Name { get; init; }
+    public required string? Name { get; set; }
 
     public string GetFullyQualifiedMethodDisplayName()
     {
