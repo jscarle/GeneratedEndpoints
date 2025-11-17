@@ -107,9 +107,10 @@ internal static class EndpointConfigurationFactory
                     var statusCode = attribute.GetConstructorIntValue() ?? 500;
                     var contentType = attribute.GetConstructorStringValue(1);
                     var additionalContentTypes = attribute.GetConstructorStringArray(2);
+                    var producesProblemMetadata = new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes);
 
                     var producesProblemList = producesProblem ??= [];
-                    producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    producesProblemList.Add(producesProblemMetadata);
                     continue;
                 }
                 case RequestHandlerAttributeKind.ProducesValidationProblem:
@@ -117,9 +118,10 @@ internal static class EndpointConfigurationFactory
                     var statusCode = attribute.GetConstructorIntValue() ?? 400;
                     var contentType = attribute.GetConstructorStringValue(1);
                     var additionalContentTypes = attribute.GetConstructorStringArray(2);
+                    var producesValidationProblemMetadata = new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes);
 
                     var producesValidationProblemList = producesValidationProblem ??= [];
-                    producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    producesValidationProblemList.Add(producesValidationProblemMetadata);
                     continue;
                 }
                 case RequestHandlerAttributeKind.DisplayName:
@@ -185,36 +187,6 @@ internal static class EndpointConfigurationFactory
         return cacheEntry.Kind;
     }
 
-    internal static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
-    {
-        List<string>? list = null;
-        HashSet<string>? seen = null;
-
-        if (existing is { Count: > 0 })
-        {
-            var count = existing.Value.Count;
-            list = new List<string>(count + 4);
-            list.AddRange(existing.Value);
-            seen = new HashSet<string>(existing.Value, StringComparer.OrdinalIgnoreCase);
-        }
-
-        foreach (var value in values)
-        {
-            var normalized = value.NormalizeOptionalString();
-            if (normalized is not { Length: > 0 })
-                continue;
-
-            seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!seen.Add(normalized))
-                continue;
-
-            list ??= [];
-            list.Add(normalized);
-        }
-
-        return list?.ToEquatableImmutableArray() ?? EquatableImmutableArray<string>.Empty;
-    }
-
     private static string RemoveAsyncSuffix(string methodName)
     {
         if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
@@ -228,87 +200,44 @@ internal static class EndpointConfigurationFactory
         return values is { Count: > 0 } ? values.ToEquatableImmutableArray() : null;
     }
 
-    private static EquatableImmutableArray<string>? GetStringArrayValues(TypedConstant typedConstant)
-    {
-        if (typedConstant.Kind != TypedConstantKind.Array || typedConstant.Values.IsDefaultOrEmpty)
-            return null;
-
-        var builder = ImmutableArray.CreateBuilder<string>(typedConstant.Values.Length);
-        foreach (var value in typedConstant.Values)
-        {
-            if (value.Value is string s && !string.IsNullOrWhiteSpace(s))
-                builder.Add(s.Trim());
-        }
-
-        return builder.Count > 0 ? builder.ToEquatableImmutable() : null;
-    }
-
     private static void TryAddAcceptsMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<AcceptsMetadata>? accepts)
     {
         string? requestType;
-        string contentType;
-        EquatableImmutableArray<string>? additionalContentTypes;
+        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
+            requestType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        else if (attribute.GetNamedTypeSymbol(RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
+            requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        else
+            return;
+
+        var contentType = attribute.GetConstructorStringValue() ?? ApplicationJsonContentType;
+        var additionalContentTypes = attribute.GetConstructorStringArray(position: 1);
         var isOptional = attribute.GetNamedBoolValue(IsOptionalAttributeNamedParameter);
 
-        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
-        {
-            requestType = attributeClass.TypeArguments[0]
-                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            contentType = attribute.ConstructorArguments.Length > 0
-                ? (attribute.ConstructorArguments[0].Value as string).NormalizeOrDefaultString("application/json")
-                : "application/json";
-            additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
-        }
-        else if (attribute.GetNamedTypeSymbol(RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
-        {
-            requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            contentType = attribute.ConstructorArguments.Length > 0
-                ? (attribute.ConstructorArguments[0].Value as string).NormalizeOrDefaultString("application/json")
-                : "application/json";
-            additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
-        }
-        else
-        {
-            return;
-        }
+        var acceptMetadata = new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional);
 
         var acceptsList = accepts ??= [];
-        acceptsList.Add(new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional));
+        acceptsList.Add(acceptMetadata);
     }
 
     private static void TryAddProducesMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<ProducesMetadata>? produces)
     {
         string? responseType;
-        int statusCode;
-        string? contentType;
-        EquatableImmutableArray<string>? additionalContentTypes;
-
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
-        {
-            responseType = attributeClass.TypeArguments[0]
-                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
-                ? producesStatusCode
-                : 200;
-            contentType = attribute.ConstructorArguments.Length > 1 ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString() : null;
-            additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
-        }
+            responseType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else if (attribute.GetNamedTypeSymbol(ResponseTypeAttributeNamedParameter) is { } responseTypeSymbol)
-        {
             responseType = responseTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesStatusCode
-                ? producesStatusCode
-                : 200;
-            contentType = attribute.ConstructorArguments.Length > 1 ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString() : null;
-            additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
-        }
         else
-        {
             return;
-        }
+
+        var statusCode = attribute.GetConstructorIntValue() ?? 200;
+        var contentType = attribute.GetConstructorStringValue(position: 1);
+        var additionalContentTypes = attribute.GetConstructorStringArray(position: 2);
+
+        var producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
 
         var producesList = produces ??= [];
-        producesList.Add(new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes));
+        producesList.Add(producesMetadata);
     }
 
     private static void TryAddEndpointFilter(

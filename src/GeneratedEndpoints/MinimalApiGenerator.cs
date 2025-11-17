@@ -906,8 +906,38 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (second is not { Count: > 0 })
             return first;
 
-        var merged = EndpointConfigurationFactory.MergeUnion(first, second.Value);
+        var merged = MergeUnion(first, second.Value);
         return merged.Count > 0 ? merged : null;
+    }
+
+    private static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, EquatableImmutableArray<string> values)
+    {
+        List<string>? list = null;
+        HashSet<string>? seen = null;
+
+        if (existing is { Count: > 0 })
+        {
+            var count = existing.Value.Count;
+            list = new List<string>(count + 4);
+            list.AddRange(existing.Value);
+            seen = new HashSet<string>(existing.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        foreach (var value in values)
+        {
+            var normalized = value.NormalizeOptionalString();
+            if (normalized is not { Length: > 0 })
+                continue;
+
+            seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!seen.Add(normalized))
+                continue;
+
+            list ??= [];
+            list.Add(normalized);
+        }
+
+        return list?.ToEquatableImmutableArray() ?? EquatableImmutableArray<string>.Empty;
     }
 
     private static EquatableImmutableArray<T>? ConcatEquatable<T>(EquatableImmutableArray<T>? first, EquatableImmutableArray<T>? second)
