@@ -15,7 +15,6 @@ namespace GeneratedEndpoints;
 [Generator]
 public sealed class MinimalApiGenerator : IIncrementalGenerator
 {
-    private static readonly ConditionalWeakTable<Compilation, CompilationTypeCache> CompilationTypeCaches = new();
     private static readonly ConditionalWeakTable<INamedTypeSymbol, RequestHandlerClassCacheEntry> RequestHandlerClassCache = new();
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -97,7 +96,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
         var attribute = context.Attributes[0];
 
-        var requestHandlerClass = GetRequestHandlerClass(requestHandlerMethodSymbol, context.SemanticModel.Compilation, cancellationToken);
+        var requestHandlerClass = GetRequestHandlerClass(requestHandlerMethodSymbol, cancellationToken);
         if (requestHandlerClass is null)
             return null;
 
@@ -147,7 +146,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return requestHandlerMethod;
     }
 
-    private static RequestHandlerClass? GetRequestHandlerClass(IMethodSymbol methodSymbol, Compilation compilation, CancellationToken cancellationToken)
+    private static RequestHandlerClass? GetRequestHandlerClass(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -155,16 +154,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (classSymbol.TypeKind != TypeKind.Class)
             return null;
 
-        var typeCache = GetCompilationTypeCache(compilation);
         var cacheEntry = RequestHandlerClassCache.GetValue(classSymbol, static _ => new RequestHandlerClassCacheEntry());
-        var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, typeCache, cancellationToken);
+        var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, cancellationToken);
 
         return requestHandlerClass;
-    }
-
-    private static CompilationTypeCache GetCompilationTypeCache(Compilation compilation)
-    {
-        return CompilationTypeCaches.GetValue(compilation, static c => new CompilationTypeCache(c));
     }
 
     private static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)

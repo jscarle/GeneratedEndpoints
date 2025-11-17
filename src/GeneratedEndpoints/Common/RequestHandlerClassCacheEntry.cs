@@ -10,7 +10,7 @@ internal sealed class RequestHandlerClassCacheEntry
     private RequestHandlerClass _value;
     private bool _initialized;
 
-    public RequestHandlerClass GetOrCreate(INamedTypeSymbol classSymbol, CompilationTypeCache compilationCache, CancellationToken cancellationToken)
+    public RequestHandlerClass GetOrCreate(INamedTypeSymbol classSymbol, CancellationToken cancellationToken)
     {
         if (_initialized)
             return _value;
@@ -24,8 +24,7 @@ internal sealed class RequestHandlerClassCacheEntry
 
             var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var isStatic = classSymbol.IsStatic;
-            var configureMethodDetails = GetConfigureMethodDetails(classSymbol, compilationCache.EndpointConventionBuilderSymbol,
-                compilationCache.ServiceProviderSymbol, cancellationToken
+            var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken
             );
 
             var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
@@ -40,8 +39,6 @@ internal sealed class RequestHandlerClassCacheEntry
 
     private static ConfigureMethodDetails GetConfigureMethodDetails(
         INamedTypeSymbol classSymbol,
-        INamedTypeSymbol? endpointConventionBuilderSymbol,
-        INamedTypeSymbol? serviceProviderSymbol,
         CancellationToken cancellationToken
     )
     {
@@ -56,7 +53,7 @@ internal sealed class RequestHandlerClassCacheEntry
             if (member is not IMethodSymbol methodSymbol)
                 continue;
 
-            if (IsConfigureMethod(methodSymbol, endpointConventionBuilderSymbol, serviceProviderSymbol, out var methodAcceptsServiceProvider))
+            if (IsConfigureMethod(methodSymbol, out var methodAcceptsServiceProvider))
             {
                 hasConfigureMethod = true;
                 if (methodAcceptsServiceProvider)
@@ -72,8 +69,6 @@ internal sealed class RequestHandlerClassCacheEntry
 
     private static bool IsConfigureMethod(
         IMethodSymbol methodSymbol,
-        INamedTypeSymbol? endpointConventionBuilderSymbol,
-        INamedTypeSymbol? serviceProviderSymbol,
         out bool acceptsServiceProvider
     )
     {
@@ -97,7 +92,7 @@ internal sealed class RequestHandlerClassCacheEntry
         if (methodSymbol.Parameters.Length == 2)
         {
             var serviceProviderParameter = methodSymbol.Parameters[1];
-            if (!IsServiceProviderParameter(serviceProviderParameter.Type, serviceProviderSymbol))
+            if (!IsServiceProviderParameter(serviceProviderParameter.Type))
                 return false;
 
             acceptsServiceProvider = true;
@@ -106,32 +101,23 @@ internal sealed class RequestHandlerClassCacheEntry
         if (!methodSymbol.ReturnsVoid)
             return false;
 
-        if (!HasEndpointConventionBuilderConstraint(builderTypeParameter, methodSymbol, endpointConventionBuilderSymbol))
+        if (!HasEndpointConventionBuilderConstraint(builderTypeParameter, methodSymbol))
             return false;
 
         return true;
     }
 
-    private static bool IsServiceProviderParameter(ITypeSymbol typeSymbol, INamedTypeSymbol? serviceProviderSymbol)
+    private static bool IsServiceProviderParameter(ITypeSymbol typeSymbol)
     {
-        if (serviceProviderSymbol is not null)
-            return SymbolEqualityComparer.Default.Equals(typeSymbol, serviceProviderSymbol);
-
         return MatchesServiceProvider(typeSymbol);
     }
 
     private static bool HasEndpointConventionBuilderConstraint(
         ITypeParameterSymbol builderTypeParameter,
-        IMethodSymbol methodSymbol,
-        INamedTypeSymbol? endpointConventionBuilderSymbol
+        IMethodSymbol methodSymbol
     )
     {
-        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(constraint =>
-            endpointConventionBuilderSymbol is not null
-                ? SymbolEqualityComparer.Default.Equals(constraint, endpointConventionBuilderSymbol)
-                : MatchesEndpointConventionBuilder(constraint)
-        );
-
+        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(MatchesEndpointConventionBuilder);
         if (symbolMatches)
             return true;
 
