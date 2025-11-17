@@ -21,6 +21,11 @@ public readonly struct EquatableImmutableArray<T> : IEquatable<EquatableImmutabl
     private ImmutableArray<T> Array => _array ?? ImmutableArray<T>.Empty;
     private readonly ImmutableArray<T>? _array;
 
+    internal ImmutableArray<T> AsImmutableArray()
+    {
+        return Array;
+    }
+
     internal EquatableImmutableArray(ImmutableArray<T>? array)
     {
         _array = array;

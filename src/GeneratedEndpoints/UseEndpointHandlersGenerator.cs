@@ -13,7 +13,7 @@ namespace GeneratedEndpoints;
 
 internal static class UseEndpointHandlersGenerator
 {
-    public static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
+    public static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -66,7 +66,7 @@ internal static class UseEndpointHandlersGenerator
         if (groupedClasses.Count > 0)
             source.AppendLine();
 
-        for (var index = 0; index < requestHandlers.Length; index++)
+        for (var index = 0; index < requestHandlers.Count; index++)
         {
             if (index > 0)
                 source.AppendLine();
@@ -87,9 +87,9 @@ internal static class UseEndpointHandlersGenerator
         context.AddSource(UseEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
     }
 
-        private static bool HasRateLimitedHandlers(ImmutableArray<RequestHandler> requestHandlers)
+    private static bool HasRateLimitedHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        for (var index = 0; index < requestHandlers.Length; index++)
+        for (var index = 0; index < requestHandlers.Count; index++)
         {
             var handler = requestHandlers[index];
             if (handler.Method.Configuration.RequireRateLimiting)
@@ -99,14 +99,14 @@ internal static class UseEndpointHandlersGenerator
         return false;
     }
 
-    private static List<RequestHandlerClass> GetClassesWithMapGroups(ImmutableArray<RequestHandler> requestHandlers)
+    private static List<RequestHandlerClass> GetClassesWithMapGroups(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         var groupedClasses = new List<RequestHandlerClass>();
-        if (requestHandlers.IsDefaultOrEmpty)
+        if (requestHandlers.Count == 0)
             return groupedClasses;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < requestHandlers.Length; index++)
+        for (var index = 0; index < requestHandlers.Count; index++)
         {
             var handler = requestHandlers[index];
             var handlerClass = handler.Class;
@@ -603,12 +603,12 @@ internal static class UseEndpointHandlersGenerator
         };
     }
 
-    private static StringBuilder GetUseEndpointHandlersStringBuilder(ImmutableArray<RequestHandler> requestHandlers)
+    private static StringBuilder GetUseEndpointHandlersStringBuilder(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         const int baseSize = 4096;
         const int perHandler = 512;
 
-        var handlerCount = Math.Max(requestHandlers.Length, 0);
+        var handlerCount = Math.Max(requestHandlers.Count, 0);
         var estimate = baseSize + (long)perHandler * handlerCount;
         estimate = (long)(estimate * 1.10);
 
