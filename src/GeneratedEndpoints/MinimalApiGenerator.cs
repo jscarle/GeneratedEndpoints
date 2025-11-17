@@ -194,85 +194,62 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(ImmutableArray<RequestHandler> requestHandlers)
     {
-        var collidingHandlers = GetRequestHandlersWithNameCollisions(requestHandlers);
-        if (collidingHandlers.IsEmpty)
+        if (requestHandlers.IsDefaultOrEmpty)
             return requestHandlers;
 
-        var builder = requestHandlers.ToBuilder();
-        for (var i = 0; i < collidingHandlers.Length; i++)
+        var handlerCount = requestHandlers.Length;
+        var nameToCollision = new Dictionary<HandlerNameKey, CollisionInfo>(handlerCount);
+        ImmutableArray<RequestHandler>.Builder? builder = null;
+
+        for (var index = 0; index < handlerCount; index++)
         {
-            var index = collidingHandlers[i];
-            var handler = builder[index];
-            var newHandler = handler with
+            var handler = requestHandlers[index];
+            var name = handler.Name;
+            if (string.IsNullOrEmpty(name))
+                continue;
+
+            var key = new HandlerNameKey(name!, handler.Method.Name);
+
+            if (!nameToCollision.TryGetValue(key, out var collision))
+            {
+                nameToCollision.Add(key, new CollisionInfo(index, firstHandlerRenamed: false));
+                continue;
+            }
+
+            builder ??= requestHandlers.ToBuilder();
+            if (!collision.FirstHandlerRenamed)
+            {
+                var firstHandler = builder[collision.FirstIndex];
+                builder[collision.FirstIndex] = firstHandler with
+                {
+                    Name = GetFullyQualifiedMethodDisplayName(firstHandler),
+                };
+                collision = collision.WithFirstHandlerRenamed();
+            }
+
+            builder[index] = handler with
             {
                 Name = GetFullyQualifiedMethodDisplayName(handler),
             };
-            builder[index] = newHandler;
+            nameToCollision[key] = collision;
         }
 
-        return builder.MoveToImmutable();
+        return builder is null ? requestHandlers : builder.MoveToImmutable();
     }
 
-    private static ImmutableArray<int> GetRequestHandlersWithNameCollisions(ImmutableArray<RequestHandler> requestHandlers)
+    private readonly struct CollisionInfo
     {
-        if (requestHandlers.IsDefaultOrEmpty)
-            return ImmutableArray<int>.Empty;
-
-        var handlerCount = requestHandlers.Length;
-        var nameToFirstIndex = new Dictionary<HandlerNameKey, int>(handlerCount);
-
-        var collisionFlags = ArrayPool<bool>.Shared.Rent(handlerCount);
-        Array.Clear(collisionFlags, 0, handlerCount);
-
-        int[]? collidingArray = null;
-        var collidingCount = 0;
-
-        try
+        public CollisionInfo(int firstIndex, bool firstHandlerRenamed)
         {
-            for (var index = 0; index < handlerCount; index++)
-            {
-                var handler = requestHandlers[index];
-                var name = handler.Name;
-                if (string.IsNullOrEmpty(name))
-                    continue;
-
-                var key = new HandlerNameKey(name!, handler.Method.Name);
-
-                if (nameToFirstIndex.TryGetValue(key, out var firstIndex))
-                {
-                    MarkCollision(firstIndex);
-                    MarkCollision(index);
-                }
-                else
-                {
-                    nameToFirstIndex.Add(key, index);
-                }
-            }
-
-            if (collidingCount == 0)
-                return ImmutableArray<int>.Empty;
-
-            Array.Sort(collidingArray!, 0, collidingCount);
-            var sorted = new int[collidingCount];
-            Array.Copy(collidingArray!, 0, sorted, 0, collidingCount);
-            return [..sorted];
-        }
-        finally
-        {
-            ArrayPool<bool>.Shared.Return(collisionFlags, clearArray: false);
-            if (collidingArray is not null)
-                ArrayPool<int>.Shared.Return(collidingArray, clearArray: false);
+            FirstIndex = firstIndex;
+            FirstHandlerRenamed = firstHandlerRenamed;
         }
 
-        void MarkCollision(int handlerIndex)
-        {
-            if (collisionFlags[handlerIndex])
-                return;
+        public int FirstIndex { get; }
 
-            collisionFlags[handlerIndex] = true;
-            collidingArray ??= ArrayPool<int>.Shared.Rent(handlerCount);
-            collidingArray[collidingCount++] = handlerIndex;
-        }
+        public bool FirstHandlerRenamed { get; }
+
+        public CollisionInfo WithFirstHandlerRenamed() => new(FirstIndex, true);
     }
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
