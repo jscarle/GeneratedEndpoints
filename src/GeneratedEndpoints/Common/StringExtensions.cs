@@ -70,4 +70,9 @@ internal static class StringExtensions
     {
         return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
     }
+
+    public static string NormalizeOrDefaultString(this string? value, string defaultValue)
+    {
+        return string.IsNullOrWhiteSpace(value) ? defaultValue : value!.Trim();
+    }
 }

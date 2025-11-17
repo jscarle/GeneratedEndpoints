@@ -35,8 +35,6 @@ internal static class EndpointConfigurationFactory
         string? rateLimitingPolicyName = null;
         List<string>? endpointFilters = null;
         HashSet<string>? endpointFilterSet = null;
-        var hasAllowAnonymousAttribute = false;
-        var hasRequireAuthorizationAttribute = false;
         bool? shortCircuit = null;
         bool? disableValidation = null;
         bool? disableRequestTimeout = null;
@@ -63,13 +61,10 @@ internal static class EndpointConfigurationFactory
                     continue;
                 case RequestHandlerAttributeKind.DisableRequestTimeout:
                     disableRequestTimeout = true;
-                    withRequestTimeout = false;
-                    requestTimeoutPolicyName = null;
                     continue;
                 case RequestHandlerAttributeKind.RequestTimeout:
-                    disableRequestTimeout = false;
-                    withRequestTimeout = true;
                     requestTimeoutPolicyName = attribute.GetConstructorStringValue();
+                    withRequestTimeout = true;
                     continue;
                 case RequestHandlerAttributeKind.Order:
                     order = attribute.GetConstructorIntValue();
@@ -87,22 +82,19 @@ internal static class EndpointConfigurationFactory
                     TryAddProducesMetadata(attribute, attributeClass, ref produces);
                     continue;
                 case RequestHandlerAttributeKind.RequireAuthorization:
+                    authorizationPolicies = attribute.GetConstructorStringArray();
                     requireAuthorization = true;
-                    hasRequireAuthorizationAttribute = true;
-                    var authorizationPoliciesValues = attribute.GetConstructorStringArray();
-                    MergeInto(ref authorizationPolicies, authorizationPoliciesValues);
                     continue;
                 case RequestHandlerAttributeKind.RequireCors:
-                    requireCors = true;
                     corsPolicyName = attribute.GetConstructorStringValue();
+                    requireCors = true;
                     continue;
                 case RequestHandlerAttributeKind.RequireHost:
-                    var requiredHostsValues = attribute.GetConstructorStringArray();
-                    MergeInto(ref requiredHosts, requiredHostsValues);
+                    requiredHosts = attribute.GetConstructorStringArray();
                     continue;
                 case RequestHandlerAttributeKind.RequireRateLimiting:
-                    requireRateLimiting = true;
                     rateLimitingPolicyName = attribute.GetConstructorStringValue();
+                    requireRateLimiting = rateLimitingPolicyName is not null;
                     continue;
                 case RequestHandlerAttributeKind.EndpointFilter:
                     TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters, ref endpointFilterSet);
@@ -138,11 +130,9 @@ internal static class EndpointConfigurationFactory
                     break;
                 case RequestHandlerAttributeKind.AllowAnonymous:
                     allowAnonymous = true;
-                    hasAllowAnonymousAttribute = true;
                     break;
                 case RequestHandlerAttributeKind.Tags:
-                    var tagsValues = attribute.GetConstructorStringArray();
-                    MergeInto(ref tags, tagsValues);
+                    tags = attribute.GetConstructorStringArray();
                     break;
                 case RequestHandlerAttributeKind.ExcludeFromDescription:
                     excludeFromDescription = true;
@@ -152,9 +142,6 @@ internal static class EndpointConfigurationFactory
                     break;
             }
         }
-
-        if (hasRequireAuthorizationAttribute && !hasAllowAnonymousAttribute)
-            allowAnonymous = false;
 
         return new EndpointConfiguration
         {
@@ -236,23 +223,9 @@ internal static class EndpointConfigurationFactory
         return methodName;
     }
 
-    private static void MergeInto(ref EquatableImmutableArray<string>? target, IEnumerable<string>? values)
-    {
-        if (values is null)
-            return;
-
-        var merged = MergeUnion(target, values);
-        target = merged.Count > 0 ? merged : null;
-    }
-
     private static EquatableImmutableArray<T>? ToEquatableOrNull<T>(List<T>? values)
     {
         return values is { Count: > 0 } ? values.ToEquatableImmutableArray() : null;
-    }
-
-    private static string NormalizeRequiredContentType(string? contentType, string defaultValue)
-    {
-        return string.IsNullOrWhiteSpace(contentType) ? defaultValue : contentType!.Trim();
     }
 
     private static EquatableImmutableArray<string>? GetStringArrayValues(TypedConstant typedConstant)
@@ -282,7 +255,7 @@ internal static class EndpointConfigurationFactory
             requestType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             contentType = attribute.ConstructorArguments.Length > 0
-                ? NormalizeRequiredContentType(attribute.ConstructorArguments[0].Value as string, "application/json")
+                ? (attribute.ConstructorArguments[0].Value as string).NormalizeOrDefaultString("application/json")
                 : "application/json";
             additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
         }
@@ -290,7 +263,7 @@ internal static class EndpointConfigurationFactory
         {
             requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             contentType = attribute.ConstructorArguments.Length > 0
-                ? NormalizeRequiredContentType(attribute.ConstructorArguments[0].Value as string, "application/json")
+                ? (attribute.ConstructorArguments[0].Value as string).NormalizeOrDefaultString("application/json")
                 : "application/json";
             additionalContentTypes = attribute.ConstructorArguments.Length > 1 ? GetStringArrayValues(attribute.ConstructorArguments[1]) : null;
         }

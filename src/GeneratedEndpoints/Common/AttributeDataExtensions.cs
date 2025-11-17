@@ -18,8 +18,11 @@ internal static class AttributeDataExtensions
             return null;
 
         var arg = attribute.ConstructorArguments[position];
-        if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
+        if (arg.Kind == TypedConstantKind.Array)
         {
+            if (arg.Values.Length == 0)
+                return null;
+
             List<string>? normalized = null;
             foreach (var value in arg.Values)
             {
@@ -36,11 +39,8 @@ internal static class AttributeDataExtensions
 
             if (normalized is { Count: > 0 })
                 return normalized.ToEquatableImmutableArray();
-
-            return null;
         }
-
-        if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
+        else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
             return new[] { singleHost.Trim() }.ToEquatableImmutableArray();
 
         return null;
