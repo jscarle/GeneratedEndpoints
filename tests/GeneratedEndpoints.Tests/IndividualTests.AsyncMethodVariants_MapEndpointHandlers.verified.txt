@@ -25,13 +25,13 @@ internal static class EndpointRouteBuilderExtensions
         builder.MapGet("/task", static ([FromServices] global::GeneratedEndpointsTests.AsyncHandlerEndpoints handler) => handler.TaskOnly())
             .WithName("TaskOnly");
 
-        builder.MapGet("/task-result", static async ([FromServices] global::GeneratedEndpointsTests.AsyncHandlerEndpoints handler, int id) => await handler.TaskWithResult(id))
+        builder.MapGet("/task-result", static ([FromServices] global::GeneratedEndpointsTests.AsyncHandlerEndpoints handler, int id) => handler.TaskWithResult(id))
             .WithName("TaskWithResult");
 
         builder.MapPost("/valuetask", static ([FromServices] global::GeneratedEndpointsTests.AsyncHandlerEndpoints handler) => handler.ValueTaskOnly())
             .WithName("ValueTaskOnly");
 
-        builder.MapPost("/valuetask-result", static async ([FromServices] global::GeneratedEndpointsTests.AsyncHandlerEndpoints handler, int id) => await handler.ValueTaskWithResult(id))
+        builder.MapPost("/valuetask-result", static ([FromServices] global::GeneratedEndpointsTests.AsyncHandlerEndpoints handler, int id) => handler.ValueTaskWithResult(id))
             .WithName("ValueTaskWithResult");
 
         return builder;

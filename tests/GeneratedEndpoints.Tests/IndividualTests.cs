@@ -14,7 +14,7 @@ public class IndividualTests
     [Fact]
     public async Task DefaultFallbackOnly()
     {
-        var source = FallbackScenario(includeDefault: true);
+        var source = FallbackScenario(true);
         await VerifyIndividualAsync(source, nameof(DefaultFallbackOnly));
     }
 
@@ -28,7 +28,7 @@ public class IndividualTests
     [Fact]
     public async Task ClassAllowAnonymous()
     {
-        var source = AuthorizationScenario(classAllowAnonymous: true);
+        var source = AuthorizationScenario(true);
         await VerifyIndividualAsync(source, nameof(ClassAllowAnonymous));
     }
 
@@ -173,32 +173,20 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task ClassMapGroup()
+    {
+        var source = AuthorizationScenario(classRequireAuthorization: true, classTags: true, classHost: "*.individual.com", classRequireCors: true,
+            classCorsPolicy: "ClassCors", applyShortCircuit: true, applyRequestTimeout: true, requestTimeoutPolicy: "ClassTimeout", orderValue: 2,
+            groupName: "ClassGroup", excludeFromDescription: true, methodAllowAnonymous: true, methodTags: true, mapGroupPattern: "/individuals"
+        );
+        await VerifyIndividualAsync(source, nameof(ClassMapGroup));
+    }
+
+    [Fact]
     public async Task GroupName()
     {
         var source = AuthorizationScenario(groupName: "IndividualGroup");
         await VerifyIndividualAsync(source, nameof(GroupName));
-    }
-
-    [Fact]
-    public async Task ClassMapGroup()
-    {
-        var source = AuthorizationScenario(
-            classRequireAuthorization: true,
-            classTags: true,
-            classHost: "*.individual.com",
-            classRequireCors: true,
-            classCorsPolicy: "ClassCors",
-            applyShortCircuit: true,
-            applyRequestTimeout: true,
-            requestTimeoutPolicy: "ClassTimeout",
-            orderValue: 2,
-            groupName: "ClassGroup",
-            excludeFromDescription: true,
-            methodAllowAnonymous: true,
-            methodTags: true,
-            mapGroupPattern: "/individuals"
-        );
-        await VerifyIndividualAsync(source, nameof(ClassMapGroup));
     }
 
     [Fact]
@@ -232,7 +220,7 @@ public class IndividualTests
     [Fact]
     public async Task ConfigureWithServiceProvider()
     {
-        var source = ConfigureScenario(configureWithServiceProvider: true);
+        var source = ConfigureScenario(true);
         await VerifyIndividualAsync(source, nameof(ConfigureWithServiceProvider));
     }
 
@@ -253,7 +241,7 @@ public class IndividualTests
     [Fact]
     public async Task MapGetEndpoint()
     {
-        var source = HttpMethodScenario(includeGet: true);
+        var source = HttpMethodScenario(true);
         await VerifyIndividualAsync(source, nameof(MapGetEndpoint));
     }
 
@@ -323,14 +311,21 @@ public class IndividualTests
     [Fact]
     public async Task MethodNameCollision()
     {
-        var source = HttpMethodScenario(includeGet: true, includeMethodNameCollision: true);
+        var source = HttpMethodScenario(true, includeMethodNameCollision: true);
         await VerifyIndividualAsync(source, nameof(MethodNameCollision));
+    }
+
+    [Fact]
+    public async Task MultipleEndpointNameCollisions()
+    {
+        var source = EndpointNameCollisionScenario();
+        await VerifyIndividualAsync(source, nameof(MultipleEndpointNameCollisions));
     }
 
     [Fact]
     public async Task BindingNames()
     {
-        var source = ContractScenario(includeBindingNames: true);
+        var source = ContractScenario(true);
         await VerifyIndividualAsync(source, nameof(BindingNames));
     }
 
@@ -466,7 +461,9 @@ public class IndividualTests
     }
 
     private static string FallbackScenario(bool includeDefault = false, bool includeCustom = false, string? customRoute = null)
-        => SourceFactory.BuildFallbackSource(includeDefault, includeCustom, customRoute);
+    {
+        return SourceFactory.BuildFallbackSource(includeDefault, includeCustom, customRoute);
+    }
 
     private static string AuthorizationScenario(
         bool classAllowAnonymous = false,
@@ -492,32 +489,15 @@ public class IndividualTests
         bool excludeFromDescription = false,
         string? mapGroupPattern = null,
         bool classDisableValidation = false,
-        bool methodDisableValidation = false)
-        => SourceFactory.BuildAuthorizationMatrixSource(
-            classAllowAnonymous,
-            methodAllowAnonymous,
-            classRequireAuthorization,
-            methodRequireAuthorization,
-            classTags,
-            methodTags,
-            classHost,
-            methodHost,
-            classRequireCors,
-            classCorsPolicy,
-            methodRequireCors,
-            methodCorsPolicy,
-            requireRateLimiting,
-            rateLimitingPolicy,
-            applyShortCircuit,
-            applyRequestTimeout,
-            requestTimeoutPolicy,
-            disableRequestTimeout,
-            orderValue,
-            groupName,
-            excludeFromDescription,
-            mapGroupPattern,
-            classDisableValidation,
-            methodDisableValidation);
+        bool methodDisableValidation = false
+    )
+    {
+        return SourceFactory.BuildAuthorizationMatrixSource(classAllowAnonymous, methodAllowAnonymous, classRequireAuthorization, methodRequireAuthorization,
+            classTags, methodTags, classHost, methodHost, classRequireCors, classCorsPolicy, methodRequireCors, methodCorsPolicy, requireRateLimiting,
+            rateLimitingPolicy, applyShortCircuit, applyRequestTimeout, requestTimeoutPolicy, disableRequestTimeout, orderValue, groupName,
+            excludeFromDescription, mapGroupPattern, classDisableValidation, methodDisableValidation
+        );
+    }
 
     private static string ConfigureScenario(
         bool configureWithServiceProvider = false,
@@ -526,15 +506,13 @@ public class IndividualTests
         bool includeMethodLevelFilter = false,
         bool includeGenericFilter = false,
         bool configureRegistersFilter = false,
-        string metadataValue = "Individual")
-        => SourceFactory.BuildConfigureAndFiltersSource(
-            configureWithServiceProvider,
-            configureAddsMetadata,
-            includeClassLevelFilter,
-            includeMethodLevelFilter,
-            includeGenericFilter,
-            configureRegistersFilter,
-            metadataValue);
+        string metadataValue = "Individual"
+    )
+    {
+        return SourceFactory.BuildConfigureAndFiltersSource(configureWithServiceProvider, configureAddsMetadata, includeClassLevelFilter,
+            includeMethodLevelFilter, includeGenericFilter, configureRegistersFilter, metadataValue
+        );
+    }
 
     private static string HttpMethodScenario(
         bool includeGet = false,
@@ -547,19 +525,18 @@ public class IndividualTests
         bool includeQuery = false,
         bool includeTrace = false,
         bool includeConnect = false,
-        bool includeMethodNameCollision = false)
-        => SourceFactory.BuildHttpMethodMatrixSource(
-            includeGet,
-            includePost,
-            includePut,
-            includeDelete,
-            includeOptions,
-            includeHead,
-            includePatch,
-            includeQuery,
-            includeTrace,
-            includeConnect,
-            includeMethodNameCollision);
+        bool includeMethodNameCollision = false
+    )
+    {
+        return SourceFactory.BuildHttpMethodMatrixSource(includeGet, includePost, includePut, includeDelete, includeOptions, includeHead, includePatch,
+            includeQuery, includeTrace, includeConnect, includeMethodNameCollision
+        );
+    }
+
+    private static string EndpointNameCollisionScenario()
+    {
+        return SourceFactory.BuildEndpointNameCollisionSource();
+    }
 
     private static string ContractScenario(
         bool includeBindingNames = false,
@@ -580,59 +557,49 @@ public class IndividualTests
         string? acceptsContentType1 = null,
         string? acceptsContentType2 = null,
         string? producesContentType1 = null,
-        string? producesContentType2 = null)
-        => SourceFactory.BuildContractsAndBindingSource(
-            includeBindingNames,
-            includeAsParameters,
-            includeFromServices,
-            includeFromKeyedServices,
-            includeAccepts,
-            includeGenericAccepts,
-            includeProducesResponse,
-            includeProducesProblem,
-            includeProducesValidationProblem,
-            includeSummaryAndDescription,
-            includeDisplayName,
-            includeTags,
-            excludeFromDescription,
-            allowAnonymous,
-            methodRequiresAuthorization,
-            acceptsContentType1,
-            acceptsContentType2,
-            producesContentType1,
-            producesContentType2);
+        string? producesContentType2 = null
+    )
+    {
+        return SourceFactory.BuildContractsAndBindingSource(includeBindingNames, includeAsParameters, includeFromServices, includeFromKeyedServices,
+            includeAccepts, includeGenericAccepts, includeProducesResponse, includeProducesProblem, includeProducesValidationProblem,
+            includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous, methodRequiresAuthorization,
+            acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
+        );
+    }
 
     private static string AsyncHandlerScenario()
-        => """
-            using System.Threading.Tasks;
+    {
+        return """
+               using System.Threading.Tasks;
 
-            internal sealed class AsyncHandlerEndpoints
-            {
-                [MapGet("/task")]
-                public async Task TaskOnly()
-                {
-                    await Task.Yield();
-                }
+               internal sealed class AsyncHandlerEndpoints
+               {
+                   [MapGet("/task")]
+                   public async Task TaskOnly()
+                   {
+                       await Task.Yield();
+                   }
 
-                [MapGet("/task-result")]
-                public async Task<Results<Ok<string>, NotFound>> TaskWithResult(int id)
-                {
-                    await Task.Yield();
-                    return id >= 0 ? TypedResults.Ok("task") : TypedResults.NotFound();
-                }
+                   [MapGet("/task-result")]
+                   public async Task<Results<Ok<string>, NotFound>> TaskWithResult(int id)
+                   {
+                       await Task.Yield();
+                       return id >= 0 ? TypedResults.Ok("task") : TypedResults.NotFound();
+                   }
 
-                [MapPost("/valuetask")]
-                public async ValueTask ValueTaskOnly()
-                {
-                    await Task.Yield();
-                }
+                   [MapPost("/valuetask")]
+                   public async ValueTask ValueTaskOnly()
+                   {
+                       await Task.Yield();
+                   }
 
-                [MapPost("/valuetask-result")]
-                public async ValueTask<Results<Ok<string>, NotFound>> ValueTaskWithResult(int id)
-                {
-                    await Task.Yield();
-                    return id >= 0 ? TypedResults.Ok("value") : TypedResults.NotFound();
-                }
-            }
-            """;
+                   [MapPost("/valuetask-result")]
+                   public async ValueTask<Results<Ok<string>, NotFound>> ValueTaskWithResult(int id)
+                   {
+                       await Task.Yield();
+                       return id >= 0 ? TypedResults.Ok("value") : TypedResults.NotFound();
+                   }
+               }
+               """;
+    }
 }

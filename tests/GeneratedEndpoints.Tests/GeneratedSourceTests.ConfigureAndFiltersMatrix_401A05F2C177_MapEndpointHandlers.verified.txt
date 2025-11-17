@@ -24,8 +24,8 @@ internal static class EndpointRouteBuilderExtensions
     {
         builder.MapGet("/configure-filters", global::GeneratedEndpointsTests.ConfigureFilterEndpoints.Handle)
             .WithName("Handle")
-            .AddEndpointFilter<global::GeneratedEndpointsTests.TimingFilter>()
-            .AddEndpointFilter<global::GeneratedEndpointsTests.ValidationFilter>();
+            .AddEndpointFilter<global::GeneratedEndpointsTests.ValidationFilter>()
+            .AddEndpointFilter<global::GeneratedEndpointsTests.TimingFilter>();
 
         return builder;
     }

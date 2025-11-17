@@ -26,15 +26,13 @@ public static class ScenarioNamer
     private static string Sanitize(object? value)
     {
         if (value is null)
-        {
             return "None";
-        }
 
         return value switch
         {
             bool b => b ? "On" : "Off",
             string s => s,
-            _ => value.ToString() ?? "Value"
+            _ => value.ToString() ?? "Value",
         };
     }
 }
