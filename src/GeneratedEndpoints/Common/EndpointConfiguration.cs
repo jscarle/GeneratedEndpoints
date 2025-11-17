@@ -1,7 +1,16 @@
 namespace GeneratedEndpoints.Common;
 
 internal readonly record struct EndpointConfiguration(
-    RequestHandlerMetadata Metadata,
+    string? Name,
+    string? DisplayName,
+    string? Summary,
+    string? Description,
+    EquatableImmutableArray<string>? Tags,
+    EquatableImmutableArray<AcceptsMetadata>? Accepts,
+    EquatableImmutableArray<ProducesMetadata>? Produces,
+    EquatableImmutableArray<ProducesProblemMetadata>? ProducesProblem,
+    EquatableImmutableArray<ProducesValidationProblemMetadata>? ProducesValidationProblem,
+    bool ExcludeFromDescription,
     bool RequireAuthorization,
     EquatableImmutableArray<string>? AuthorizationPolicies,
     bool DisableAntiforgery,

@@ -42,7 +42,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
     }
 
-
     private static IncrementalValueProvider<ImmutableArray<RequestHandler>> CombineRequestHandlers(
         ImmutableArray<IncrementalValueProvider<ImmutableArray<RequestHandler>>> handlerProviders
     )
@@ -206,14 +205,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         foreach (var index in collidingHandlers)
         {
             var handler = builder[index];
-            var configuration = handler.Configuration;
-            var metadata = configuration.Metadata with
+            var configuration = handler.Configuration with
             {
                 Name = GetFullyQualifiedMethodDisplayName(handler),
-            };
-            configuration = configuration with
-            {
-                Metadata = metadata,
             };
             builder[index] = handler with
             {
@@ -240,7 +234,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             for (var index = 0; index < handlerCount; index++)
             {
                 var handler = requestHandlers[index];
-                var name = handler.Configuration.Metadata.Name;
+                var name = handler.Configuration.Name;
                 if (string.IsNullOrEmpty(name))
                     continue;
 
@@ -276,7 +270,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 return;
 
             collisionFlags[handlerIndex] = true;
-            collidingIndices ??= new List<int>();
+            collidingIndices ??= [];
             collidingIndices.Add(handlerIndex);
         }
     }
@@ -597,41 +591,39 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static void AppendEndpointConfiguration(StringBuilder source, string indent, EndpointConfiguration configuration, bool includeNameAndDisplayName)
     {
-        var metadata = configuration.Metadata;
-
-        if (includeNameAndDisplayName && !string.IsNullOrEmpty(metadata.Name))
+        if (includeNameAndDisplayName && !string.IsNullOrEmpty(configuration.Name))
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithName(");
-            source.Append(metadata.Name.ToStringLiteral());
+            source.Append(configuration.Name.ToStringLiteral());
             source.Append(')');
         }
 
-        if (includeNameAndDisplayName && !string.IsNullOrEmpty(metadata.DisplayName))
+        if (includeNameAndDisplayName && !string.IsNullOrEmpty(configuration.DisplayName))
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithDisplayName(");
-            source.Append(metadata.DisplayName.ToStringLiteral());
+            source.Append(configuration.DisplayName.ToStringLiteral());
             source.Append(')');
         }
 
-        if (!string.IsNullOrEmpty(metadata.Summary))
+        if (!string.IsNullOrEmpty(configuration.Summary))
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithSummary(");
-            source.Append(metadata.Summary.ToStringLiteral());
+            source.Append(configuration.Summary.ToStringLiteral());
             source.Append(')');
         }
 
-        if (!string.IsNullOrEmpty(metadata.Description))
+        if (!string.IsNullOrEmpty(configuration.Description))
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithDescription(");
-            source.Append(metadata.Description.ToStringLiteral());
+            source.Append(configuration.Description.ToStringLiteral());
             source.Append(')');
         }
 
@@ -653,24 +645,24 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
-        if (metadata.ExcludeFromDescription)
+        if (configuration.ExcludeFromDescription)
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".ExcludeFromDescription()");
         }
 
-        if (metadata.Tags is { Count: > 0 })
+        if (configuration.Tags is { Count: > 0 })
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithTags(");
-            AppendCommaSeparatedLiterals(source, metadata.Tags.Value);
+            AppendCommaSeparatedLiterals(source, configuration.Tags.Value);
             source.Append(')');
         }
 
-        if (metadata.Accepts is { Count: > 0 })
-            foreach (var accepts in metadata.Accepts.Value)
+        if (configuration.Accepts is { Count: > 0 })
+            foreach (var accepts in configuration.Accepts.Value)
             {
                 source.AppendLine();
                 source.Append(indent);
@@ -685,8 +677,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(')');
             }
 
-        if (metadata.Produces is { Count: > 0 })
-            foreach (var produces in metadata.Produces.Value)
+        if (configuration.Produces is { Count: > 0 })
+            foreach (var produces in configuration.Produces.Value)
             {
                 source.AppendLine();
                 source.Append(indent);
@@ -699,8 +691,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(')');
             }
 
-        if (metadata.ProducesProblem is { Count: > 0 })
-            foreach (var producesProblem in metadata.ProducesProblem.Value)
+        if (configuration.ProducesProblem is { Count: > 0 })
+            foreach (var producesProblem in configuration.ProducesProblem.Value)
             {
                 source.AppendLine();
                 source.Append(indent);
@@ -710,8 +702,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 source.Append(')');
             }
 
-        if (metadata.ProducesValidationProblem is { Count: > 0 })
-            foreach (var producesValidationProblem in metadata.ProducesValidationProblem.Value)
+        if (configuration.ProducesValidationProblem is { Count: > 0 })
+            foreach (var producesValidationProblem in configuration.ProducesValidationProblem.Value)
             {
                 source.AppendLine();
                 source.Append(indent);
@@ -836,7 +828,16 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static EndpointConfiguration MergeEndpointConfigurations(EndpointConfiguration classConfiguration, EndpointConfiguration methodConfiguration)
     {
-        var metadata = MergeRequestHandlerMetadata(classConfiguration.Metadata, methodConfiguration.Metadata);
+        var name = methodConfiguration.Name ?? classConfiguration.Name;
+        var displayName = methodConfiguration.DisplayName ?? classConfiguration.DisplayName;
+        var summary = methodConfiguration.Summary ?? classConfiguration.Summary;
+        var description = methodConfiguration.Description ?? classConfiguration.Description;
+        var tags = MergeDistinctStrings(classConfiguration.Tags, methodConfiguration.Tags);
+        var accepts = ConcatEquatable(classConfiguration.Accepts, methodConfiguration.Accepts);
+        var produces = ConcatEquatable(classConfiguration.Produces, methodConfiguration.Produces);
+        var producesProblem = ConcatEquatable(classConfiguration.ProducesProblem, methodConfiguration.ProducesProblem);
+        var producesValidationProblem = ConcatEquatable(classConfiguration.ProducesValidationProblem, methodConfiguration.ProducesValidationProblem);
+        var excludeFromDescription = classConfiguration.ExcludeFromDescription || methodConfiguration.ExcludeFromDescription;
         var authorizationPolicies = MergeDistinctStrings(classConfiguration.AuthorizationPolicies, methodConfiguration.AuthorizationPolicies);
         var requiredHosts = MergeDistinctStrings(classConfiguration.RequiredHosts, methodConfiguration.RequiredHosts);
         var endpointFilterTypes = ConcatEquatable(classConfiguration.EndpointFilterTypes, methodConfiguration.EndpointFilterTypes);
@@ -866,20 +867,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var order = methodConfiguration.Order ?? classConfiguration.Order;
         var endpointGroupName = methodConfiguration.EndpointGroupName ?? classConfiguration.EndpointGroupName;
 
-        return new EndpointConfiguration(metadata, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName,
-            requiredHosts, requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableValidation, disableRequestTimeout,
-            withRequestTimeout, requestTimeoutPolicyName, order, endpointGroupName
-        );
-    }
-
-    private static RequestHandlerMetadata MergeRequestHandlerMetadata(RequestHandlerMetadata classMetadata, RequestHandlerMetadata methodMetadata)
-    {
-        return new RequestHandlerMetadata(methodMetadata.Name ?? classMetadata.Name, methodMetadata.DisplayName ?? classMetadata.DisplayName,
-            methodMetadata.Summary ?? classMetadata.Summary, methodMetadata.Description ?? classMetadata.Description,
-            MergeDistinctStrings(classMetadata.Tags, methodMetadata.Tags), ConcatEquatable(classMetadata.Accepts, methodMetadata.Accepts),
-            ConcatEquatable(classMetadata.Produces, methodMetadata.Produces), ConcatEquatable(classMetadata.ProducesProblem, methodMetadata.ProducesProblem),
-            ConcatEquatable(classMetadata.ProducesValidationProblem, methodMetadata.ProducesValidationProblem),
-            classMetadata.ExcludeFromDescription || methodMetadata.ExcludeFromDescription
+        return new EndpointConfiguration(name, displayName, summary, description, tags, accepts, produces, producesProblem, producesValidationProblem,
+            excludeFromDescription, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts,
+            requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableValidation, disableRequestTimeout, withRequestTimeout,
+            requestTimeoutPolicyName, order, endpointGroupName
         );
     }
 
@@ -952,11 +943,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (values.Count == 0)
             return;
 
-        source.Append(values[0].ToStringLiteral());
+        source.Append(values[0]
+            .ToStringLiteral()
+        );
         for (var i = 1; i < values.Count; i++)
         {
             source.Append(", ");
-            source.Append(values[i].ToStringLiteral());
+            source.Append(values[i]
+                .ToStringLiteral()
+            );
         }
     }
 

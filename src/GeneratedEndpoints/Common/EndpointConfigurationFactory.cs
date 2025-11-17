@@ -1,25 +1,16 @@
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
-using System.ComponentModel;
 using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
 
 internal static class EndpointConfigurationFactory
 {
-    private sealed class GeneratedAttributeKindCacheEntry(GeneratedAttributeKind kind)
-    {
-        public GeneratedAttributeKind Kind { get; } = kind;
-    }
-
     private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
 
-    public static EndpointConfiguration Create(
-        ISymbol methodSymbol,
-        string? name,
-        bool enforceMethodRequireAuthorizationRules
-    )
+    public static EndpointConfiguration Create(ISymbol methodSymbol, string? name, bool enforceMethodRequireAuthorizationRules)
     {
         var attributes = methodSymbol.GetAttributes();
         var (displayName, description) = GetDisplayAndDescriptionAttributes(methodSymbol);
@@ -32,42 +23,56 @@ internal static class EndpointConfigurationFactory
         if (enforceMethodRequireAuthorizationRules && state is { HasRequireAuthorizationAttribute: true, HasAllowAnonymousAttribute: false })
             state.AllowAnonymous = false;
 
-        var metadata = new RequestHandlerMetadata(
-            name,
-            displayName,
-            state.Summary,
-            description,
-            state.Tags,
-            ToEquatableOrNull(state.Accepts),
-            ToEquatableOrNull(state.Produces),
-            ToEquatableOrNull(state.ProducesProblem),
-            ToEquatableOrNull(state.ProducesValidationProblem),
-            state.ExcludeFromDescription ?? false
-        );
-
         var withRequestTimeout = state.WithRequestTimeout ?? false;
         var requestTimeoutPolicyName = withRequestTimeout ? state.RequestTimeoutPolicyName : null;
 
-        return new EndpointConfiguration(
-            metadata,
-            state.RequireAuthorization ?? false,
-            state.AuthorizationPolicies,
-            state.DisableAntiforgery ?? false,
-            state.AllowAnonymous ?? false,
-            state.RequireCors ?? false,
-            state.CorsPolicyName,
-            state.RequiredHosts,
-            state.RequireRateLimiting ?? false,
-            state.RateLimitingPolicyName,
-            ToEquatableOrNull(state.EndpointFilters),
-            state.ShortCircuit ?? false,
-            state.DisableValidation ?? false,
-            state.DisableRequestTimeout ?? false,
-            withRequestTimeout,
-            requestTimeoutPolicyName,
-            state.Order,
-            state.EndpointGroupName
+        return new EndpointConfiguration(name, displayName, state.Summary, description, state.Tags, ToEquatableOrNull(state.Accepts),
+            ToEquatableOrNull(state.Produces), ToEquatableOrNull(state.ProducesProblem), ToEquatableOrNull(state.ProducesValidationProblem),
+            state.ExcludeFromDescription ?? false, state.RequireAuthorization ?? false, state.AuthorizationPolicies, state.DisableAntiforgery ?? false,
+            state.AllowAnonymous ?? false, state.RequireCors ?? false, state.CorsPolicyName, state.RequiredHosts, state.RequireRateLimiting ?? false,
+            state.RateLimitingPolicyName, ToEquatableOrNull(state.EndpointFilters), state.ShortCircuit ?? false, state.DisableValidation ?? false,
+            state.DisableRequestTimeout ?? false, withRequestTimeout, requestTimeoutPolicyName, state.Order, state.EndpointGroupName
         );
+    }
+
+    public static GeneratedAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
+    {
+        var definition = attributeClass.OriginalDefinition;
+        var cacheEntry = GeneratedAttributeKindCache.GetValue(
+            definition, static def => new GeneratedAttributeKindCacheEntry(GetGeneratedAttributeKindCore(def))
+        );
+
+        return cacheEntry.Kind;
+    }
+
+    internal static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
+    {
+        List<string>? list = null;
+        HashSet<string>? seen = null;
+
+        if (existing is { Count: > 0 })
+        {
+            var count = existing.Value.Count;
+            list = new List<string>(count + 4);
+            list.AddRange(existing.Value);
+            seen = new HashSet<string>(existing.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        foreach (var value in values)
+        {
+            var normalized = value.NormalizeOptionalString();
+            if (normalized is not { Length: > 0 })
+                continue;
+
+            seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!seen.Add(normalized))
+                continue;
+
+            list ??= [];
+            list.Add(normalized);
+        }
+
+        return list?.ToEquatableImmutableArray() ?? EquatableImmutableArray<string>.Empty;
     }
 
     private static string RemoveAsyncSuffix(string methodName)
@@ -91,31 +96,16 @@ internal static class EndpointConfigurationFactory
 
             if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DisplayNameAttribute), ComponentModelNamespaceParts))
             {
-                displayName = attribute.ConstructorArguments.Length > 0
-                    ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
-                    : null;
+                displayName = attribute.ConstructorArguments.Length > 0 ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString() : null;
 
                 continue;
             }
 
             if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DescriptionAttribute), ComponentModelNamespaceParts))
-                description = attribute.ConstructorArguments.Length > 0
-                    ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
-                    : null;
+                description = attribute.ConstructorArguments.Length > 0 ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString() : null;
         }
 
         return (displayName, description);
-    }
-
-    public static GeneratedAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
-    {
-        var definition = attributeClass.OriginalDefinition;
-        var cacheEntry = GeneratedAttributeKindCache.GetValue(
-            definition,
-            static def => new GeneratedAttributeKindCacheEntry(GetGeneratedAttributeKindCore(def))
-        );
-
-        return cacheEntry.Kind;
     }
 
     private static void PopulateAttributeState(ImmutableArray<AttributeData> attributes, ref EndpointAttributeState state)
@@ -332,36 +322,6 @@ internal static class EndpointConfigurationFactory
             MergeInto(ref target, normalized);
     }
 
-    internal static EquatableImmutableArray<string> MergeUnion(EquatableImmutableArray<string>? existing, IEnumerable<string> values)
-    {
-        List<string>? list = null;
-        HashSet<string>? seen = null;
-
-        if (existing is { Count: > 0 })
-        {
-            var count = existing.Value.Count;
-            list = new List<string>(count + 4);
-            list.AddRange(existing.Value);
-            seen = new HashSet<string>(existing.Value, StringComparer.OrdinalIgnoreCase);
-        }
-
-        foreach (var value in values)
-        {
-            var normalized = value.NormalizeOptionalString();
-            if (normalized is not { Length: > 0 })
-                continue;
-
-            seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!seen.Add(normalized))
-                continue;
-
-            list ??= [];
-            list.Add(normalized);
-        }
-
-        return list?.ToEquatableImmutableArray() ?? EquatableImmutableArray<string>.Empty;
-    }
-
     private static EquatableImmutableArray<T>? ToEquatableOrNull<T>(List<T>? values)
     {
         return values is { Count: > 0 } ? values.ToEquatableImmutableArray() : null;
@@ -459,7 +419,8 @@ internal static class EndpointConfigurationFactory
         AttributeData attribute,
         INamedTypeSymbol attributeClass,
         ref List<string>? endpointFilters,
-        ref HashSet<string>? endpointFilterSet)
+        ref HashSet<string>? endpointFilterSet
+    )
     {
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
@@ -474,10 +435,7 @@ internal static class EndpointConfigurationFactory
             TryAddEndpointFilterType(filterTypeSymbol, ref endpointFilters, ref endpointFilterSet);
     }
 
-    private static void TryAddEndpointFilterType(
-        ITypeSymbol? typeSymbol,
-        ref List<string>? endpointFilters,
-        ref HashSet<string>? endpointFilterSet)
+    private static void TryAddEndpointFilterType(ITypeSymbol? typeSymbol, ref List<string>? endpointFilters, ref HashSet<string>? endpointFilterSet)
     {
         if (typeSymbol is null or ITypeParameterSymbol or IErrorTypeSymbol)
             return;
@@ -520,5 +478,10 @@ internal static class EndpointConfigurationFactory
             ProducesValidationProblemAttributeName => GeneratedAttributeKind.ProducesValidationProblem,
             _ => GeneratedAttributeKind.None,
         };
+    }
+
+    private sealed class GeneratedAttributeKindCacheEntry(GeneratedAttributeKind kind)
+    {
+        public GeneratedAttributeKind Kind { get; } = kind;
     }
 }
