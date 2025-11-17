@@ -116,24 +116,28 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var attributeName = attribute.AttributeClass?.Name ?? "";
+        var attributeName = attribute.AttributeClass?.Name ?? string.Empty;
 
-        var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : "";
+        var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : string.Empty;
 
-        var pattern = (attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : "") ?? "";
+        var pattern = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : null;
+        pattern ??= string.Empty;
 
         string? name = null;
-        for (var index = 0; index < attribute.NamedArguments.Length; index++)
+        var namedArguments = attribute.NamedArguments;
+        if (!namedArguments.IsDefaultOrEmpty)
         {
-            var namedArg = attribute.NamedArguments[index];
-            switch (namedArg.Key)
+            for (var i = 0; i < namedArguments.Length; i++)
             {
-                case NameAttributeNamedParameter:
-                {
-                    var value = namedArg.Value.Value as string;
-                    name = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+                var namedArg = namedArguments[i];
+                if (namedArg.Key != NameAttributeNamedParameter)
+                    continue;
+
+                if (namedArg.Value.Value is not string value)
                     break;
-                }
+
+                name = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+                break;
             }
         }
 
@@ -193,12 +197,16 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static ImmutableArray<RequestHandler> SortRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        if (requestHandlers.Count <= 1)
-            return [..requestHandlers];
+        var count = requestHandlers.Count;
+        if (count == 0)
+            return ImmutableArray<RequestHandler>.Empty;
+        if (count == 1)
+            return ImmutableArray.Create(requestHandlers[0]);
 
-        var array = requestHandlers.ToArray();
-        Array.Sort(array, RequestHandlerComparer.Instance);
-        return [..array];
+        var builder = ImmutableArray.CreateBuilder<RequestHandler>(count);
+        builder.AddRange(requestHandlers);
+        builder.Sort(RequestHandlerComparer.Instance);
+        return builder.MoveToImmutable();
     }
 
     private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(ImmutableArray<RequestHandler> requestHandlers)
@@ -208,8 +216,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return requestHandlers;
 
         var builder = requestHandlers.ToBuilder();
-        foreach (var index in collidingHandlers)
+        for (var i = 0; i < collidingHandlers.Length; i++)
         {
+            var index = collidingHandlers[i];
             var handler = builder[index];
             var configuration = handler.Configuration with
             {
@@ -230,10 +239,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return ImmutableArray<int>.Empty;
 
         var handlerCount = requestHandlers.Length;
-        var nameToFirstIndex = new Dictionary<(string Name, string Method), int>(handlerCount);
+        var nameToFirstIndex = new Dictionary<HandlerNameKey, int>(handlerCount);
         var collisionFlags = ArrayPool<bool>.Shared.Rent(handlerCount);
         Array.Clear(collisionFlags, 0, handlerCount);
-        List<int>? collidingIndices = null;
+        int[]? collidingIndices = null;
+        var collidingCount = 0;
 
         try
         {
@@ -244,7 +254,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 if (string.IsNullOrEmpty(name))
                     continue;
 
-                var key = (name!, handler.Method.Name);
+                var key = new HandlerNameKey(name!, handler.Method.Name);
 
                 if (nameToFirstIndex.TryGetValue(key, out var firstIndex))
                 {
@@ -257,17 +267,20 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 }
             }
 
-            if (collidingIndices is null || collidingIndices.Count == 0)
+            if (collidingIndices is null || collidingCount == 0)
                 return ImmutableArray<int>.Empty;
 
-            collidingIndices.Sort();
-            var builder = ImmutableArray.CreateBuilder<int>(collidingIndices.Count);
-            builder.AddRange(collidingIndices);
+            Array.Sort(collidingIndices, 0, collidingCount);
+            var builder = ImmutableArray.CreateBuilder<int>(collidingCount);
+            for (var i = 0; i < collidingCount; i++)
+                builder.Add(collidingIndices[i]);
             return builder.MoveToImmutable();
         }
         finally
         {
             ArrayPool<bool>.Shared.Return(collisionFlags);
+            if (collidingIndices is not null)
+                ArrayPool<int>.Shared.Return(collidingIndices);
         }
 
         void MarkCollision(int handlerIndex)
@@ -276,20 +289,74 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 return;
 
             collisionFlags[handlerIndex] = true;
-            collidingIndices ??= [];
-            collidingIndices.Add(handlerIndex);
+            collidingIndices ??= ArrayPool<int>.Shared.Rent(handlerCount);
+            collidingIndices[collidingCount++] = handlerIndex;
         }
     }
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
     {
-        var className = requestHandler.Class.Name;
-        if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
-            className = className[GlobalPrefix.Length..];
+        var className = requestHandler.Class.Name ?? string.Empty;
+        var methodName = requestHandler.Method.Name ?? string.Empty;
 
-        if (className.IndexOf('+') >= 0)
-            className = className.Replace('+', '.');
+        var startIndex = className.StartsWith(GlobalPrefix, StringComparison.Ordinal)
+            ? GlobalPrefix.Length
+            : 0;
+        var length = className.Length - startIndex;
+        var containsNestedTypeSeparator = className.IndexOf('+', startIndex, length) >= 0;
 
-        return string.Concat(className, ".", requestHandler.Method.Name);
+        if (length == 0)
+            return string.Concat(".", methodName);
+
+        var totalLength = length + 1 + methodName.Length;
+        var buffer = ArrayPool<char>.Shared.Rent(totalLength);
+        try
+        {
+            var destinationIndex = 0;
+            for (var i = 0; i < length; i++)
+            {
+                var character = className[startIndex + i];
+                buffer[destinationIndex++] = containsNestedTypeSeparator && character == '+' ? '.' : character;
+            }
+
+            buffer[destinationIndex++] = '.';
+            methodName.CopyTo(0, buffer, destinationIndex, methodName.Length);
+
+            return new string(buffer, 0, totalLength);
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+        }
     }
+
+    private readonly struct HandlerNameKey : IEquatable<HandlerNameKey>
+    {
+        private readonly string _name;
+        private readonly string _method;
+
+        public HandlerNameKey(string name, string method)
+        {
+            _name = name;
+            _method = method;
+        }
+
+        public bool Equals(HandlerNameKey other)
+        {
+            return ReferenceEquals(_name, other._name) && ReferenceEquals(_method, other._method)
+                || (string.Equals(_name, other._name, StringComparison.Ordinal)
+                    && string.Equals(_method, other._method, StringComparison.Ordinal));
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is HandlerNameKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(StringComparer.Ordinal.GetHashCode(_name), StringComparer.Ordinal.GetHashCode(_method));
+        }
+    }
+
 }
