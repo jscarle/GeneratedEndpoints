@@ -5,6 +5,5 @@ internal readonly record struct RequestHandler(
     RequestHandlerMethod Method,
     string HttpMethod,
     string Pattern,
-    string? Name,
-    EndpointConfiguration Configuration
+    string? Name
 );
