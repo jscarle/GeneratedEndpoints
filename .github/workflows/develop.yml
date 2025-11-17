@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: 'csharp'
 
@@ -39,4 +39,4 @@ jobs:
         run: dotnet test ./tests/GeneratedEndpoints.Tests/GeneratedEndpoints.Tests.csproj --configuration Release --no-build --verbosity normal --framework net10.0
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
