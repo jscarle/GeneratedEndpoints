@@ -4,7 +4,6 @@ namespace GeneratedEndpoints.Common;
 
 internal record struct RequestHandler
 {
-    private string? _name;
     public required RequestHandlerClass Class { get; init; }
     public required RequestHandlerMethod Method { get; init; }
     public required string HttpMethod { get; init; }
@@ -15,6 +14,8 @@ internal record struct RequestHandler
         readonly get => _name;
         init => _name = value;
     }
+
+    private string? _name;
 
     public void SetFullyQualifiedName()
     {

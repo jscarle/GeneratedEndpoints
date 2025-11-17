@@ -41,7 +41,9 @@ internal static class AttributeDataExtensions
                 return normalized.ToEquatableImmutableArray();
         }
         else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
+        {
             return new[] { singleHost.Trim() }.ToEquatableImmutableArray();
+        }
 
         return null;
     }

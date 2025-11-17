@@ -10,7 +10,6 @@ internal static class EndpointConfigurationFactory
 
     public static EndpointConfiguration Create(ISymbol symbol)
     {
-
         var attributes = symbol.GetAttributes();
 
         string? displayName = null;
@@ -218,14 +217,15 @@ internal static class EndpointConfigurationFactory
     {
         string? requestType;
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
-            requestType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            requestType = attributeClass.TypeArguments[0]
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else if (attribute.GetNamedTypeSymbol(RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
             requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else
             return;
 
         var contentType = attribute.GetConstructorStringValue() ?? ApplicationJsonContentType;
-        var additionalContentTypes = attribute.GetConstructorStringArray(position: 1);
+        var additionalContentTypes = attribute.GetConstructorStringArray(1);
         var isOptional = attribute.GetNamedBoolValue(IsOptionalAttributeNamedParameter);
 
         var acceptMetadata = new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional);
@@ -238,15 +238,16 @@ internal static class EndpointConfigurationFactory
     {
         string? responseType;
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
-            responseType = attributeClass.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            responseType = attributeClass.TypeArguments[0]
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else if (attribute.GetNamedTypeSymbol(ResponseTypeAttributeNamedParameter) is { } responseTypeSymbol)
             responseType = responseTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else
             return;
 
         var statusCode = attribute.GetConstructorIntValue() ?? 200;
-        var contentType = attribute.GetConstructorStringValue(position: 1);
-        var additionalContentTypes = attribute.GetConstructorStringArray(position: 2);
+        var contentType = attribute.GetConstructorStringValue(1);
+        var additionalContentTypes = attribute.GetConstructorStringArray(2);
 
         var producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
 

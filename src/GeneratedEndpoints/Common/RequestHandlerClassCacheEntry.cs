@@ -24,8 +24,7 @@ internal sealed class RequestHandlerClassCacheEntry
 
             var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var isStatic = classSymbol.IsStatic;
-            var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken
-            );
+            var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken);
 
             var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
 
@@ -37,10 +36,7 @@ internal sealed class RequestHandlerClassCacheEntry
         }
     }
 
-    private static ConfigureMethodDetails GetConfigureMethodDetails(
-        INamedTypeSymbol classSymbol,
-        CancellationToken cancellationToken
-    )
+    private static ConfigureMethodDetails GetConfigureMethodDetails(INamedTypeSymbol classSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -67,10 +63,7 @@ internal sealed class RequestHandlerClassCacheEntry
         return new ConfigureMethodDetails(hasConfigureMethod, acceptsServiceProvider);
     }
 
-    private static bool IsConfigureMethod(
-        IMethodSymbol methodSymbol,
-        out bool acceptsServiceProvider
-    )
+    private static bool IsConfigureMethod(IMethodSymbol methodSymbol, out bool acceptsServiceProvider)
     {
         acceptsServiceProvider = false;
 
@@ -112,10 +105,7 @@ internal sealed class RequestHandlerClassCacheEntry
         return MatchesServiceProvider(typeSymbol);
     }
 
-    private static bool HasEndpointConventionBuilderConstraint(
-        ITypeParameterSymbol builderTypeParameter,
-        IMethodSymbol methodSymbol
-    )
+    private static bool HasEndpointConventionBuilderConstraint(ITypeParameterSymbol builderTypeParameter, IMethodSymbol methodSymbol)
     {
         var symbolMatches = builderTypeParameter.ConstraintTypes.Any(MatchesEndpointConventionBuilder);
         if (symbolMatches)

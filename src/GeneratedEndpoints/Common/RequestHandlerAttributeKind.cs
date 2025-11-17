@@ -24,5 +24,5 @@ internal enum RequestHandlerAttributeKind
     Description,
     AllowAnonymous,
     Tags,
-    ExcludeFromDescription
+    ExcludeFromDescription,
 }
