@@ -22,17 +22,12 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        builder.MapGet("/contracts/{id:int}", global::GeneratedEndpointsTests.ContractEndpoints.Handle)
+        builder.MapGet("/contracts/{id:int}", global::ContractEndpoints.Handle)
             .WithName("Handle")
             .WithDisplayName("Contract endpoint")
-            .WithSummary("Gets detailed content.")
-            .WithDescription("Shows binding and contract combinations.")
             .WithTags("Contracts", "Bindings")
-            .Accepts<global::GeneratedEndpointsTests.RequestRecord>("application/xml")
-            .Produces<global::GeneratedEndpointsTests.ResponseRecord>(200, "application/json", "text/json")
-            .Produces<global::GeneratedEndpointsTests.ResponseRecord>(200, "application/json")
-            .ProducesProblem(500, "application/json")
-            .ProducesValidationProblem(422, "application/json")
+            .Produces<global::ResponseRecord>(200, "application/problem+json")
+            .ProducesProblem(500, "application/problem+json")
             .AllowAnonymous();
 
         return builder;

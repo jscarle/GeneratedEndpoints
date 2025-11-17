@@ -322,6 +322,7 @@ public static class SourceFactory
         bool includeAccepts,
         bool includeGenericAccepts,
         bool includeProducesResponse,
+        bool includeGenericProducesResponse,
         bool includeProducesProblem,
         bool includeProducesValidationProblem,
         bool includeSummaryAndDescription,
@@ -382,6 +383,9 @@ public static class SourceFactory
                 $"    [ProducesResponse(200, \"{producesContentType1 ?? "application/json"}\"{secondProduces}, ResponseType = typeof(ResponseRecord))]"
             );
         }
+
+        if (includeGenericProducesResponse)
+            builder.AppendLine($"    [ProducesResponse<ResponseRecord>(200, \"{producesContentType1 ?? "application/json"}\")]");
 
         if (includeProducesProblem)
             builder.AppendLine($"    [ProducesProblem(500, \"{producesContentType1 ?? "application/problem+json"}\")]");
