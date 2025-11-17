@@ -171,19 +171,16 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         UseEndpointHandlersGenerator.GenerateSource(context, normalized);
     }
 
-    private static ImmutableArray<RequestHandler> NormalizeRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
+    private static EquatableImmutableArray<RequestHandler> NormalizeRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        if (requestHandlers.Count == 0)
-            return ImmutableArray<RequestHandler>.Empty;
-
-        if (requestHandlers.Count == 1)
-            return [requestHandlers[0]];
+        if (requestHandlers.Count <= 1)
+            return requestHandlers;
 
         var sorted = SortRequestHandlers(requestHandlers);
         return EnsureUniqueEndpointNames(sorted);
     }
 
-    private static ImmutableArray<RequestHandler> SortRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
+    private static EquatableImmutableArray<RequestHandler> SortRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         var count = requestHandlers.Count;
 
@@ -194,15 +191,15 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         builder.Sort(RequestHandlerComparer.Instance);
-        return builder.MoveToImmutable();
+        return builder.ToEquatableImmutable();
     }
 
-    private static ImmutableArray<RequestHandler> EnsureUniqueEndpointNames(ImmutableArray<RequestHandler> requestHandlers)
+    private static EquatableImmutableArray<RequestHandler> EnsureUniqueEndpointNames(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        if (requestHandlers.IsDefaultOrEmpty)
+        if (requestHandlers.Count == 0)
             return requestHandlers;
 
-        var handlerCount = requestHandlers.Length;
+        var handlerCount = requestHandlers.Count;
         Dictionary<HandlerNameKey, CollisionInfo>? nameToCollision = null;
         ImmutableArray<RequestHandler>.Builder? builder = null;
 
@@ -221,7 +218,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 continue;
             }
 
-            builder ??= requestHandlers.ToBuilder();
+            builder ??= requestHandlers.AsImmutableArray().ToBuilder();
             handler = builder[index];
             if (!collision.FirstHandlerRenamed)
             {
@@ -240,7 +237,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             nameToCollision[key] = collision;
         }
 
-        return builder?.MoveToImmutable() ?? requestHandlers;
+        return builder is null ? requestHandlers : builder.ToEquatableImmutable();
     }
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)

@@ -1,5 +1,4 @@
-﻿using System.Collections.Immutable;
-using System.Text;
+﻿using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -13,7 +12,7 @@ namespace GeneratedEndpoints;
 
 internal static class AddEndpointHandlersGenerator
 {
-    public static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
+    public static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -63,14 +62,14 @@ internal static class AddEndpointHandlersGenerator
         context.AddSource(AddEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
     }
 
-    private static List<string> GetDistinctNonStaticClassNames(ImmutableArray<RequestHandler> requestHandlers)
+    private static List<string> GetDistinctNonStaticClassNames(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         var classNames = new List<string>();
-        if (requestHandlers.IsDefaultOrEmpty)
+        if (requestHandlers.Count == 0)
             return classNames;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < requestHandlers.Length; index++)
+        for (var index = 0; index < requestHandlers.Count; index++)
         {
             var requestHandler = requestHandlers[index];
             if (requestHandler.Class.IsStatic)
