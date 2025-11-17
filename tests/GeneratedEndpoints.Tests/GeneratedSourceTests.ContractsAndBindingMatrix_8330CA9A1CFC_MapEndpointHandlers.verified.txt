@@ -29,8 +29,7 @@ internal static class EndpointRouteBuilderExtensions
             .WithDescription("Shows binding and contract combinations.")
             .Accepts<global::GeneratedEndpointsTests.RequestRecord>("application/json")
             .ProducesValidationProblem(422, "application/problem+json")
-            .RequireAuthorization("ContractsPolicy")
-            .AllowAnonymous();
+            .RequireAuthorization("ContractsPolicy");
 
         return builder;
     }

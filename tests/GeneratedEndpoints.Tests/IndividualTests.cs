@@ -569,9 +569,9 @@ public class IndividualTests
     )
     {
         return SourceFactory.BuildContractsAndBindingSource(includeBindingNames, includeAsParameters, includeFromServices, includeFromKeyedServices,
-            includeAccepts, includeGenericAccepts, includeProducesResponse, includeGenericProducesResponse, includeProducesProblem, includeProducesValidationProblem,
-            includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous, methodRequiresAuthorization,
-            acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
+            includeAccepts, includeGenericAccepts, includeProducesResponse, includeGenericProducesResponse, includeProducesProblem,
+            includeProducesValidationProblem, includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous,
+            methodRequiresAuthorization, acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
         );
     }
 

@@ -181,7 +181,9 @@ public class GeneratedSourceTests
     [InlineData(false, true, false, true, false, true, false, true, false, true, false, false, true, false, true, false, true, "application/xml", null,
         "application/json", null
     )]
-    [InlineData(true, false, true, false, true, false, true, false, true, false, true, false, true, true, false, true, false, null, "text/plain", null, "text/plain")]
+    [InlineData(true, false, true, false, true, false, true, false, true, false, true, false, true, true, false, true, false, null, "text/plain", null,
+        "text/plain"
+    )]
     public async Task ContractsAndBindingMatrix(
         bool withNamespace,
         bool includeBindingNames,
@@ -207,9 +209,9 @@ public class GeneratedSourceTests
     )
     {
         var source = SourceFactory.BuildContractsAndBindingSource(includeBindingNames, includeAsParameters, includeFromServices, includeFromKeyedServices,
-            includeAccepts, includeGenericAccepts, includeProducesResponse, includeGenericProducesResponse, includeProducesProblem, includeProducesValidationProblem,
-            includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous, methodRequiresAuthorization,
-            acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
+            includeAccepts, includeGenericAccepts, includeProducesResponse, includeGenericProducesResponse, includeProducesProblem,
+            includeProducesValidationProblem, includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous,
+            methodRequiresAuthorization, acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
         );
 
         var sources = TestHelpers.GetSources(source, withNamespace);

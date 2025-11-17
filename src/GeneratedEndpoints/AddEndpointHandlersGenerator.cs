@@ -17,7 +17,10 @@ internal static class AddEndpointHandlersGenerator
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var nonStaticClassNames = grouped.Keys.Where(x => !x.IsStatic).Select(x => x.Name).ToList();
+        var nonStaticClassNames = grouped.Keys
+            .Where(x => !x.IsStatic)
+            .Select(x => x.Name)
+            .ToList();
         var source = new StringBuilder();
         source.AppendLine(FileHeader);
 

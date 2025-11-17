@@ -29,7 +29,6 @@ internal static class EndpointRouteBuilderExtensions
             .RequireAuthorization("MethodPolicy")
             .RequireCors("MethodCors")
             .RequireHost("services.contoso.com", "contoso.com")
-            .AllowAnonymous()
             .DisableRequestTimeout();
 
         return builder;

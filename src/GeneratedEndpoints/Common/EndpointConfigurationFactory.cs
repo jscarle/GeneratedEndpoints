@@ -212,7 +212,8 @@ internal static class EndpointConfigurationFactory
             requestType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else
-            requestType = attribute.GetConstructorTypeSymbol()?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            requestType = attribute.GetConstructorTypeSymbol()
+                ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         if (requestType is null)
             return;
@@ -234,16 +235,18 @@ internal static class EndpointConfigurationFactory
         {
             var responseType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var statusCode = attribute.GetConstructorIntValue(position: 0) ?? 200;
-            var contentType = attribute.GetConstructorStringValue(position: 1);
+            var statusCode = attribute.GetConstructorIntValue(0) ?? 200;
+            var contentType = attribute.GetConstructorStringValue(1);
             var additionalContentTypes = attribute.GetConstructorStringArray(2);
             producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
         }
         else
         {
-            var responseType = attribute.GetConstructorTypeSymbol()?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ?? "";
-            var statusCode = attribute.GetConstructorIntValue(position: 1) ?? 200;
-            var contentType = attribute.GetConstructorStringValue(position: 2);
+            var responseType = attribute.GetConstructorTypeSymbol()
+                                   ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                               ?? "";
+            var statusCode = attribute.GetConstructorIntValue(1) ?? 200;
+            var contentType = attribute.GetConstructorStringValue(2);
             var additionalContentTypes = attribute.GetConstructorStringArray(3);
             producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
         }
