@@ -45,6 +45,15 @@
       <None Update="IndividualTests.RequireRateLimiting_MapEndpointHandlers.received.txt">
         <DependentUpon>IndividualTests.cs</DependentUpon>
       </None>
+      <None Update="GeneratedSourceTests.AuthorizationAndMetadataMatrix_4F441534B0BD_MapEndpointHandlers.received.txt">
+        <DependentUpon>GeneratedSourceTests.cs</DependentUpon>
+      </None>
+      <None Update="GeneratedSourceTests.AuthorizationAndMetadataMatrix_25B2AC35B582_MapEndpointHandlers.received.txt">
+        <DependentUpon>GeneratedSourceTests.cs</DependentUpon>
+      </None>
+      <None Update="GeneratedSourceTests.AuthorizationAndMetadataMatrix_257E8A8FA30F_MapEndpointHandlers.received.txt">
+        <DependentUpon>GeneratedSourceTests.cs</DependentUpon>
+      </None>
     </ItemGroup>
 
 </Project>

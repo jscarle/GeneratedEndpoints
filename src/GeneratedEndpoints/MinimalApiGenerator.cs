@@ -420,9 +420,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         {
             var groupedClass = groupedClasses[index];
             source.Append("        var ");
-            source.Append(groupedClass.MapGroupBuilderIdentifier);
+            source.Append(groupedClass.Configuration.GroupIdentifier);
             source.Append(" = builder.MapGroup(");
-            source.Append(groupedClass.MapGroupPattern!.ToStringLiteral());
+            source.Append(groupedClass.Configuration.GroupPattern!.ToStringLiteral());
             source.Append(')');
             AppendEndpointConfiguration(source, "            ", groupedClass.Configuration, false);
             source.AppendLine(";");
@@ -475,7 +475,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         {
             var handler = requestHandlers[index];
             var handlerClass = handler.Class;
-            if (handlerClass.MapGroupPattern is null)
+            if (handlerClass.Configuration.GroupPattern is null)
                 continue;
 
             if (seen.Add(handlerClass.Name))
@@ -491,7 +491,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var configureAcceptsServiceProvider = requestHandler.Class.ConfigureMethodAcceptsServiceProvider;
         var indent = wrapWithConfigure ? "            " : "        ";
         var continuationIndent = indent + "    ";
-        var routeBuilderIdentifier = requestHandler.Class.MapGroupBuilderIdentifier ?? "builder";
+        var routeBuilderIdentifier = requestHandler.Class.Configuration.GroupIdentifier ?? "builder";
 
         if (wrapWithConfigure)
         {
@@ -565,7 +565,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         source.Append(')');
 
         var configuration = requestHandler.Configuration;
-        if (requestHandler.Class.MapGroupPattern is null)
+        if (requestHandler.Class.Configuration.GroupPattern is null)
             configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
 
         AppendEndpointConfiguration(source, continuationIndent, configuration, true);
@@ -627,12 +627,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             source.Append(')');
         }
 
-        if (!string.IsNullOrEmpty(configuration.EndpointGroupName))
+        if (!string.IsNullOrEmpty(configuration.GroupName))
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithGroupName(");
-            source.Append(configuration.EndpointGroupName.ToStringLiteral());
+            source.Append(configuration.GroupName.ToStringLiteral());
             source.Append(')');
         }
 
@@ -852,6 +852,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var disableValidation = classConfiguration.DisableValidation || methodConfiguration.DisableValidation;
         var disableRequestTimeout = classConfiguration.DisableRequestTimeout || methodConfiguration.DisableRequestTimeout;
         var withRequestTimeout = classConfiguration.WithRequestTimeout || methodConfiguration.WithRequestTimeout;
+        var groupIdentifier = classConfiguration.GroupIdentifier ?? methodConfiguration.GroupIdentifier;
+        var groupPattern = classConfiguration.GroupPattern ?? methodConfiguration.GroupPattern;
+        var groupName = classConfiguration.GroupName ?? methodConfiguration.GroupName;
+
         string? requestTimeoutPolicyName = null;
         if (methodConfiguration.WithRequestTimeout)
             requestTimeoutPolicyName = methodConfiguration.RequestTimeoutPolicyName;
@@ -865,7 +869,6 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
 
         var order = methodConfiguration.Order ?? classConfiguration.Order;
-        var endpointGroupName = methodConfiguration.EndpointGroupName ?? classConfiguration.EndpointGroupName;
 
         return new EndpointConfiguration
         {
@@ -895,7 +898,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             WithRequestTimeout = withRequestTimeout,
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
-            EndpointGroupName = endpointGroupName,
+            GroupIdentifier = groupIdentifier,
+            GroupPattern = groupPattern,
+            GroupName = groupName,
         };
     }
 

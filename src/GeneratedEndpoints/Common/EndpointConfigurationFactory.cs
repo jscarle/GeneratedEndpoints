@@ -11,6 +11,7 @@ internal static class EndpointConfigurationFactory
 
     public static EndpointConfiguration Create(ISymbol symbol, string? name)
     {
+
         var attributes = symbol.GetAttributes();
 
         if (symbol is IMethodSymbol)
@@ -41,7 +42,9 @@ internal static class EndpointConfigurationFactory
         bool? withRequestTimeout = null;
         string? requestTimeoutPolicyName = null;
         int? order = null;
-        string? endpointGroupName = null;
+        string? groupIdentifier = null;
+        string? groupPattern = null;
+        string? groupName = null;
         string? summary = null;
 
         foreach (var attribute in attributes)
@@ -70,7 +73,9 @@ internal static class EndpointConfigurationFactory
                     order = attribute.GetConstructorIntValue();
                     continue;
                 case RequestHandlerAttributeKind.MapGroup:
-                    endpointGroupName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
+                    groupIdentifier = GetMapGroupIdentifier(symbol);
+                    groupPattern = attribute.GetConstructorStringValue() ?? "";
+                    groupName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
                     continue;
                 case RequestHandlerAttributeKind.Summary:
                     summary = attribute.GetConstructorStringValue();
@@ -173,11 +178,33 @@ internal static class EndpointConfigurationFactory
             WithRequestTimeout = withRequestTimeout ?? false,
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
-            EndpointGroupName = endpointGroupName,
+            GroupIdentifier = groupIdentifier,
+            GroupPattern = groupPattern,
+            GroupName = groupName,
         };
     }
 
-    public static RequestHandlerAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
+    private static string? GetMapGroupIdentifier(ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedTypeSymbol)
+            return null;
+
+        var className = namedTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+        if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
+            className = className[GlobalPrefix.Length..];
+
+        var builder = StringBuilderPool.Get(className.Length + 8);
+        builder.Append('_');
+
+        foreach (var character in className)
+            builder.Append(char.IsLetterOrDigit(character) ? character : '_');
+
+        builder.Append("_Group");
+        return StringBuilderPool.ToStringAndReturn(builder);
+    }
+
+    private static RequestHandlerAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
     {
         var definition = attributeClass.OriginalDefinition;
         var cacheEntry = GeneratedAttributeKindCache.GetValue(

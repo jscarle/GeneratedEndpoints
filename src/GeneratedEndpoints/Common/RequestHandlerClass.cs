@@ -5,7 +5,5 @@ internal readonly record struct RequestHandlerClass(
     bool IsStatic,
     bool HasConfigureMethod,
     bool ConfigureMethodAcceptsServiceProvider,
-    string? MapGroupPattern,
-    string? MapGroupBuilderIdentifier,
     EndpointConfiguration Configuration
 );

@@ -28,12 +28,10 @@ internal sealed class RequestHandlerClassCacheEntry
                 compilationCache.ServiceProviderSymbol, cancellationToken
             );
 
-            var mapGroupPattern = GetMapGroupPattern(classSymbol);
-            var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
             var classConfiguration = EndpointConfigurationFactory.Create(classSymbol, null);
 
             _value = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
-                configureMethodDetails.ConfigureMethodAcceptsServiceProvider, mapGroupPattern, mapGroupIdentifier, classConfiguration
+                configureMethodDetails.ConfigureMethodAcceptsServiceProvider, classConfiguration
             );
             _initialized = true;
             return _value;
@@ -179,38 +177,5 @@ internal sealed class RequestHandlerClassCacheEntry
 
         var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? "";
         return string.Equals(containingNamespace, "System", StringComparison.Ordinal);
-    }
-
-    private static string? GetMapGroupPattern(INamedTypeSymbol classSymbol)
-    {
-        foreach (var attribute in classSymbol.GetAttributes())
-        {
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass is null)
-                continue;
-
-            if (EndpointConfigurationFactory.GetGeneratedAttributeKind(attributeClass) != RequestHandlerAttributeKind.MapGroup)
-                continue;
-
-            if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string pattern)
-                return pattern.Trim();
-        }
-
-        return null;
-    }
-
-    private static string GetMapGroupIdentifier(string className)
-    {
-        if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
-            className = className[GlobalPrefix.Length..];
-
-        var builder = StringBuilderPool.Get(className.Length + 8);
-        builder.Append('_');
-
-        foreach (var character in className)
-            builder.Append(char.IsLetterOrDigit(character) ? character : '_');
-
-        builder.Append("_Group");
-        return StringBuilderPool.ToStringAndReturn(builder);
     }
 }
