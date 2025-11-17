@@ -27,7 +27,5 @@ internal readonly record struct EndpointConfiguration
     public required bool WithRequestTimeout { get; init; }
     public required string? RequestTimeoutPolicyName { get; init; }
     public required int? Order { get; init; }
-    public required string? GroupIdentifier { get; init; }
-    public required string? GroupPattern { get; init; }
-    public required string? GroupName { get; init; }
+    public required EndpointGroup? Group { get; init; }
 }

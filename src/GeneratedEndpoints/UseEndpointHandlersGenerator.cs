@@ -13,11 +13,15 @@ namespace GeneratedEndpoints;
 
 internal static class UseEndpointHandlersGenerator
 {
-    public static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
+    public static void GenerateSource(SourceProductionContext context, ImmutableSortedDictionary<RequestHandlerClass, ImmutableArray<RequestHandler>> grouped)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var source = GetUseEndpointHandlersStringBuilder(requestHandlers);
+        var requestHandlers = grouped.Values
+            .SelectMany(x => x)
+            .ToImmutableList();
+
+        var source = new StringBuilder();
         source.AppendLine(FileHeader);
 
         source.AppendLine();
@@ -26,7 +30,7 @@ internal static class UseEndpointHandlersGenerator
         source.AppendLine("using Microsoft.AspNetCore.Http;");
         source.AppendLine("using Microsoft.AspNetCore.Mvc;");
         source.AppendLine("using Microsoft.AspNetCore.Routing;");
-        if (HasRateLimitedHandlers(requestHandlers))
+        if (AddUsingRateLimiting(requestHandlers))
             source.AppendLine("using Microsoft.AspNetCore.RateLimiting;");
         source.AppendLine("using Microsoft.Extensions.DependencyInjection;");
         source.AppendLine();
@@ -49,17 +53,23 @@ internal static class UseEndpointHandlersGenerator
 
         source.AppendLine("    {");
 
-        var groupedClasses = GetClassesWithMapGroups(requestHandlers);
+        var groupedClasses = GetClassesWithGroups(requestHandlers);
 
         for (var index = 0; index < groupedClasses.Count; index++)
         {
             var groupedClass = groupedClasses[index];
+            var configuration = groupedClass.Configuration;
+            if (!configuration.Group.HasValue)
+                continue;
+
+            var group = configuration.Group.Value;
+
             source.Append("        var ");
-            source.Append(groupedClass.Configuration.GroupIdentifier);
+            source.Append(group.Identifier);
             source.Append(" = builder.MapGroup(");
-            source.Append(groupedClass.Configuration.GroupPattern!.ToStringLiteral());
+            source.Append(group.Pattern.ToStringLiteral());
             source.Append(')');
-            AppendEndpointConfiguration(source, "            ", groupedClass.Configuration);
+            AppendEndpointConfiguration(source, "            ", configuration);
             source.AppendLine(";");
         }
 
@@ -87,7 +97,7 @@ internal static class UseEndpointHandlersGenerator
         context.AddSource(UseEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
     }
 
-    private static bool HasRateLimitedHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
+    private static bool AddUsingRateLimiting(ImmutableList<RequestHandler> requestHandlers)
     {
         for (var index = 0; index < requestHandlers.Count; index++)
         {
@@ -99,25 +109,29 @@ internal static class UseEndpointHandlersGenerator
         return false;
     }
 
-    private static List<RequestHandlerClass> GetClassesWithMapGroups(EquatableImmutableArray<RequestHandler> requestHandlers)
+    private static List<RequestHandlerClass> GetClassesWithGroups(ImmutableList<RequestHandler> requestHandlers)
     {
-        var groupedClasses = new List<RequestHandlerClass>();
         if (requestHandlers.Count == 0)
-            return groupedClasses;
+            return [];
 
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string>? seen = null;
+        List<RequestHandlerClass>? groupedClasses = null;
         for (var index = 0; index < requestHandlers.Count; index++)
         {
             var handler = requestHandlers[index];
             var handlerClass = handler.Class;
-            if (handlerClass.Configuration.GroupPattern is null)
+            if (!handlerClass.Configuration.Group.HasValue)
                 continue;
 
-            if (seen.Add(handlerClass.Name))
-                groupedClasses.Add(handlerClass);
+            seen ??= new HashSet<string>(StringComparer.Ordinal);
+            if (!seen.Add(handlerClass.Name))
+                continue;
+
+            groupedClasses ??= [];
+            groupedClasses.Add(handlerClass);
         }
 
-        return groupedClasses;
+        return groupedClasses ?? [];
     }
 
     private static void GenerateMapRequestHandler(StringBuilder source, RequestHandler requestHandler)
@@ -126,7 +140,7 @@ internal static class UseEndpointHandlersGenerator
         var configureAcceptsServiceProvider = requestHandler.Class.ConfigureMethodAcceptsServiceProvider;
         var indent = wrapWithConfigure ? "            " : "        ";
         var continuationIndent = indent + "    ";
-        var routeBuilderIdentifier = requestHandler.Class.Configuration.GroupIdentifier ?? "builder";
+        var routeBuilderIdentifier = requestHandler.Class.Configuration.Group?.Identifier ?? "builder";
 
         if (wrapWithConfigure)
         {
@@ -200,7 +214,7 @@ internal static class UseEndpointHandlersGenerator
         source.Append(')');
 
         var configuration = requestHandler.Method.Configuration;
-        if (requestHandler.Class.Configuration.GroupPattern is null)
+        if (!requestHandler.Class.Configuration.Group.HasValue)
             configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
 
         if (!string.IsNullOrEmpty(requestHandler.Name))
@@ -261,12 +275,12 @@ internal static class UseEndpointHandlersGenerator
             source.Append(')');
         }
 
-        if (!string.IsNullOrEmpty(configuration.GroupName))
+        if (configuration.Group is { Name.Length: > 0 })
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithGroupName(");
-            source.Append(configuration.GroupName.ToStringLiteral());
+            source.Append(configuration.Group.Value.Name.ToStringLiteral());
             source.Append(')');
         }
 
@@ -465,51 +479,32 @@ internal static class UseEndpointHandlersGenerator
         var displayName = methodConfiguration.DisplayName ?? classConfiguration.DisplayName;
         var summary = methodConfiguration.Summary ?? classConfiguration.Summary;
         var description = methodConfiguration.Description ?? classConfiguration.Description;
-
         var tags = MergeDistinctStrings(methodConfiguration.Tags, classConfiguration.Tags);
+        var excludeFromDescription = methodConfiguration.ExcludeFromDescription || classConfiguration.ExcludeFromDescription;
+
         var accepts = ConcatEquatable(methodConfiguration.Accepts, classConfiguration.Accepts);
         var produces = ConcatEquatable(methodConfiguration.Produces, classConfiguration.Produces);
         var producesProblem = ConcatEquatable(methodConfiguration.ProducesProblem, classConfiguration.ProducesProblem);
         var producesValidationProblem = ConcatEquatable(methodConfiguration.ProducesValidationProblem, classConfiguration.ProducesValidationProblem);
 
-        var excludeFromDescription = methodConfiguration.ExcludeFromDescription || classConfiguration.ExcludeFromDescription;
-
-        var authorizationPolicies = MergeDistinctStrings(methodConfiguration.AuthorizationPolicies, classConfiguration.AuthorizationPolicies);
+        var shortCircuit = methodConfiguration.ShortCircuit || classConfiguration.ShortCircuit;
+        var order = methodConfiguration.Order ?? classConfiguration.Order;
+        var disableAntiforgery = methodConfiguration.DisableAntiforgery || classConfiguration.DisableAntiforgery;
+        var disableValidation = methodConfiguration.DisableValidation || classConfiguration.DisableValidation;
         var requiredHosts = MergeDistinctStrings(methodConfiguration.RequiredHosts, classConfiguration.RequiredHosts);
         var endpointFilterTypes = ConcatEquatable(methodConfiguration.EndpointFilterTypes, classConfiguration.EndpointFilterTypes);
 
-        var requireAuthorization = methodConfiguration.RequireAuthorization || classConfiguration.RequireAuthorization;
-        var disableAntiforgery = methodConfiguration.DisableAntiforgery || classConfiguration.DisableAntiforgery;
-        var allowAnonymous = methodConfiguration.AllowAnonymous || classConfiguration.AllowAnonymous;
+        var (allowAnonymous, requireAuthorization) = ResolveAuthorization(methodConfiguration, classConfiguration);
+        var authorizationPolicies = MergeDistinctStrings(methodConfiguration.AuthorizationPolicies, classConfiguration.AuthorizationPolicies);
 
-        var requireCors = methodConfiguration.RequireCors || classConfiguration.RequireCors;
-        var corsPolicyName = methodConfiguration.CorsPolicyName ?? classConfiguration.CorsPolicyName;
+        var (requireCors, corsPolicyName) = ResolveCors(methodConfiguration, classConfiguration);
+        var (requireRateLimiting, rateLimitingPolicyName) = ResolveRateLimiting(methodConfiguration, classConfiguration);
 
-        var requireRateLimiting = methodConfiguration.RequireRateLimiting || classConfiguration.RequireRateLimiting;
-        var rateLimitingPolicyName = methodConfiguration.RateLimitingPolicyName ?? classConfiguration.RateLimitingPolicyName;
+        var (disableRequestTimeout, withRequestTimeout, requestTimeoutPolicyName) = ResolveRequestTimeout(methodConfiguration, classConfiguration);
 
-        var shortCircuit = methodConfiguration.ShortCircuit || classConfiguration.ShortCircuit;
-        var disableValidation = methodConfiguration.DisableValidation || classConfiguration.DisableValidation;
-        var disableRequestTimeout = methodConfiguration.DisableRequestTimeout || classConfiguration.DisableRequestTimeout;
-        var withRequestTimeout = methodConfiguration.WithRequestTimeout || classConfiguration.WithRequestTimeout;
-
-        var groupIdentifier = methodConfiguration.GroupIdentifier ?? classConfiguration.GroupIdentifier;
-        var groupPattern = methodConfiguration.GroupPattern ?? classConfiguration.GroupPattern;
-        var groupName = methodConfiguration.GroupName ?? classConfiguration.GroupName;
-
-        string? requestTimeoutPolicyName = null;
-        if (methodConfiguration.WithRequestTimeout)
-            requestTimeoutPolicyName = methodConfiguration.RequestTimeoutPolicyName;
-        else if (classConfiguration.WithRequestTimeout)
-            requestTimeoutPolicyName = classConfiguration.RequestTimeoutPolicyName;
-
-        if (disableRequestTimeout)
-        {
-            withRequestTimeout = false;
-            requestTimeoutPolicyName = null;
-        }
-
-        var order = methodConfiguration.Order ?? classConfiguration.Order;
+        var groupIdentifier = methodConfiguration.Group?.Identifier ?? classConfiguration.Group?.Identifier;
+        var groupPattern = methodConfiguration.Group?.Pattern ?? classConfiguration.Group?.Pattern;
+        var groupName = methodConfiguration.Group?.Name ?? classConfiguration.Group?.Name;
 
         return new EndpointConfiguration
         {
@@ -538,10 +533,107 @@ internal static class UseEndpointHandlersGenerator
             WithRequestTimeout = withRequestTimeout,
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
-            GroupIdentifier = groupIdentifier,
-            GroupPattern = groupPattern,
-            GroupName = groupName,
+            Group = groupIdentifier is not null && groupPattern is not null
+                ? new EndpointGroup
+                {
+                    Identifier = groupIdentifier,
+                    Pattern = groupPattern,
+                    Name = groupName,
+                }
+                : null,
         };
+    }
+
+    private static (bool AllowAnonymous, bool RequireAuthorization) ResolveAuthorization(
+        EndpointConfiguration methodConfiguration,
+        EndpointConfiguration classConfiguration
+    )
+    {
+        var methodReq = methodConfiguration.RequireAuthorization;
+        var methodAnon = !methodReq && methodConfiguration.AllowAnonymous;
+
+        var classReq = classConfiguration.RequireAuthorization;
+        var classAnon = !classReq && classConfiguration.AllowAnonymous;
+
+        var methodDeclares = methodConfiguration.AllowAnonymous || methodConfiguration.RequireAuthorization;
+
+        if (methodDeclares)
+        {
+            // Method directive wins
+            if (methodReq)
+                return (AllowAnonymous: false, RequireAuthorization: true);
+
+            if (methodAnon)
+                return (AllowAnonymous: true, RequireAuthorization: false);
+
+            return (false, false);
+        }
+
+        if (classReq)
+            return (AllowAnonymous: false, RequireAuthorization: true);
+
+        if (classAnon)
+            return (AllowAnonymous: true, RequireAuthorization: false);
+
+        return (AllowAnonymous: false, RequireAuthorization: false);
+    }
+
+    private static (bool DisableRequestTimeout, bool WithRequestTimeout, string? RequestTimeoutPolicyName) ResolveRequestTimeout(
+        EndpointConfiguration methodConfiguration,
+        EndpointConfiguration classConfiguration
+    )
+    {
+        var methodWith = methodConfiguration.WithRequestTimeout;
+        var methodDisable = !methodWith && methodConfiguration.DisableRequestTimeout;
+
+        var classWith = classConfiguration.WithRequestTimeout;
+        var classDisable = !classWith && classConfiguration.DisableRequestTimeout;
+
+        var methodDeclares = methodConfiguration.DisableRequestTimeout || methodConfiguration.WithRequestTimeout;
+
+        if (methodDeclares)
+        {
+            if (methodWith)
+                return (DisableRequestTimeout: false, WithRequestTimeout: true, methodConfiguration.RequestTimeoutPolicyName);
+
+            if (methodDisable)
+                return (DisableRequestTimeout: true, WithRequestTimeout: false, null);
+
+            return (false, false, null);
+        }
+
+        if (classWith)
+            return (DisableRequestTimeout: false, WithRequestTimeout: true, classConfiguration.RequestTimeoutPolicyName);
+
+        if (classDisable)
+            return (DisableRequestTimeout: true, WithRequestTimeout: false, null);
+
+        return (DisableRequestTimeout: false, WithRequestTimeout: false, null);
+    }
+
+    private static (bool RequireCors, string? CorsPolicyName) ResolveCors(EndpointConfiguration methodConfiguration, EndpointConfiguration classConfiguration)
+    {
+        if (methodConfiguration.RequireCors)
+            return (RequireCors: true, methodConfiguration.CorsPolicyName);
+
+        if (classConfiguration.RequireCors)
+            return (RequireCors: true, classConfiguration.CorsPolicyName);
+
+        return (RequireCors: false, CorsPolicyName: null);
+    }
+
+    private static (bool RequireRateLimiting, string? RateLimitingPolicyName) ResolveRateLimiting(
+        EndpointConfiguration methodConfiguration,
+        EndpointConfiguration classConfiguration
+    )
+    {
+        if (methodConfiguration.RequireRateLimiting)
+            return (RequireRateLimiting: true, methodConfiguration.RateLimitingPolicyName);
+
+        if (classConfiguration.RequireRateLimiting)
+            return (RequireRateLimiting: true, classConfiguration.RateLimitingPolicyName);
+
+        return (RequireRateLimiting: false, RateLimitingPolicyName: null);
     }
 
     private static EquatableImmutableArray<string>? MergeDistinctStrings(EquatableImmutableArray<string>? first, EquatableImmutableArray<string>? second)
@@ -609,21 +701,6 @@ internal static class UseEndpointHandlersGenerator
             "PATCH" => "Patch",
             _ => null,
         };
-    }
-
-    private static StringBuilder GetUseEndpointHandlersStringBuilder(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
-        const int baseSize = 4096;
-        const int perHandler = 512;
-
-        var handlerCount = Math.Max(requestHandlers.Count, 0);
-        var estimate = baseSize + (long)perHandler * handlerCount;
-        estimate = (long)(estimate * 1.10);
-
-        if (estimate > int.MaxValue)
-            estimate = int.MaxValue;
-
-        return StringBuilderPool.Get((int)Math.Max(baseSize, estimate));
     }
 
     private static void AppendAdditionalContentTypes(StringBuilder source, EquatableImmutableArray<string>? additionalContentTypes)

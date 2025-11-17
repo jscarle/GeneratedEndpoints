@@ -36,9 +36,9 @@
     <!-- Output -->
     <PropertyGroup>
         <AssemblyName>GeneratedEndpoints</AssemblyName>
-        <Version>10.0.1</Version>
-        <AssemblyVersion>10.0.1.0</AssemblyVersion>
-        <FileVersion>10.0.1.0</FileVersion>
+        <Version>10.0.2</Version>
+        <AssemblyVersion>10.0.2.0</AssemblyVersion>
+        <FileVersion>10.0.2.0</FileVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <IncludeBuildOutput>false</IncludeBuildOutput>
     </PropertyGroup>

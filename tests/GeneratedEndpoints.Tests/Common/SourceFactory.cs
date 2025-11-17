@@ -322,6 +322,7 @@ public static class SourceFactory
         bool includeAccepts,
         bool includeGenericAccepts,
         bool includeProducesResponse,
+        bool includeGenericProducesResponse,
         bool includeProducesProblem,
         bool includeProducesValidationProblem,
         bool includeSummaryAndDescription,
@@ -378,10 +379,11 @@ public static class SourceFactory
         if (includeProducesResponse)
         {
             var secondProduces = string.IsNullOrWhiteSpace(producesContentType2) ? "" : $", \"{producesContentType2}\"";
-            builder.AppendLine(
-                $"    [ProducesResponse(200, \"{producesContentType1 ?? "application/json"}\"{secondProduces}, ResponseType = typeof(ResponseRecord))]"
-            );
+            builder.AppendLine($"    [ProducesResponse(typeof(ResponseRecord), 200, \"{producesContentType1 ?? "application/json"}\"{secondProduces})]");
         }
+
+        if (includeGenericProducesResponse)
+            builder.AppendLine($"    [ProducesResponse<ResponseRecord>(200, \"{producesContentType1 ?? "application/json"}\")]");
 
         if (includeProducesProblem)
             builder.AppendLine($"    [ProducesProblem(500, \"{producesContentType1 ?? "application/problem+json"}\")]");

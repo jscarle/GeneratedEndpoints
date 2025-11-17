@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
 
@@ -74,5 +75,13 @@ internal static class StringExtensions
     public static string NormalizeOrDefaultString(this string? value, string defaultValue)
     {
         return string.IsNullOrWhiteSpace(value) ? defaultValue : value!.Trim();
+    }
+
+    public static string RemoveAsyncSuffix(this string methodName)
+    {
+        if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
+            return methodName[..^AsyncSuffix.Length];
+
+        return methodName;
     }
 }

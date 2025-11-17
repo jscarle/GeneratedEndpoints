@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -14,46 +13,13 @@ namespace GeneratedEndpoints;
 [Generator]
 public sealed class MinimalApiGenerator : IIncrementalGenerator
 {
-    private static readonly ConditionalWeakTable<INamedTypeSymbol, RequestHandlerClassCacheEntry> RequestHandlerClassCache = new();
-
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterPostInitializationOutput(RegisterAttributes);
 
-        var requestHandlerProviders = ImmutableArray.CreateBuilder<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
-
-        for (var index = 0; index < HttpAttributeDefinitions.Length; index++)
-        {
-            var definition = HttpAttributeDefinitions[index];
-            var handlers = context.SyntaxProvider
-                .ForAttributeWithMetadataName(definition.FullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
-                .WhereNotNull()
-                .Collect();
-
-            requestHandlerProviders.Add(handlers);
-        }
-
-        var requestHandlers = CombineRequestHandlers(requestHandlerProviders.MoveToImmutable())
-            .Select((x, _) => x.ToEquatableImmutableArray());
+        var requestHandlers = GetRequestHandlers(context);
 
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
-    }
-
-    private static IncrementalValueProvider<ImmutableArray<RequestHandler>> CombineRequestHandlers(
-        ImmutableArray<IncrementalValueProvider<ImmutableArray<RequestHandler>>> handlerProviders
-    )
-    {
-        if (handlerProviders.IsDefaultOrEmpty)
-            throw new InvalidOperationException("No HTTP attribute definitions were provided.");
-
-        var combined = handlerProviders[0];
-        for (var i = 1; i < handlerProviders.Length; i++)
-        {
-            combined = combined.Combine(handlerProviders[i])
-                .Select(static (x, _) => x.Left.AddRange(x.Right));
-        }
-
-        return combined;
     }
 
     private static void RegisterAttributes(IncrementalGeneratorPostInitializationContext context)
@@ -80,6 +46,44 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.AddSource(SummaryAttributeHint, SummaryAttributeSourceText);
     }
 
+    private static IncrementalValueProvider<EquatableImmutableArray<RequestHandler>> GetRequestHandlers(IncrementalGeneratorInitializationContext context)
+    {
+        var list = new List<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
+
+        for (var index = 0; index < HttpAttributeDefinitions.Length; index++)
+        {
+            var definition = HttpAttributeDefinitions[index];
+            var handlers = context.SyntaxProvider
+                .ForAttributeWithMetadataName(definition.FullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
+                .WhereNotNull()
+                .Collect();
+
+            list.Add(handlers);
+        }
+
+        if (list.Count == 0)
+            throw new InvalidOperationException("No HTTP attribute definitions were provided.");
+
+        var combined = list[0];
+        for (var i = 1; i < list.Count; i++)
+        {
+            combined = combined.Combine(list[i])
+                .Select(static (x, ct) =>
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        return x.Left.AddRange(x.Right);
+                    }
+                );
+        }
+
+        return combined.Select((x, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return x.ToEquatableImmutableArray();
+            }
+        );
+    }
+
     private static bool RequestHandlerFilter(SyntaxNode syntaxNode, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -95,11 +99,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
         var attribute = context.Attributes[0];
 
-        var requestHandlerClass = GetRequestHandlerClass(methodSymbol, cancellationToken);
+        var requestHandlerClass = RequestHandlerClassHelper.Create(methodSymbol, cancellationToken);
         if (requestHandlerClass is null)
             return null;
 
-        var requestHandlerMethod = GetRequestHandlerMethod(methodSymbol, cancellationToken);
+        var requestHandlerMethod = RequestHandlerMethodHelper.Create(methodSymbol, cancellationToken);
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(methodSymbol, attribute, cancellationToken);
 
@@ -127,69 +131,32 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : "";
         var pattern = attribute.GetConstructorStringValue() ?? "";
         var name = attribute.GetNamedStringValue(NameAttributeNamedParameter);
-        name ??= RemoveAsyncSuffix(methodSymbol.Name);
+        name ??= methodSymbol.Name.RemoveAsyncSuffix();
 
         return (httpMethod, pattern, name);
-    }
-
-    private static string RemoveAsyncSuffix(string methodName)
-    {
-        if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
-            return methodName[..^AsyncSuffix.Length];
-
-        return methodName;
-    }
-
-    private static RequestHandlerClass? GetRequestHandlerClass(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var classSymbol = methodSymbol.ContainingType;
-        if (classSymbol.TypeKind != TypeKind.Class)
-            return null;
-
-        var cacheEntry = RequestHandlerClassCache.GetValue(classSymbol, static _ => new RequestHandlerClassCacheEntry());
-        var requestHandlerClass = cacheEntry.GetOrCreate(classSymbol, cancellationToken);
-
-        return requestHandlerClass;
-    }
-
-    private static RequestHandlerMethod GetRequestHandlerMethod(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var name = methodSymbol.Name;
-        var isStatic = methodSymbol.IsStatic;
-        var parameters = methodSymbol.GetParameters(cancellationToken);
-        var configuration = EndpointConfigurationFactory.Create(methodSymbol);
-        var requestHandlerMethod = new RequestHandlerMethod(name, isStatic, parameters, configuration);
-
-        return requestHandlerMethod;
     }
 
     private static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var normalized = NormalizeRequestHandlers(requestHandlers);
-
-        AddEndpointHandlersGenerator.GenerateSource(context, normalized);
-        UseEndpointHandlersGenerator.GenerateSource(context, normalized);
-    }
-
-    private static EquatableImmutableArray<RequestHandler> NormalizeRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
-        if (requestHandlers.Count <= 1)
-            return requestHandlers;
-
-        requestHandlers.SortInPlace(RequestHandlerComparer.Instance);
         ResolveEndpointNameCollisions(requestHandlers);
 
-        return requestHandlers;
+        var grouped = requestHandlers.GroupBy(x => x.Class)
+            .OrderBy(x => x.Key)
+            .ToImmutableSortedDictionary(x => x.Key, x => x.OrderBy(y => y.Method)
+                .ToImmutableArray()
+            );
+
+        AddEndpointHandlersGenerator.GenerateSource(context, grouped);
+        UseEndpointHandlersGenerator.GenerateSource(context, grouped);
     }
 
     private static void ResolveEndpointNameCollisions(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
+        if (requestHandlers.Count <= 1)
+            return;
+
         var raw = requestHandlers.AsArray();
         if (raw is null)
             return;

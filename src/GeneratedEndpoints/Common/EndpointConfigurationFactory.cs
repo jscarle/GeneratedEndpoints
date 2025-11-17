@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using static GeneratedEndpoints.Common.Constants;
 
@@ -6,8 +5,6 @@ namespace GeneratedEndpoints.Common;
 
 internal static class EndpointConfigurationFactory
 {
-    private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
-
     public static EndpointConfiguration Create(ISymbol symbol)
     {
         var attributes = symbol.GetAttributes();
@@ -48,7 +45,7 @@ internal static class EndpointConfigurationFactory
             if (attributeClass is null)
                 continue;
 
-            var attributeKind = GetGeneratedAttributeKind(attributeClass);
+            var attributeKind = attributeClass.OriginalDefinition.GetRequestHandlerAttributeKind();
             switch (attributeKind)
             {
                 case RequestHandlerAttributeKind.ShortCircuit:
@@ -172,9 +169,14 @@ internal static class EndpointConfigurationFactory
             WithRequestTimeout = withRequestTimeout ?? false,
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
-            GroupIdentifier = groupIdentifier,
-            GroupPattern = groupPattern,
-            GroupName = groupName,
+            Group = groupIdentifier is not null && groupPattern is not null
+                ? new EndpointGroup
+                {
+                    Identifier = groupIdentifier,
+                    Pattern = groupPattern,
+                    Name = groupName,
+                }
+                : null,
         };
     }
 
@@ -198,16 +200,6 @@ internal static class EndpointConfigurationFactory
         return StringBuilderPool.ToStringAndReturn(builder);
     }
 
-    private static RequestHandlerAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
-    {
-        var definition = attributeClass.OriginalDefinition;
-        var cacheEntry = GeneratedAttributeKindCache.GetValue(
-            definition, static def => new GeneratedAttributeKindCacheEntry(def.GetRequestHandlerAttributeKind())
-        );
-
-        return cacheEntry.Kind;
-    }
-
     private static EquatableImmutableArray<T>? ToEquatableOrNull<T>(List<T>? values)
     {
         return values is { Count: > 0 } ? values.ToEquatableImmutableArray() : null;
@@ -219,9 +211,11 @@ internal static class EndpointConfigurationFactory
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
             requestType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        else if (attribute.GetNamedTypeSymbol(RequestTypeAttributeNamedParameter) is { } requestTypeSymbol)
-            requestType = requestTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else
+            requestType = attribute.GetConstructorTypeSymbol()
+                ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+        if (requestType is null)
             return;
 
         var contentType = attribute.GetConstructorStringValue() ?? ApplicationJsonContentType;
@@ -236,23 +230,29 @@ internal static class EndpointConfigurationFactory
 
     private static void TryAddProducesMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<ProducesMetadata>? produces)
     {
-        string? responseType;
+        ProducesMetadata? producesMetadata;
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
-            responseType = attributeClass.TypeArguments[0]
+        {
+            var responseType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        else if (attribute.GetNamedTypeSymbol(ResponseTypeAttributeNamedParameter) is { } responseTypeSymbol)
-            responseType = responseTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var statusCode = attribute.GetConstructorIntValue(0) ?? 200;
+            var contentType = attribute.GetConstructorStringValue(1);
+            var additionalContentTypes = attribute.GetConstructorStringArray(2);
+            producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
+        }
         else
-            return;
-
-        var statusCode = attribute.GetConstructorIntValue() ?? 200;
-        var contentType = attribute.GetConstructorStringValue(1);
-        var additionalContentTypes = attribute.GetConstructorStringArray(2);
-
-        var producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
+        {
+            var responseType = attribute.GetConstructorTypeSymbol()
+                                   ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                               ?? "";
+            var statusCode = attribute.GetConstructorIntValue(1) ?? 200;
+            var contentType = attribute.GetConstructorStringValue(2);
+            var additionalContentTypes = attribute.GetConstructorStringArray(3);
+            producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
+        }
 
         var producesList = produces ??= [];
-        producesList.Add(producesMetadata);
+        producesList.Add(producesMetadata.Value);
     }
 
     private static void TryAddEndpointFilter(
@@ -290,10 +290,5 @@ internal static class EndpointConfigurationFactory
 
         endpointFilters ??= [];
         endpointFilters.Add(displayString);
-    }
-
-    private sealed class GeneratedAttributeKindCacheEntry(RequestHandlerAttributeKind kind)
-    {
-        public RequestHandlerAttributeKind Kind { get; } = kind;
     }
 }

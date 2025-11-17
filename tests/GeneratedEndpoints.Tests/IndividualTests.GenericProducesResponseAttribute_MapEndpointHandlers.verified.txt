@@ -24,12 +24,7 @@ internal static class EndpointRouteBuilderExtensions
     {
         builder.MapGet("/contracts/{id:int}", global::GeneratedEndpointsTests.ContractEndpoints.Handle)
             .WithName("Handle")
-            .WithDisplayName("Contract endpoint")
-            .WithSummary("Gets detailed content.")
-            .WithDescription("Shows binding and contract combinations.")
-            .Accepts<global::GeneratedEndpointsTests.RequestRecord>("application/json")
-            .ProducesValidationProblem(422, "application/problem+json")
-            .RequireAuthorization("ContractsPolicy");
+            .Produces<global::GeneratedEndpointsTests.ResponseRecord>(200, "application/json");
 
         return builder;
     }

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using static GeneratedEndpoints.Common.AttributeSymbolMatcher;
 using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
@@ -45,7 +44,7 @@ internal static class MethodSymbolExtensions
             if (attributeClass is null)
                 continue;
 
-            var attributeSource = GetBindingSourceFromAttributeClass(attributeClass);
+            var attributeSource = attributeClass.GetBindingSource();
             if (attributeSource == BindingSource.None)
                 continue;
 
@@ -67,25 +66,6 @@ internal static class MethodSymbolExtensions
         var bindingPrefix = GetBindingSourceAttribute(source, typedKey, bindingName);
 
         return bindingPrefix;
-    }
-
-    private static BindingSource GetBindingSourceFromAttributeClass(INamedTypeSymbol attributeClass)
-    {
-        var definition = attributeClass.OriginalDefinition;
-        var namespaceSymbol = definition.ContainingNamespace;
-
-        return definition.Name switch
-        {
-            "FromRouteAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromRoute,
-            "FromQueryAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromQuery,
-            "FromHeaderAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromHeader,
-            "FromBodyAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromBody,
-            "FromFormAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromForm,
-            "FromServicesAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreMvcNamespaceParts) => BindingSource.FromServices,
-            "FromKeyedServicesAttribute" when IsInNamespace(namespaceSymbol, ExtensionsDependencyInjectionNamespaceParts) => BindingSource.FromKeyedServices,
-            "AsParametersAttribute" when IsInNamespace(namespaceSymbol, AspNetCoreHttpNamespaceParts) => BindingSource.AsParameters,
-            _ => BindingSource.None,
-        };
     }
 
     private static string GetBindingSourceAttribute(BindingSource source, TypedConstant? typedKey, string? bindingName)

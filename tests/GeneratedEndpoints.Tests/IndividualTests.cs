@@ -379,6 +379,13 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task GenericProducesResponseAttribute()
+    {
+        var source = ContractScenario(includeGenericProducesResponse: true, producesContentType1: "application/json");
+        await VerifyIndividualAsync(source, nameof(GenericProducesResponseAttribute));
+    }
+
+    [Fact]
     public async Task ProducesResponseMultipleContentTypes()
     {
         var source = ContractScenario(includeProducesResponse: true, producesContentType1: "application/json", producesContentType2: "text/json");
@@ -546,6 +553,7 @@ public class IndividualTests
         bool includeAccepts = false,
         bool includeGenericAccepts = false,
         bool includeProducesResponse = false,
+        bool includeGenericProducesResponse = false,
         bool includeProducesProblem = false,
         bool includeProducesValidationProblem = false,
         bool includeSummaryAndDescription = false,
@@ -561,9 +569,9 @@ public class IndividualTests
     )
     {
         return SourceFactory.BuildContractsAndBindingSource(includeBindingNames, includeAsParameters, includeFromServices, includeFromKeyedServices,
-            includeAccepts, includeGenericAccepts, includeProducesResponse, includeProducesProblem, includeProducesValidationProblem,
-            includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous, methodRequiresAuthorization,
-            acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
+            includeAccepts, includeGenericAccepts, includeProducesResponse, includeGenericProducesResponse, includeProducesProblem,
+            includeProducesValidationProblem, includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous,
+            methodRequiresAuthorization, acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
         );
     }
 
