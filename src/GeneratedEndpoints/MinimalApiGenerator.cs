@@ -173,22 +173,26 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static ImmutableArray<RequestHandler> NormalizeRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        var sorted = SortRequestHandlers(requestHandlers);
-        sorted = EnsureUniqueEndpointNames(sorted);
+        if (requestHandlers.Count == 0)
+            return ImmutableArray<RequestHandler>.Empty;
 
-        return sorted;
+        if (requestHandlers.Count == 1)
+            return [requestHandlers[0]];
+
+        var sorted = SortRequestHandlers(requestHandlers);
+        return EnsureUniqueEndpointNames(sorted);
     }
 
     private static ImmutableArray<RequestHandler> SortRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         var count = requestHandlers.Count;
-        if (count == 0)
-            return ImmutableArray<RequestHandler>.Empty;
-        if (count == 1)
-            return [requestHandlers[0]];
 
         var builder = ImmutableArray.CreateBuilder<RequestHandler>(count);
-        builder.AddRange(requestHandlers);
+        for (var index = 0; index < count; index++)
+        {
+            builder.Add(requestHandlers[index]);
+        }
+
         builder.Sort(RequestHandlerComparer.Instance);
         return builder.MoveToImmutable();
     }
@@ -199,18 +203,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return requestHandlers;
 
         var handlerCount = requestHandlers.Length;
-        var nameToCollision = new Dictionary<HandlerNameKey, CollisionInfo>(handlerCount);
+        Dictionary<HandlerNameKey, CollisionInfo>? nameToCollision = null;
         ImmutableArray<RequestHandler>.Builder? builder = null;
 
         for (var index = 0; index < handlerCount; index++)
         {
-            var handler = requestHandlers[index];
+            var handler = builder is null ? requestHandlers[index] : builder[index];
             var name = handler.Name;
             if (string.IsNullOrEmpty(name))
                 continue;
 
+            nameToCollision ??= new Dictionary<HandlerNameKey, CollisionInfo>(handlerCount);
             var key = new HandlerNameKey(name!, handler.Method.Name);
-
             if (!nameToCollision.TryGetValue(key, out var collision))
             {
                 nameToCollision.Add(key, new CollisionInfo(index, false));
@@ -218,6 +222,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             }
 
             builder ??= requestHandlers.ToBuilder();
+            handler = builder[index];
             if (!collision.FirstHandlerRenamed)
             {
                 var firstHandler = builder[collision.FirstIndex];
