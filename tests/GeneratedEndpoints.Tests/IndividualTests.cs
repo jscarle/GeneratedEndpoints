@@ -195,6 +195,13 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task GroupName()
+    {
+        var source = AuthorizationScenario(groupName: "IndividualGroup");
+        await VerifyIndividualAsync(source, nameof(GroupName));
+    }
+
+    [Fact]
     public async Task ExcludeFromDescription()
     {
         var source = AuthorizationScenario(excludeFromDescription: true);
