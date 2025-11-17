@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using GeneratedEndpoints.Common;
@@ -195,33 +196,31 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return;
 
         var span = raw.AsSpan();
+        var seen = new Dictionary<string, int>(span.Length, StringComparer.Ordinal);
 
-        for (var outerIndex = 0; outerIndex < span.Length - 1; outerIndex++)
+        for (var index = 0; index < span.Length; index++)
         {
-            ref var outer = ref span[outerIndex];
-            var outerName = outer.Name;
-            if (string.IsNullOrEmpty(outerName))
+            ref var handler = ref span[index];
+            var name = handler.Name;
+            if (string.IsNullOrEmpty(name))
                 continue;
+            var nonEmptyName = name!;
 
-            var collisionHandled = false;
-            for (var innerIndex = outerIndex + 1; innerIndex < span.Length; innerIndex++)
+            if (!seen.TryGetValue(nonEmptyName, out var state))
             {
-                ref var inner = ref span[innerIndex];
-                var innerName = inner.Name;
-                if (innerName is null)
-                    continue;
-
-                if (!string.Equals(outerName, innerName, StringComparison.Ordinal))
-                    continue;
-
-                if (!collisionHandled)
-                {
-                    outer.SetFullyQualifiedName();
-                    collisionHandled = true;
-                }
-
-                inner.SetFullyQualifiedName();
+                seen.Add(nonEmptyName, index);
+                continue;
             }
+
+            var firstIndex = state >= 0 ? state : ~state;
+            if (state >= 0)
+            {
+                ref var firstHandler = ref span[firstIndex];
+                firstHandler.SetFullyQualifiedName();
+                seen[nonEmptyName] = ~firstIndex;
+            }
+
+            handler.SetFullyQualifiedName();
         }
     }
 }
