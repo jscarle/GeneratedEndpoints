@@ -59,7 +59,7 @@ internal static class UseEndpointHandlersGenerator
             source.Append(" = builder.MapGroup(");
             source.Append(groupedClass.Configuration.GroupPattern!.ToStringLiteral());
             source.Append(')');
-            AppendEndpointConfiguration(source, "            ", groupedClass.Configuration, false);
+            AppendEndpointConfiguration(source, "            ", groupedClass.Configuration);
             source.AppendLine(";");
         }
 
@@ -203,7 +203,15 @@ internal static class UseEndpointHandlersGenerator
         if (requestHandler.Class.Configuration.GroupPattern is null)
             configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
 
-        AppendEndpointConfiguration(source, continuationIndent, configuration, true);
+        if (!string.IsNullOrEmpty(requestHandler.Name))
+        {
+            source.AppendLine();
+            source.Append(continuationIndent);
+            source.Append(".WithName(");
+            source.Append(requestHandler.Name.ToStringLiteral());
+            source.Append(')');
+        }
+        AppendEndpointConfiguration(source, continuationIndent, configuration);
 
         if (wrapWithConfigure && configureAcceptsServiceProvider)
         {
@@ -224,18 +232,9 @@ internal static class UseEndpointHandlersGenerator
         }
     }
 
-    private static void AppendEndpointConfiguration(StringBuilder source, string indent, EndpointConfiguration configuration, bool includeNameAndDisplayName)
+    private static void AppendEndpointConfiguration(StringBuilder source, string indent, EndpointConfiguration configuration)
     {
-        if (includeNameAndDisplayName && !string.IsNullOrEmpty(configuration.Name))
-        {
-            source.AppendLine();
-            source.Append(indent);
-            source.Append(".WithName(");
-            source.Append(configuration.Name.ToStringLiteral());
-            source.Append(')');
-        }
-
-        if (includeNameAndDisplayName && !string.IsNullOrEmpty(configuration.DisplayName))
+        if (!string.IsNullOrEmpty(configuration.DisplayName))
         {
             source.AppendLine();
             source.Append(indent);
@@ -463,7 +462,6 @@ internal static class UseEndpointHandlersGenerator
 
     private static EndpointConfiguration MergeEndpointConfigurations(EndpointConfiguration classConfiguration, EndpointConfiguration methodConfiguration)
     {
-        var name = methodConfiguration.Name ?? classConfiguration.Name;
         var displayName = methodConfiguration.DisplayName ?? classConfiguration.DisplayName;
         var summary = methodConfiguration.Summary ?? classConfiguration.Summary;
         var description = methodConfiguration.Description ?? classConfiguration.Description;
@@ -507,7 +505,6 @@ internal static class UseEndpointHandlersGenerator
 
         return new EndpointConfiguration
         {
-            Name = name,
             DisplayName = displayName,
             Summary = summary,
             Description = description,

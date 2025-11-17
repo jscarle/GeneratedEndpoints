@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using static GeneratedEndpoints.Common.Constants;
@@ -9,13 +8,10 @@ internal static class EndpointConfigurationFactory
 {
     private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
 
-    public static EndpointConfiguration Create(ISymbol symbol, string? name)
+    public static EndpointConfiguration Create(ISymbol symbol)
     {
 
         var attributes = symbol.GetAttributes();
-
-        if (symbol is IMethodSymbol)
-            name ??= RemoveAsyncSuffix(symbol.Name);
 
         string? displayName = null;
         string? description = null;
@@ -152,7 +148,6 @@ internal static class EndpointConfigurationFactory
 
         return new EndpointConfiguration
         {
-            Name = name,
             DisplayName = displayName,
             Summary = summary,
             Description = description,
@@ -212,14 +207,6 @@ internal static class EndpointConfigurationFactory
         );
 
         return cacheEntry.Kind;
-    }
-
-    private static string RemoveAsyncSuffix(string methodName)
-    {
-        if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
-            return methodName[..^AsyncSuffix.Length];
-
-        return methodName;
     }
 
     private static EquatableImmutableArray<T>? ToEquatableOrNull<T>(List<T>? values)

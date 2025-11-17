@@ -28,7 +28,7 @@ internal sealed class RequestHandlerClassCacheEntry
                 compilationCache.ServiceProviderSymbol, cancellationToken
             );
 
-            var classConfiguration = EndpointConfigurationFactory.Create(classSymbol, null);
+            var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
 
             _value = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
                 configureMethodDetails.ConfigureMethodAcceptsServiceProvider, classConfiguration

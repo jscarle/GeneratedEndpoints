@@ -2,7 +2,6 @@ namespace GeneratedEndpoints.Common;
 
 internal readonly record struct EndpointConfiguration
 {
-    public required string? Name { get; init; }
     public required string? DisplayName { get; init; }
     public required string? Summary { get; init; }
     public required string? Description { get; init; }

@@ -103,16 +103,16 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var requestHandlerMethod = GetRequestHandlerMethod(requestHandlerMethodSymbol, cancellationToken);
 
-        var (httpMethod, pattern, name) = GetRequestHandlerAttribute(attribute, cancellationToken);
+        var (httpMethod, pattern, name) = GetRequestHandlerAttribute(requestHandlerMethodSymbol, attribute, cancellationToken);
 
-        var methodConfiguration = EndpointConfigurationFactory.Create(requestHandlerMethodSymbol, name);
+        var methodConfiguration = EndpointConfigurationFactory.Create(requestHandlerMethodSymbol);
 
-        var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
+        var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, name, methodConfiguration);
 
         return requestHandler;
     }
 
-    private static (string HttpMethod, string Pattern, string? Name) GetRequestHandlerAttribute(AttributeData attribute, CancellationToken cancellationToken)
+    private static (string HttpMethod, string Pattern, string? Name) GetRequestHandlerAttribute(IMethodSymbol methodSymbol, AttributeData attribute, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -120,8 +120,18 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : "";
         var pattern = attribute.GetConstructorStringValue() ?? "";
         var name = attribute.GetNamedStringValue(NameAttributeNamedParameter);
+        name ??= RemoveAsyncSuffix(methodSymbol.Name);
+
 
         return (httpMethod, pattern, name);
+    }
+
+    private static string RemoveAsyncSuffix(string methodName)
+    {
+        if (methodName.EndsWith(AsyncSuffix, StringComparison.OrdinalIgnoreCase) && methodName.Length > AsyncSuffix.Length)
+            return methodName[..^AsyncSuffix.Length];
+
+        return methodName;
     }
 
     private static RequestHandlerMethod GetRequestHandlerMethod(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
@@ -130,7 +140,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var name = methodSymbol.Name;
         var isStatic = methodSymbol.IsStatic;
-        var parameters = RequestHandlerParameterHelper.Build(methodSymbol, cancellationToken);
+        var parameters = methodSymbol.GetParameters(cancellationToken);
 
         var requestHandlerMethod = new RequestHandlerMethod(name, isStatic, parameters);
 
@@ -181,7 +191,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (count == 0)
             return ImmutableArray<RequestHandler>.Empty;
         if (count == 1)
-            return ImmutableArray.Create(requestHandlers[0]);
+            return [requestHandlers[0]];
 
         var builder = ImmutableArray.CreateBuilder<RequestHandler>(count);
         builder.AddRange(requestHandlers);
@@ -200,14 +210,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         {
             var index = collidingHandlers[i];
             var handler = builder[index];
-            var configuration = handler.Configuration with
+            var newHandler = handler with
             {
                 Name = GetFullyQualifiedMethodDisplayName(handler),
             };
-            builder[index] = handler with
-            {
-                Configuration = configuration,
-            };
+            builder[index] = newHandler;
         }
 
         return builder.MoveToImmutable();
@@ -232,7 +239,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             for (var index = 0; index < handlerCount; index++)
             {
                 var handler = requestHandlers[index];
-                var name = handler.Configuration.Name;
+                var name = handler.Name;
                 if (string.IsNullOrEmpty(name))
                     continue;
 
@@ -255,7 +262,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             Array.Sort(collidingArray!, 0, collidingCount);
             var sorted = new int[collidingCount];
             Array.Copy(collidingArray!, 0, sorted, 0, collidingCount);
-            return ImmutableArray.Create(sorted);
+            return [..sorted];
         }
         finally
         {
@@ -277,8 +284,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
     {
-        var className = requestHandler.Class.Name ?? string.Empty;
-        var methodName = requestHandler.Method.Name ?? string.Empty;
+        var className = requestHandler.Class.Name;
+        var methodName = requestHandler.Method.Name;
 
         var startIndex = className.StartsWith(GlobalPrefix, StringComparison.Ordinal)
             ? GlobalPrefix.Length
@@ -311,18 +318,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         }
     }
 
-    private readonly struct HandlerNameKey : IEquatable<HandlerNameKey>
+    private readonly struct HandlerNameKey(string name, string method) : IEquatable<HandlerNameKey>
     {
-        private readonly string _name;
-        private readonly string _method;
-        private readonly int _hashCode;
-
-        public HandlerNameKey(string name, string method)
-        {
-            _name = name;
-            _method = method;
-            _hashCode = CombineHashCodes(StringComparer.Ordinal.GetHashCode(name), StringComparer.Ordinal.GetHashCode(method));
-        }
+        private readonly string _name = name;
+        private readonly string _method = method;
+        private readonly int _hashCode = CombineHashCodes(StringComparer.Ordinal.GetHashCode(name), StringComparer.Ordinal.GetHashCode(method));
 
         public bool Equals(HandlerNameKey other)
         {

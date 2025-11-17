@@ -9,9 +9,9 @@ namespace GeneratedEndpoints.Common;
 // ReSharper disable LoopCanBeConvertedToQuery
 // Do not refactor, use for loop to avoid allocations.
 
-internal static class RequestHandlerParameterHelper
+internal static class MethodSymbolExtensions
 {
-    public static EquatableImmutableArray<Parameter> Build(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    public static EquatableImmutableArray<Parameter> GetParameters(this IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
