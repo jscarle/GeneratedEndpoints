@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using GeneratedEndpoints.Common;
@@ -116,30 +116,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var attributeName = attribute.AttributeClass?.Name ?? string.Empty;
-
-        var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : string.Empty;
-
-        var pattern = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0].Value as string : null;
-        pattern ??= string.Empty;
-
-        string? name = null;
-        var namedArguments = attribute.NamedArguments;
-        if (!namedArguments.IsDefaultOrEmpty)
-        {
-            for (var i = 0; i < namedArguments.Length; i++)
-            {
-                var namedArg = namedArguments[i];
-                if (namedArg.Key != NameAttributeNamedParameter)
-                    continue;
-
-                if (namedArg.Value.Value is not string value)
-                    break;
-
-                name = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-                break;
-            }
-        }
+        var attributeName = attribute.AttributeClass?.Name ?? "";
+        var httpMethod = HttpAttributeDefinitionsByName.TryGetValue(attributeName, out var definition) ? definition.Verb : "";
+        var pattern = attribute.GetConstructorStringValue() ?? "";
+        var name = attribute.GetNamedStringValue(NameAttributeNamedParameter);
 
         return (httpMethod, pattern, name);
     }
