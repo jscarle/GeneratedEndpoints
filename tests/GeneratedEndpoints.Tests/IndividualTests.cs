@@ -328,6 +328,13 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task MultipleEndpointNameCollisions()
+    {
+        var source = EndpointNameCollisionScenario();
+        await VerifyIndividualAsync(source, nameof(MultipleEndpointNameCollisions));
+    }
+
+    [Fact]
     public async Task BindingNames()
     {
         var source = ContractScenario(includeBindingNames: true);
@@ -560,6 +567,9 @@ public class IndividualTests
             includeTrace,
             includeConnect,
             includeMethodNameCollision);
+
+    private static string EndpointNameCollisionScenario()
+        => SourceFactory.BuildEndpointNameCollisionSource();
 
     private static string ContractScenario(
         bool includeBindingNames = false,
