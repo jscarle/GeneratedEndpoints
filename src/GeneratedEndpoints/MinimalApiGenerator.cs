@@ -240,9 +240,11 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var handlerCount = requestHandlers.Length;
         var nameToFirstIndex = new Dictionary<HandlerNameKey, int>(handlerCount);
+
         var collisionFlags = ArrayPool<bool>.Shared.Rent(handlerCount);
         Array.Clear(collisionFlags, 0, handlerCount);
-        int[]? collidingIndices = null;
+
+        int[]? collidingArray = null;
         var collidingCount = 0;
 
         try
@@ -267,20 +269,19 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 }
             }
 
-            if (collidingIndices is null || collidingCount == 0)
+            if (collidingCount == 0)
                 return ImmutableArray<int>.Empty;
 
-            Array.Sort(collidingIndices, 0, collidingCount);
-            var builder = ImmutableArray.CreateBuilder<int>(collidingCount);
-            for (var i = 0; i < collidingCount; i++)
-                builder.Add(collidingIndices[i]);
-            return builder.MoveToImmutable();
+            Array.Sort(collidingArray!, 0, collidingCount);
+            var sorted = new int[collidingCount];
+            Array.Copy(collidingArray!, 0, sorted, 0, collidingCount);
+            return ImmutableArray.Create(sorted);
         }
         finally
         {
-            ArrayPool<bool>.Shared.Return(collisionFlags);
-            if (collidingIndices is not null)
-                ArrayPool<int>.Shared.Return(collidingIndices);
+            ArrayPool<bool>.Shared.Return(collisionFlags, clearArray: false);
+            if (collidingArray is not null)
+                ArrayPool<int>.Shared.Return(collidingArray, clearArray: false);
         }
 
         void MarkCollision(int handlerIndex)
@@ -289,8 +290,8 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
                 return;
 
             collisionFlags[handlerIndex] = true;
-            collidingIndices ??= ArrayPool<int>.Shared.Rent(handlerCount);
-            collidingIndices[collidingCount++] = handlerIndex;
+            collidingArray ??= ArrayPool<int>.Shared.Rent(handlerCount);
+            collidingArray[collidingCount++] = handlerIndex;
         }
     }
 
@@ -334,11 +335,13 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         private readonly string _name;
         private readonly string _method;
+        private readonly int _hashCode;
 
         public HandlerNameKey(string name, string method)
         {
             _name = name;
             _method = method;
+            _hashCode = CombineHashCodes(StringComparer.Ordinal.GetHashCode(name), StringComparer.Ordinal.GetHashCode(method));
         }
 
         public bool Equals(HandlerNameKey other)
@@ -355,7 +358,16 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(StringComparer.Ordinal.GetHashCode(_name), StringComparer.Ordinal.GetHashCode(_method));
+            return _hashCode;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int CombineHashCodes(int left, int right)
+        {
+            unchecked
+            {
+                return (left * 397) ^ right;
+            }
         }
     }
 
