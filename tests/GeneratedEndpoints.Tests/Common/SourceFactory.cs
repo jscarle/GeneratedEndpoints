@@ -343,6 +343,33 @@ public static class SourceFactory
         return builder.ToString();
     }
 
+    public static string BuildEndpointNameCollisionSource()
+        => """
+            internal static class AlphaEndpoints
+            {
+                [MapGet("/alpha/collision")] public static Ok Collision() => TypedResults.Ok("alpha-collision");
+                [MapGet("/alpha/unique")] public static Ok UniqueAlpha() => TypedResults.Ok("unique-alpha");
+            }
+
+            internal static class BetaEndpoints
+            {
+                [MapGet("/beta/unique")] public static Ok UniqueBeta() => TypedResults.Ok("unique-beta");
+                [MapGet("/beta/collision")] public static Ok Collision() => TypedResults.Ok("beta-collision");
+            }
+
+            internal static class GammaEndpoints
+            {
+                [MapGet("/gamma/collision")] public static Ok Collision() => TypedResults.Ok("gamma-collision");
+                [MapGet("/gamma/unique")] public static Ok UniqueGamma() => TypedResults.Ok("unique-gamma");
+            }
+
+            internal static class DeltaEndpoints
+            {
+                [MapGet("/delta/unique")] public static Ok UniqueDelta() => TypedResults.Ok("unique-delta");
+                [MapGet("/delta/collision")] public static Ok Collision() => TypedResults.Ok("delta-collision");
+            }
+            """;
+
     public static string BuildContractsAndBindingSource(
         bool includeBindingNames,
         bool includeAsParameters,
