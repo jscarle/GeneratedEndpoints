@@ -37,7 +37,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             requestHandlerProviders.Add(handlers);
         }
 
-        var requestHandlers = CombineRequestHandlers(requestHandlerProviders.MoveToImmutable());
+        var requestHandlers = CombineRequestHandlers(requestHandlerProviders.MoveToImmutable()).Select((x, _) => x.ToEquatableImmutableArray());
 
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
     }
@@ -174,7 +174,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         return CompilationTypeCaches.GetValue(compilation, static c => new CompilationTypeCache(c));
     }
 
-    private static void GenerateSource(SourceProductionContext context, ImmutableArray<RequestHandler> requestHandlers)
+    private static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -185,10 +185,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         GenerateUseEndpointHandlersClass(context, sorted);
     }
 
-    private static ImmutableArray<RequestHandler> SortRequestHandlers(ImmutableArray<RequestHandler> requestHandlers)
+    private static ImmutableArray<RequestHandler> SortRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
-        if (requestHandlers.Length <= 1)
-            return requestHandlers;
+        if (requestHandlers.Count <= 1)
+            return [..requestHandlers];
 
         var array = requestHandlers.ToArray();
         Array.Sort(array, RequestHandlerComparer.Instance);
