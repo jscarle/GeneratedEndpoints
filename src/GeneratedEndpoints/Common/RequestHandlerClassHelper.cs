@@ -4,36 +4,31 @@ using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
 
-internal sealed class RequestHandlerClassCacheEntry
+internal static class RequestHandlerClassHelper
 {
-    private readonly object _lock = new();
-    private RequestHandlerClass _value;
-    private bool _initialized;
-
-    public RequestHandlerClass GetOrCreate(INamedTypeSymbol classSymbol, CancellationToken cancellationToken)
+    public static RequestHandlerClass? Create(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
-        if (_initialized)
-            return _value;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        lock (_lock)
+        var classSymbol = methodSymbol.ContainingType;
+        if (classSymbol.TypeKind != TypeKind.Class)
+            return null;
+
+        var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var isStatic = classSymbol.IsStatic;
+        var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken);
+        var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
+
+        var requestHandlerClass = new RequestHandlerClass
         {
-            if (_initialized)
-                return _value;
+            Name = name,
+            IsStatic = isStatic,
+            HasConfigureMethod = configureMethodDetails.HasConfigureMethod,
+            ConfigureMethodAcceptsServiceProvider = configureMethodDetails.ConfigureMethodAcceptsServiceProvider,
+            Configuration = classConfiguration,
+        };
 
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var isStatic = classSymbol.IsStatic;
-            var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken);
-
-            var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
-
-            _value = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
-                configureMethodDetails.ConfigureMethodAcceptsServiceProvider, classConfiguration
-            );
-            _initialized = true;
-            return _value;
-        }
+        return requestHandlerClass;
     }
 
     private static ConfigureMethodDetails GetConfigureMethodDetails(INamedTypeSymbol classSymbol, CancellationToken cancellationToken)

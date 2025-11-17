@@ -172,9 +172,14 @@ internal static class EndpointConfigurationFactory
             WithRequestTimeout = withRequestTimeout ?? false,
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
-            GroupIdentifier = groupIdentifier,
-            GroupPattern = groupPattern,
-            GroupName = groupName,
+            Group = groupIdentifier is not null && groupPattern is not null
+                ? new EndpointGroup
+                {
+                    Identifier = groupIdentifier,
+                    Pattern = groupPattern,
+                    Name = groupName,
+                }
+                : null,
         };
     }
 

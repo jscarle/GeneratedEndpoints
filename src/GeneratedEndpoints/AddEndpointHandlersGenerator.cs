@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Immutable;
+using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -12,12 +13,12 @@ namespace GeneratedEndpoints;
 
 internal static class AddEndpointHandlersGenerator
 {
-    public static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
+    public static void GenerateSource(SourceProductionContext context, ImmutableSortedDictionary<RequestHandlerClass, ImmutableArray<RequestHandler>> grouped)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var nonStaticClassNames = GetDistinctNonStaticClassNames(requestHandlers);
-        var source = GetAddEndpointHandlersStringBuilder(nonStaticClassNames);
+        var nonStaticClassNames = grouped.Keys.Where(x => !x.IsStatic).Select(x => x.Name).ToList();
+        var source = new StringBuilder();
         source.AppendLine(FileHeader);
 
         source.AppendLine();
@@ -60,46 +61,5 @@ internal static class AddEndpointHandlersGenerator
 
         var sourceText = StringBuilderPool.ToStringAndReturn(source);
         context.AddSource(AddEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
-    }
-
-    private static List<string> GetDistinctNonStaticClassNames(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
-        var classNames = new List<string>();
-        if (requestHandlers.Count == 0)
-            return classNames;
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < requestHandlers.Count; index++)
-        {
-            var requestHandler = requestHandlers[index];
-            if (requestHandler.Class.IsStatic)
-                continue;
-
-            var className = requestHandler.Class.Name;
-            if (seen.Add(className))
-                classNames.Add(className);
-        }
-
-        return classNames;
-    }
-
-    private static StringBuilder GetAddEndpointHandlersStringBuilder(List<string> nonStaticClassNames)
-    {
-        var estimate = 512L;
-        for (var index = 0; index < nonStaticClassNames.Count; index++)
-        {
-            var className = nonStaticClassNames[index];
-            estimate += 36 + className.Length;
-        }
-
-        estimate += Math.Max(256, nonStaticClassNames.Count * 12);
-        estimate = (long)(estimate * 1.10);
-
-        if (estimate < 512)
-            estimate = 512;
-        else if (estimate > int.MaxValue)
-            estimate = int.MaxValue;
-
-        return StringBuilderPool.Get((int)estimate);
     }
 }

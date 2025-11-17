@@ -13,11 +13,13 @@ namespace GeneratedEndpoints;
 
 internal static class UseEndpointHandlersGenerator
 {
-    public static void GenerateSource(SourceProductionContext context, EquatableImmutableArray<RequestHandler> requestHandlers)
+    public static void GenerateSource(SourceProductionContext context, ImmutableSortedDictionary<RequestHandlerClass, ImmutableArray<RequestHandler>> grouped)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var source = GetUseEndpointHandlersStringBuilder(requestHandlers);
+        var requestHandlers = grouped.Values.SelectMany(x => x).ToImmutableList();
+
+        var source = new StringBuilder();
         source.AppendLine(FileHeader);
 
         source.AppendLine();
@@ -26,7 +28,7 @@ internal static class UseEndpointHandlersGenerator
         source.AppendLine("using Microsoft.AspNetCore.Http;");
         source.AppendLine("using Microsoft.AspNetCore.Mvc;");
         source.AppendLine("using Microsoft.AspNetCore.Routing;");
-        if (HasRateLimitedHandlers(requestHandlers))
+        if (AddUsingRateLimiting(requestHandlers))
             source.AppendLine("using Microsoft.AspNetCore.RateLimiting;");
         source.AppendLine("using Microsoft.Extensions.DependencyInjection;");
         source.AppendLine();
@@ -49,17 +51,23 @@ internal static class UseEndpointHandlersGenerator
 
         source.AppendLine("    {");
 
-        var groupedClasses = GetClassesWithMapGroups(requestHandlers);
+        var groupedClasses = GetClassesWithGroups(requestHandlers);
 
         for (var index = 0; index < groupedClasses.Count; index++)
         {
             var groupedClass = groupedClasses[index];
+            var configuration = groupedClass.Configuration;
+            if (!configuration.Group.HasValue)
+                continue;
+
+            var group = configuration.Group.Value;
+
             source.Append("        var ");
-            source.Append(groupedClass.Configuration.GroupIdentifier);
+            source.Append(group.Identifier);
             source.Append(" = builder.MapGroup(");
-            source.Append(groupedClass.Configuration.GroupPattern!.ToStringLiteral());
+            source.Append(group.Pattern.ToStringLiteral());
             source.Append(')');
-            AppendEndpointConfiguration(source, "            ", groupedClass.Configuration);
+            AppendEndpointConfiguration(source, "            ", configuration);
             source.AppendLine(";");
         }
 
@@ -87,7 +95,7 @@ internal static class UseEndpointHandlersGenerator
         context.AddSource(UseEndpointHandlersMethodHint, SourceText.From(sourceText, Encoding.UTF8));
     }
 
-    private static bool HasRateLimitedHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
+    private static bool AddUsingRateLimiting(ImmutableList<RequestHandler> requestHandlers)
     {
         for (var index = 0; index < requestHandlers.Count; index++)
         {
@@ -99,25 +107,29 @@ internal static class UseEndpointHandlersGenerator
         return false;
     }
 
-    private static List<RequestHandlerClass> GetClassesWithMapGroups(EquatableImmutableArray<RequestHandler> requestHandlers)
+    private static List<RequestHandlerClass> GetClassesWithGroups(ImmutableList<RequestHandler> requestHandlers)
     {
-        var groupedClasses = new List<RequestHandlerClass>();
         if (requestHandlers.Count == 0)
-            return groupedClasses;
+            return [];
 
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string>? seen = null;
+        List<RequestHandlerClass>? groupedClasses = null;
         for (var index = 0; index < requestHandlers.Count; index++)
         {
             var handler = requestHandlers[index];
             var handlerClass = handler.Class;
-            if (handlerClass.Configuration.GroupPattern is null)
+            if (!handlerClass.Configuration.Group.HasValue)
                 continue;
 
-            if (seen.Add(handlerClass.Name))
-                groupedClasses.Add(handlerClass);
+            seen ??= new HashSet<string>(StringComparer.Ordinal);
+            if (!seen.Add(handlerClass.Name))
+                continue;
+
+            groupedClasses ??= [];
+            groupedClasses.Add(handlerClass);
         }
 
-        return groupedClasses;
+        return groupedClasses ?? [];
     }
 
     private static void GenerateMapRequestHandler(StringBuilder source, RequestHandler requestHandler)
@@ -126,7 +138,7 @@ internal static class UseEndpointHandlersGenerator
         var configureAcceptsServiceProvider = requestHandler.Class.ConfigureMethodAcceptsServiceProvider;
         var indent = wrapWithConfigure ? "            " : "        ";
         var continuationIndent = indent + "    ";
-        var routeBuilderIdentifier = requestHandler.Class.Configuration.GroupIdentifier ?? "builder";
+        var routeBuilderIdentifier = requestHandler.Class.Configuration.Group?.Identifier ?? "builder";
 
         if (wrapWithConfigure)
         {
@@ -200,7 +212,7 @@ internal static class UseEndpointHandlersGenerator
         source.Append(')');
 
         var configuration = requestHandler.Method.Configuration;
-        if (requestHandler.Class.Configuration.GroupPattern is null)
+        if (!requestHandler.Class.Configuration.Group.HasValue)
             configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
 
         if (!string.IsNullOrEmpty(requestHandler.Name))
@@ -261,12 +273,12 @@ internal static class UseEndpointHandlersGenerator
             source.Append(')');
         }
 
-        if (!string.IsNullOrEmpty(configuration.GroupName))
+        if (configuration.Group is { Name.Length: > 0 })
         {
             source.AppendLine();
             source.Append(indent);
             source.Append(".WithGroupName(");
-            source.Append(configuration.GroupName.ToStringLiteral());
+            source.Append(configuration.Group.Value.Name.ToStringLiteral());
             source.Append(')');
         }
 
@@ -493,9 +505,9 @@ internal static class UseEndpointHandlersGenerator
         var disableRequestTimeout = methodConfiguration.DisableRequestTimeout || classConfiguration.DisableRequestTimeout;
         var withRequestTimeout = methodConfiguration.WithRequestTimeout || classConfiguration.WithRequestTimeout;
 
-        var groupIdentifier = methodConfiguration.GroupIdentifier ?? classConfiguration.GroupIdentifier;
-        var groupPattern = methodConfiguration.GroupPattern ?? classConfiguration.GroupPattern;
-        var groupName = methodConfiguration.GroupName ?? classConfiguration.GroupName;
+        var groupIdentifier = methodConfiguration.Group?.Identifier ?? classConfiguration.Group?.Identifier;
+        var groupPattern = methodConfiguration.Group?.Pattern ?? classConfiguration.Group?.Pattern;
+        var groupName = methodConfiguration.Group?.Name ?? classConfiguration.Group?.Name;
 
         string? requestTimeoutPolicyName = null;
         if (methodConfiguration.WithRequestTimeout)
@@ -538,9 +550,14 @@ internal static class UseEndpointHandlersGenerator
             WithRequestTimeout = withRequestTimeout,
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
-            GroupIdentifier = groupIdentifier,
-            GroupPattern = groupPattern,
-            GroupName = groupName,
+            Group = groupIdentifier is not null && groupPattern is not null
+                ? new EndpointGroup
+                {
+                    Identifier = groupIdentifier,
+                    Pattern = groupPattern,
+                    Name = groupName,
+                }
+                : null,
         };
     }
 
@@ -609,21 +626,6 @@ internal static class UseEndpointHandlersGenerator
             "PATCH" => "Patch",
             _ => null,
         };
-    }
-
-    private static StringBuilder GetUseEndpointHandlersStringBuilder(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
-        const int baseSize = 4096;
-        const int perHandler = 512;
-
-        var handlerCount = Math.Max(requestHandlers.Count, 0);
-        var estimate = baseSize + (long)perHandler * handlerCount;
-        estimate = (long)(estimate * 1.10);
-
-        if (estimate > int.MaxValue)
-            estimate = int.MaxValue;
-
-        return StringBuilderPool.Get((int)Math.Max(baseSize, estimate));
     }
 
     private static void AppendAdditionalContentTypes(StringBuilder source, EquatableImmutableArray<string>? additionalContentTypes)
