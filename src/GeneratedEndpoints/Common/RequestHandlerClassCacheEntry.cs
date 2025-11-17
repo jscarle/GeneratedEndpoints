@@ -30,7 +30,7 @@ internal sealed class RequestHandlerClassCacheEntry
 
             var mapGroupPattern = GetMapGroupPattern(classSymbol);
             var mapGroupIdentifier = mapGroupPattern is null ? null : GetMapGroupIdentifier(name);
-            var classConfiguration = EndpointConfigurationFactory.Create(classSymbol, null, false);
+            var classConfiguration = EndpointConfigurationFactory.Create(classSymbol, null);
 
             _value = new RequestHandlerClass(name, isStatic, configureMethodDetails.HasConfigureMethod,
                 configureMethodDetails.ConfigureMethodAcceptsServiceProvider, mapGroupPattern, mapGroupIdentifier, classConfiguration

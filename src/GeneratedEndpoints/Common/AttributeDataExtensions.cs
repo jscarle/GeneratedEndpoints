@@ -4,6 +4,56 @@ namespace GeneratedEndpoints.Common;
 
 internal static class AttributeDataExtensions
 {
+    public static string? GetConstructorStringValue(this AttributeData attribute, int position = 0)
+    {
+        if (attribute.ConstructorArguments.Length > position)
+            return (attribute.ConstructorArguments[position].Value as string).NormalizeOptionalString();
+
+        return null;
+    }
+
+    public static EquatableImmutableArray<string>? GetConstructorStringArray(this AttributeData attribute, int position = 0)
+    {
+        if (attribute.ConstructorArguments.Length <= position)
+            return null;
+
+        var arg = attribute.ConstructorArguments[position];
+        if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
+        {
+            List<string>? normalized = null;
+            foreach (var value in arg.Values)
+            {
+                if (value.Value is not string stringValue)
+                    continue;
+
+                var trimmed = stringValue.NormalizeOptionalString();
+                if (trimmed is not { Length: > 0 })
+                    continue;
+
+                normalized ??= new List<string>(arg.Values.Length);
+                normalized.Add(trimmed);
+            }
+
+            if (normalized is { Count: > 0 })
+                return normalized.ToEquatableImmutableArray();
+
+            return null;
+        }
+
+        if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
+            return new[] { singleHost.Trim() }.ToEquatableImmutableArray();
+
+        return null;
+    }
+
+    public static int? GetConstructorIntValue(this AttributeData attribute, int position = 0)
+    {
+        if (attribute.ConstructorArguments.Length > position && attribute.ConstructorArguments[position].Value is int value)
+            return value;
+
+        return null;
+    }
+
     public static ITypeSymbol? GetNamedTypeSymbol(this AttributeData attribute, string namedParameter)
     {
         foreach (var namedArg in attribute.NamedArguments)
@@ -36,5 +86,4 @@ internal static class AttributeDataExtensions
 
         return null;
     }
-
 }

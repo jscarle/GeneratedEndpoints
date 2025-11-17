@@ -106,7 +106,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(attribute, cancellationToken);
 
-        var methodConfiguration = EndpointConfigurationFactory.Create(requestHandlerMethodSymbol, name, true);
+        var methodConfiguration = EndpointConfigurationFactory.Create(requestHandlerMethodSymbol, name);
 
         var requestHandler = new RequestHandler(requestHandlerClass.Value, requestHandlerMethod, httpMethod, pattern, methodConfiguration);
 
@@ -867,11 +867,36 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var order = methodConfiguration.Order ?? classConfiguration.Order;
         var endpointGroupName = methodConfiguration.EndpointGroupName ?? classConfiguration.EndpointGroupName;
 
-        return new EndpointConfiguration(name, displayName, summary, description, tags, accepts, produces, producesProblem, producesValidationProblem,
-            excludeFromDescription, requireAuthorization, authorizationPolicies, disableAntiforgery, allowAnonymous, requireCors, corsPolicyName, requiredHosts,
-            requireRateLimiting, rateLimitingPolicyName, endpointFilterTypes, shortCircuit, disableValidation, disableRequestTimeout, withRequestTimeout,
-            requestTimeoutPolicyName, order, endpointGroupName
-        );
+        return new EndpointConfiguration
+        {
+            Name = name,
+            DisplayName = displayName,
+            Summary = summary,
+            Description = description,
+            Tags = tags,
+            Accepts = accepts,
+            Produces = produces,
+            ProducesProblem = producesProblem,
+            ProducesValidationProblem = producesValidationProblem,
+            ExcludeFromDescription = excludeFromDescription,
+            RequireAuthorization = requireAuthorization,
+            AuthorizationPolicies = authorizationPolicies,
+            DisableAntiforgery = disableAntiforgery,
+            AllowAnonymous = allowAnonymous,
+            RequireCors = requireCors,
+            CorsPolicyName = corsPolicyName,
+            RequiredHosts = requiredHosts,
+            RequireRateLimiting = requireRateLimiting,
+            RateLimitingPolicyName = rateLimitingPolicyName,
+            EndpointFilterTypes = endpointFilterTypes,
+            ShortCircuit = shortCircuit,
+            DisableValidation = disableValidation,
+            DisableRequestTimeout = disableRequestTimeout,
+            WithRequestTimeout = withRequestTimeout,
+            RequestTimeoutPolicyName = requestTimeoutPolicyName,
+            Order = order,
+            EndpointGroupName = endpointGroupName,
+        };
     }
 
     private static EquatableImmutableArray<string>? MergeDistinctStrings(EquatableImmutableArray<string>? first, EquatableImmutableArray<string>? second)
