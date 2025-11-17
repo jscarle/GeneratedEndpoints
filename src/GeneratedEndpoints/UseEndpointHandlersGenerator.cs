@@ -92,7 +92,7 @@ internal static class UseEndpointHandlersGenerator
         for (var index = 0; index < requestHandlers.Length; index++)
         {
             var handler = requestHandlers[index];
-            if (handler.Configuration.RequireRateLimiting)
+            if (handler.Method.Configuration.RequireRateLimiting)
                 return true;
         }
 
@@ -199,7 +199,7 @@ internal static class UseEndpointHandlersGenerator
         }
         source.Append(')');
 
-        var configuration = requestHandler.Configuration;
+        var configuration = requestHandler.Method.Configuration;
         if (requestHandler.Class.Configuration.GroupPattern is null)
             configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
 
