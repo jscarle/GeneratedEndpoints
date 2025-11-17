@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace GeneratedEndpoints.Common;
 
 internal static partial class Constants
@@ -61,7 +63,11 @@ internal static partial class Constants
     internal const string SummaryAttributeFullyQualifiedName = $"{AttributesNamespace}.{SummaryAttributeName}";
     internal const string SummaryAttributeHint = $"{SummaryAttributeFullyQualifiedName}.gs.cs";
 
+    internal const string DisplayNameAttributeName = nameof(DisplayNameAttribute);
+    internal const string DescriptionAttributeName = nameof(DescriptionAttribute);
     internal const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
+    internal const string TagsAttributeName = "TagsAttribute";
+    internal const string ExcludeFromDescriptionAttributeName = "ExcludeFromDescriptionAttribute";
 
     internal const string EndpointFilterAttributeName = "EndpointFilterAttribute";
     internal const string EndpointFilterAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointFilterAttributeName}";

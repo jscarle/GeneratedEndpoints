@@ -189,7 +189,7 @@ internal sealed class RequestHandlerClassCacheEntry
             if (attributeClass is null)
                 continue;
 
-            if (EndpointConfigurationFactory.GetGeneratedAttributeKind(attributeClass) != GeneratedAttributeKind.MapGroup)
+            if (EndpointConfigurationFactory.GetGeneratedAttributeKind(attributeClass) != RequestHandlerAttributeKind.MapGroup)
                 continue;
 
             if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string pattern)

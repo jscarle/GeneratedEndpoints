@@ -10,36 +10,221 @@ internal static class EndpointConfigurationFactory
 {
     private static readonly ConditionalWeakTable<INamedTypeSymbol, GeneratedAttributeKindCacheEntry> GeneratedAttributeKindCache = new();
 
-    public static EndpointConfiguration Create(ISymbol methodSymbol, string? name, bool enforceMethodRequireAuthorizationRules)
+    public static EndpointConfiguration Create(ISymbol symbol, string? name, bool enforceMethodRequireAuthorizationRules)
     {
-        var attributes = methodSymbol.GetAttributes();
-        var (displayName, description) = GetDisplayAndDescriptionAttributes(methodSymbol);
+        var attributes = symbol.GetAttributes();
 
-        name ??= RemoveAsyncSuffix(methodSymbol.Name);
+        if (symbol is IMethodSymbol)
+            name ??= RemoveAsyncSuffix(symbol.Name);
 
-        var state = new EndpointAttributeState();
-        PopulateAttributeState(attributes, ref state);
+        string? displayName = null;
+        string? description = null;
+        EquatableImmutableArray<string>? tags = null;
+        bool? requireAuthorization = null;
+        EquatableImmutableArray<string>? authorizationPolicies = null;
+        bool? disableAntiforgery = null;
+        bool? allowAnonymous = null;
+        bool? excludeFromDescription = null;
+        List<AcceptsMetadata>? accepts = null;
+        List<ProducesMetadata>? produces = null;
+        List<ProducesProblemMetadata>? producesProblem = null;
+        List<ProducesValidationProblemMetadata>? producesValidationProblem = null;
+        bool? requireCors = null;
+        string? corsPolicyName = null;
+        EquatableImmutableArray<string>? requiredHosts = null;
+        bool? requireRateLimiting = null;
+        string? rateLimitingPolicyName = null;
+        List<string>? endpointFilters = null;
+        HashSet<string>? endpointFilterSet = null;
+        bool hasAllowAnonymousAttribute = false;
+        bool hasRequireAuthorizationAttribute = false;
+        bool? shortCircuit = null;
+        bool? disableValidation = null;
+        bool? disableRequestTimeout = null;
+        bool? withRequestTimeout = null;
+        string? requestTimeoutPolicyName = null;
+        int? order = null;
+        string? endpointGroupName = null;
+        string? summary = null;
 
-        if (enforceMethodRequireAuthorizationRules && state is { HasRequireAuthorizationAttribute: true, HasAllowAnonymousAttribute: false })
-            state.AllowAnonymous = false;
+        foreach (var attribute in attributes)
+        {
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass is null)
+                continue;
 
-        var withRequestTimeout = state.WithRequestTimeout ?? false;
-        var requestTimeoutPolicyName = withRequestTimeout ? state.RequestTimeoutPolicyName : null;
+            var attributeKind = GetGeneratedAttributeKind(attributeClass);
+            switch (attributeKind)
+            {
+                case RequestHandlerAttributeKind.ShortCircuit:
+                    shortCircuit = true;
+                    continue;
+                case RequestHandlerAttributeKind.DisableValidation:
+                    disableValidation = true;
+                    continue;
+                case RequestHandlerAttributeKind.DisableRequestTimeout:
+                    disableRequestTimeout = true;
+                    withRequestTimeout = false;
+                    requestTimeoutPolicyName = null;
+                    continue;
+                case RequestHandlerAttributeKind.RequestTimeout:
+                {
+                    disableRequestTimeout = false;
+                    withRequestTimeout = true;
+                    string? policyName = null;
+                    if (attribute.ConstructorArguments.Length > 0)
+                        policyName = (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString();
+                    requestTimeoutPolicyName = policyName;
+                    continue;
+                }
+                case RequestHandlerAttributeKind.Order:
+                    if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
+                        order = orderValue;
+                    continue;
+                case RequestHandlerAttributeKind.MapGroup:
+                {
+                    var groupName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
+                    if (!string.IsNullOrEmpty(groupName))
+                        endpointGroupName = groupName;
+                    continue;
+                }
+                case RequestHandlerAttributeKind.Summary:
+                    if (attribute.ConstructorArguments.Length > 0)
+                    {
+                        var summaryValue = (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString();
+                        if (!string.IsNullOrEmpty(summaryValue))
+                            summary = summaryValue;
+                    }
+                    continue;
+                case RequestHandlerAttributeKind.Accepts:
+                    TryAddAcceptsMetadata(attribute, attributeClass, ref accepts);
+                    continue;
+                case RequestHandlerAttributeKind.ProducesResponse:
+                    TryAddProducesMetadata(attribute, attributeClass, ref produces);
+                    continue;
+                case RequestHandlerAttributeKind.RequireAuthorization:
+                    requireAuthorization = true;
+                    hasRequireAuthorizationAttribute = true;
+                    if (attribute.ConstructorArguments.Length == 1)
+                    {
+                        var arg = attribute.ConstructorArguments[0];
+                        MergeInto(ref authorizationPolicies, arg.Values);
+                    }
 
-        return new EndpointConfiguration(name, displayName, state.Summary, description, state.Tags, ToEquatableOrNull(state.Accepts),
-            ToEquatableOrNull(state.Produces), ToEquatableOrNull(state.ProducesProblem), ToEquatableOrNull(state.ProducesValidationProblem),
-            state.ExcludeFromDescription ?? false, state.RequireAuthorization ?? false, state.AuthorizationPolicies, state.DisableAntiforgery ?? false,
-            state.AllowAnonymous ?? false, state.RequireCors ?? false, state.CorsPolicyName, state.RequiredHosts, state.RequireRateLimiting ?? false,
-            state.RateLimitingPolicyName, ToEquatableOrNull(state.EndpointFilters), state.ShortCircuit ?? false, state.DisableValidation ?? false,
-            state.DisableRequestTimeout ?? false, withRequestTimeout, requestTimeoutPolicyName, state.Order, state.EndpointGroupName
+                    continue;
+                case RequestHandlerAttributeKind.RequireCors:
+                    requireCors = true;
+                    corsPolicyName = attribute.ConstructorArguments.Length > 0
+                        ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
+                        : null;
+                    continue;
+                case RequestHandlerAttributeKind.RequireHost:
+                    if (attribute.ConstructorArguments.Length == 1)
+                    {
+                        var arg = attribute.ConstructorArguments[0];
+                        if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
+                            MergeInto(ref requiredHosts, arg.Values);
+                        else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
+                            MergeInto(ref requiredHosts, [singleHost.Trim()]);
+                    }
+
+                    continue;
+                case RequestHandlerAttributeKind.RequireRateLimiting:
+                {
+                    var policyName = attribute.ConstructorArguments.Length > 0
+                        ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
+                        : null;
+
+                    if (!string.IsNullOrEmpty(policyName))
+                    {
+                        requireRateLimiting = true;
+                        rateLimitingPolicyName = policyName;
+                    }
+
+                    continue;
+                }
+                case RequestHandlerAttributeKind.EndpointFilter:
+                    TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters, ref endpointFilterSet);
+                    continue;
+                case RequestHandlerAttributeKind.DisableAntiforgery:
+                    disableAntiforgery = true;
+                    continue;
+                case RequestHandlerAttributeKind.ProducesProblem:
+                {
+                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
+                        ? producesProblemStatusCode
+                        : 500;
+                    var contentType = attribute.ConstructorArguments.Length > 1
+                        ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString()
+                        : null;
+                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
+
+                    var producesProblemList = producesProblem ??= [];
+                    producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    continue;
+                }
+                case RequestHandlerAttributeKind.ProducesValidationProblem:
+                {
+                    var statusCode =
+                        attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
+                            ? producesValidationProblemStatusCode
+                            : 400;
+                    var contentType = attribute.ConstructorArguments.Length > 1
+                        ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString()
+                        : null;
+                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
+
+                    var producesValidationProblemList = producesValidationProblem ??= [];
+                    producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
+                    continue;
+                }
+                case RequestHandlerAttributeKind.DisplayName:
+                    displayName = attribute.ConstructorArguments.Length > 0 ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString() : null;
+                    break;
+                case RequestHandlerAttributeKind.Description:
+                    description = attribute.ConstructorArguments.Length > 0 ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString() : null;
+                    break;
+                case RequestHandlerAttributeKind.AllowAnonymous:
+                    allowAnonymous = true;
+                    hasAllowAnonymousAttribute = true;
+                    break;
+                case RequestHandlerAttributeKind.Tags:
+                    if (attribute.ConstructorArguments.Length > 0)
+                    {
+                        var arg = attribute.ConstructorArguments[0];
+                        MergeInto(ref tags, arg.Values);
+                    }
+                    break;
+                case RequestHandlerAttributeKind.ExcludeFromDescription:
+                    excludeFromDescription = true;
+                    break;
+                case RequestHandlerAttributeKind.None:
+                default:
+                    break;
+            }
+        }
+
+
+        if (enforceMethodRequireAuthorizationRules && hasRequireAuthorizationAttribute && !hasAllowAnonymousAttribute)
+            allowAnonymous = false;
+
+        var withRequestTimeout1 = withRequestTimeout ?? false;
+        var requestTimeoutPolicyName1 = withRequestTimeout1 ? requestTimeoutPolicyName : null;
+
+        return new EndpointConfiguration(name, displayName, summary, description, tags, ToEquatableOrNull(accepts),
+            ToEquatableOrNull(produces), ToEquatableOrNull(producesProblem), ToEquatableOrNull(producesValidationProblem),
+            excludeFromDescription ?? false, requireAuthorization ?? false, authorizationPolicies, disableAntiforgery ?? false,
+            allowAnonymous ?? false, requireCors ?? false, corsPolicyName, requiredHosts, requireRateLimiting ?? false,
+            rateLimitingPolicyName, ToEquatableOrNull(endpointFilters), shortCircuit ?? false, disableValidation ?? false,
+            disableRequestTimeout ?? false, withRequestTimeout1, requestTimeoutPolicyName1, order, endpointGroupName
         );
     }
 
-    public static GeneratedAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
+    public static RequestHandlerAttributeKind GetGeneratedAttributeKind(INamedTypeSymbol attributeClass)
     {
         var definition = attributeClass.OriginalDefinition;
         var cacheEntry = GeneratedAttributeKindCache.GetValue(
-            definition, static def => new GeneratedAttributeKindCacheEntry(GetGeneratedAttributeKindCore(def))
+            definition, static def => new GeneratedAttributeKindCacheEntry(def.GetRequestHandlerAttributeKind())
         );
 
         return cacheEntry.Kind;
@@ -81,216 +266,6 @@ internal static class EndpointConfigurationFactory
             return methodName[..^AsyncSuffix.Length];
 
         return methodName;
-    }
-
-    private static (string? DisplayName, string? Description) GetDisplayAndDescriptionAttributes(ISymbol methodSymbol)
-    {
-        string? displayName = null;
-        string? description = null;
-
-        foreach (var attribute in methodSymbol.GetAttributes())
-        {
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass is null)
-                continue;
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DisplayNameAttribute), ComponentModelNamespaceParts))
-            {
-                displayName = attribute.ConstructorArguments.Length > 0 ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString() : null;
-
-                continue;
-            }
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, nameof(DescriptionAttribute), ComponentModelNamespaceParts))
-                description = attribute.ConstructorArguments.Length > 0 ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString() : null;
-        }
-
-        return (displayName, description);
-    }
-
-    private static void PopulateAttributeState(ImmutableArray<AttributeData> attributes, ref EndpointAttributeState state)
-    {
-        ref var tags = ref state.Tags;
-        ref var requireAuthorization = ref state.RequireAuthorization;
-        ref var authorizationPolicies = ref state.AuthorizationPolicies;
-        ref var disableAntiforgery = ref state.DisableAntiforgery;
-        ref var allowAnonymous = ref state.AllowAnonymous;
-        ref var excludeFromDescription = ref state.ExcludeFromDescription;
-        ref var accepts = ref state.Accepts;
-        ref var produces = ref state.Produces;
-        ref var producesProblem = ref state.ProducesProblem;
-        ref var producesValidationProblem = ref state.ProducesValidationProblem;
-        ref var requireCors = ref state.RequireCors;
-        ref var corsPolicyName = ref state.CorsPolicyName;
-        ref var requiredHosts = ref state.RequiredHosts;
-        ref var requireRateLimiting = ref state.RequireRateLimiting;
-        ref var rateLimitingPolicyName = ref state.RateLimitingPolicyName;
-        ref var endpointFilters = ref state.EndpointFilters;
-        ref var endpointFilterSet = ref state.EndpointFilterSet;
-        ref var hasAllowAnonymousAttribute = ref state.HasAllowAnonymousAttribute;
-        ref var hasRequireAuthorizationAttribute = ref state.HasRequireAuthorizationAttribute;
-        ref var shortCircuit = ref state.ShortCircuit;
-        ref var disableValidation = ref state.DisableValidation;
-        ref var disableRequestTimeout = ref state.DisableRequestTimeout;
-        ref var withRequestTimeout = ref state.WithRequestTimeout;
-        ref var requestTimeoutPolicyName = ref state.RequestTimeoutPolicyName;
-        ref var order = ref state.Order;
-        ref var endpointGroupName = ref state.EndpointGroupName;
-        ref var summary = ref state.Summary;
-
-        foreach (var attribute in attributes)
-        {
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass is null)
-                continue;
-
-            switch (GetGeneratedAttributeKind(attributeClass))
-            {
-                case GeneratedAttributeKind.ShortCircuit:
-                    shortCircuit = true;
-                    continue;
-                case GeneratedAttributeKind.DisableValidation:
-                    disableValidation = true;
-                    continue;
-                case GeneratedAttributeKind.DisableRequestTimeout:
-                    disableRequestTimeout = true;
-                    withRequestTimeout = false;
-                    requestTimeoutPolicyName = null;
-                    continue;
-                case GeneratedAttributeKind.RequestTimeout:
-                {
-                    disableRequestTimeout = false;
-                    withRequestTimeout = true;
-                    string? policyName = null;
-                    if (attribute.ConstructorArguments.Length > 0)
-                        policyName = (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString();
-                    requestTimeoutPolicyName = policyName;
-                    continue;
-                }
-                case GeneratedAttributeKind.Order:
-                    if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int orderValue)
-                        order = orderValue;
-                    continue;
-                case GeneratedAttributeKind.MapGroup:
-                {
-                    var groupName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
-                    if (!string.IsNullOrEmpty(groupName))
-                        endpointGroupName = groupName;
-                    continue;
-                }
-                case GeneratedAttributeKind.Summary:
-                    if (attribute.ConstructorArguments.Length > 0)
-                    {
-                        var summaryValue = (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString();
-                        if (!string.IsNullOrEmpty(summaryValue))
-                            summary = summaryValue;
-                    }
-                    continue;
-                case GeneratedAttributeKind.Accepts:
-                    TryAddAcceptsMetadata(attribute, attributeClass, ref accepts);
-                    continue;
-                case GeneratedAttributeKind.ProducesResponse:
-                    TryAddProducesMetadata(attribute, attributeClass, ref produces);
-                    continue;
-                case GeneratedAttributeKind.RequireAuthorization:
-                    requireAuthorization = true;
-                    hasRequireAuthorizationAttribute = true;
-                    if (attribute.ConstructorArguments.Length == 1)
-                    {
-                        var arg = attribute.ConstructorArguments[0];
-                        MergeInto(ref authorizationPolicies, arg.Values);
-                    }
-
-                    continue;
-                case GeneratedAttributeKind.RequireCors:
-                    requireCors = true;
-                    corsPolicyName = attribute.ConstructorArguments.Length > 0
-                        ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
-                        : null;
-                    continue;
-                case GeneratedAttributeKind.RequireHost:
-                    if (attribute.ConstructorArguments.Length == 1)
-                    {
-                        var arg = attribute.ConstructorArguments[0];
-                        if (arg is { Kind: TypedConstantKind.Array, Values.Length: > 0 })
-                            MergeInto(ref requiredHosts, arg.Values);
-                        else if (arg.Value is string singleHost && !string.IsNullOrWhiteSpace(singleHost))
-                            MergeInto(ref requiredHosts, [singleHost.Trim()]);
-                    }
-
-                    continue;
-                case GeneratedAttributeKind.RequireRateLimiting:
-                {
-                    var policyName = attribute.ConstructorArguments.Length > 0
-                        ? (attribute.ConstructorArguments[0].Value as string).NormalizeOptionalString()
-                        : null;
-
-                    if (!string.IsNullOrEmpty(policyName))
-                    {
-                        requireRateLimiting = true;
-                        rateLimitingPolicyName = policyName;
-                    }
-
-                    continue;
-                }
-                case GeneratedAttributeKind.EndpointFilter:
-                    TryAddEndpointFilter(attribute, attributeClass, ref endpointFilters, ref endpointFilterSet);
-                    continue;
-                case GeneratedAttributeKind.DisableAntiforgery:
-                    disableAntiforgery = true;
-                    continue;
-                case GeneratedAttributeKind.ProducesProblem:
-                {
-                    var statusCode = attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesProblemStatusCode
-                        ? producesProblemStatusCode
-                        : 500;
-                    var contentType = attribute.ConstructorArguments.Length > 1
-                        ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString()
-                        : null;
-                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
-
-                    var producesProblemList = producesProblem ??= [];
-                    producesProblemList.Add(new ProducesProblemMetadata(statusCode, contentType, additionalContentTypes));
-                    continue;
-                }
-                case GeneratedAttributeKind.ProducesValidationProblem:
-                {
-                    var statusCode =
-                        attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is int producesValidationProblemStatusCode
-                            ? producesValidationProblemStatusCode
-                            : 400;
-                    var contentType = attribute.ConstructorArguments.Length > 1
-                        ? (attribute.ConstructorArguments[1].Value as string).NormalizeOptionalString()
-                        : null;
-                    var additionalContentTypes = attribute.ConstructorArguments.Length > 2 ? GetStringArrayValues(attribute.ConstructorArguments[2]) : null;
-
-                    var producesValidationProblemList = producesValidationProblem ??= [];
-                    producesValidationProblemList.Add(new ProducesValidationProblemMetadata(statusCode, contentType, additionalContentTypes));
-                    continue;
-                }
-            }
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, AllowAnonymousAttributeName, AspNetCoreAuthorizationNamespaceParts))
-            {
-                allowAnonymous = true;
-                hasAllowAnonymousAttribute = true;
-                continue;
-            }
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, "TagsAttribute", AspNetCoreHttpNamespaceParts))
-            {
-                if (attribute.ConstructorArguments.Length > 0)
-                {
-                    var arg = attribute.ConstructorArguments[0];
-                    MergeInto(ref tags, arg.Values);
-                }
-
-                continue;
-            }
-
-            if (AttributeSymbolMatcher.IsAttribute(attributeClass, "ExcludeFromDescriptionAttribute", AspNetCoreRoutingNamespaceParts))
-                excludeFromDescription = true;
-        }
     }
 
     private static void MergeInto(ref EquatableImmutableArray<string>? target, IEnumerable<string> values)
@@ -452,36 +427,9 @@ internal static class EndpointConfigurationFactory
         endpointFilters.Add(displayString);
     }
 
-    private static GeneratedAttributeKind GetGeneratedAttributeKindCore(INamedTypeSymbol definition)
-    {
-        if (!AttributeSymbolMatcher.IsInNamespace(definition.ContainingNamespace, AttributesNamespaceParts))
-            return GeneratedAttributeKind.None;
 
-        return definition.Name switch
-        {
-            ShortCircuitAttributeName => GeneratedAttributeKind.ShortCircuit,
-            DisableValidationAttributeName => GeneratedAttributeKind.DisableValidation,
-            DisableRequestTimeoutAttributeName => GeneratedAttributeKind.DisableRequestTimeout,
-            RequestTimeoutAttributeName => GeneratedAttributeKind.RequestTimeout,
-            OrderAttributeName => GeneratedAttributeKind.Order,
-            MapGroupAttributeName => GeneratedAttributeKind.MapGroup,
-            SummaryAttributeName => GeneratedAttributeKind.Summary,
-            AcceptsAttributeName => GeneratedAttributeKind.Accepts,
-            ProducesResponseAttributeName => GeneratedAttributeKind.ProducesResponse,
-            RequireAuthorizationAttributeName => GeneratedAttributeKind.RequireAuthorization,
-            RequireCorsAttributeName => GeneratedAttributeKind.RequireCors,
-            RequireHostAttributeName => GeneratedAttributeKind.RequireHost,
-            RequireRateLimitingAttributeName => GeneratedAttributeKind.RequireRateLimiting,
-            EndpointFilterAttributeName => GeneratedAttributeKind.EndpointFilter,
-            DisableAntiforgeryAttributeName => GeneratedAttributeKind.DisableAntiforgery,
-            ProducesProblemAttributeName => GeneratedAttributeKind.ProducesProblem,
-            ProducesValidationProblemAttributeName => GeneratedAttributeKind.ProducesValidationProblem,
-            _ => GeneratedAttributeKind.None,
-        };
-    }
-
-    private sealed class GeneratedAttributeKindCacheEntry(GeneratedAttributeKind kind)
+    private sealed class GeneratedAttributeKindCacheEntry(RequestHandlerAttributeKind kind)
     {
-        public GeneratedAttributeKind Kind { get; } = kind;
+        public RequestHandlerAttributeKind Kind { get; } = kind;
     }
 }

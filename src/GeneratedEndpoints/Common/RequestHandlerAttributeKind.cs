@@ -1,6 +1,6 @@
 namespace GeneratedEndpoints.Common;
 
-internal enum GeneratedAttributeKind
+internal enum RequestHandlerAttributeKind
 {
     None = 0,
     ShortCircuit,
@@ -20,4 +20,9 @@ internal enum GeneratedAttributeKind
     DisableAntiforgery,
     ProducesProblem,
     ProducesValidationProblem,
+    DisplayName,
+    Description,
+    AllowAnonymous,
+    Tags,
+    ExcludeFromDescription
 }
