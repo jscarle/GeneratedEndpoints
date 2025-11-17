@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
 

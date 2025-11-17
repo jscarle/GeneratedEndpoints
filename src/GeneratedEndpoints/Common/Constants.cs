@@ -1,5 +1,3 @@
-using System.ComponentModel;
-
 namespace GeneratedEndpoints.Common;
 
 internal static partial class Constants
@@ -7,8 +5,6 @@ internal static partial class Constants
     internal const string FallbackHttpMethod = "__FALLBACK__";
 
     internal const string NameAttributeNamedParameter = "Name";
-    internal const string ResponseTypeAttributeNamedParameter = "ResponseType";
-    internal const string RequestTypeAttributeNamedParameter = "RequestType";
     internal const string IsOptionalAttributeNamedParameter = "IsOptional";
 
     internal const string RequireAuthorizationAttributeName = "RequireAuthorizationAttribute";

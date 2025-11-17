@@ -22,9 +22,9 @@ internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
 {
     [Tags("Featured")]
     [AllowAnonymous]
-    [Accepts("application/json", "application/xml", RequestType = typeof(GetUserRequest))]
+    [Accepts(typeof(GetUserRequest), "application/json", "application/xml")]
     [Accepts<GetUserMetadata>("application/json", "application/xml", IsOptional = true)]
-    [ProducesResponse(StatusCodes.Status200OK, "application/json", ResponseType = typeof(UserProfile))]
+    [ProducesResponse(typeof(UserProfile), StatusCodes.Status200OK, "application/json")]
     [ProducesResponse<UserProfile>(StatusCodes.Status202Accepted, "application/json")]
     [ProducesProblem(StatusCodes.Status500InternalServerError, "application/problem+json")]
     [ProducesValidationProblem(StatusCodes.Status400BadRequest, "application/problem+json")]

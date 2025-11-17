@@ -21,15 +21,15 @@ internal sealed class EndpointFilterAttribute : global::System.Attribute
     /// <summary>
     /// Gets the CLR type of the endpoint filter.
     /// </summary>
-    public global::System.Type FilterType { get; }
+    public global::System.Type Type { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EndpointFilterAttribute"/> class.
     /// </summary>
-    /// <param name="filterType">The CLR type of the endpoint filter.</param>
-    public EndpointFilterAttribute(global::System.Type filterType)
+    /// <param name="type">The CLR type of the endpoint filter.</param>
+    public EndpointFilterAttribute(global::System.Type type)
     {
-        FilterType = filterType ?? throw new global::System.ArgumentNullException(nameof(filterType));
+        Type = type;
     }
 }
 
@@ -43,5 +43,5 @@ internal sealed class EndpointFilterAttribute<TFilter> : global::System.Attribut
     /// <summary>
     /// Gets the CLR type of the endpoint filter.
     /// </summary>
-    public global::System.Type FilterType => typeof(TFilter);
+    public global::System.Type Type => typeof(TFilter);
 }

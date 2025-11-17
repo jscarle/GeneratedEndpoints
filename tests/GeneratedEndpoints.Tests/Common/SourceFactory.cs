@@ -380,7 +380,7 @@ public static class SourceFactory
         {
             var secondProduces = string.IsNullOrWhiteSpace(producesContentType2) ? "" : $", \"{producesContentType2}\"";
             builder.AppendLine(
-                $"    [ProducesResponse(200, \"{producesContentType1 ?? "application/json"}\"{secondProduces}, ResponseType = typeof(ResponseRecord))]"
+                $"    [ProducesResponse(typeof(ResponseRecord), 200, \"{producesContentType1 ?? "application/json"}\"{secondProduces})]"
             );
         }
 

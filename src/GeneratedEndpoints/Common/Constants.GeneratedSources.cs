@@ -370,14 +370,9 @@ internal static partial class Constants
                                                                                        internal sealed class {{AcceptsAttributeName}} : global::System.Attribute
                                                                                        {
                                                                                            /// <summary>
-                                                                                           /// Gets the request type accepted by the endpoint.
+                                                                                           /// Gets the CLR type of the endpoint filter.
                                                                                            /// </summary>
-                                                                                           public global::System.Type? RequestType { get; init; }
-
-                                                                                           /// <summary>
-                                                                                           /// Gets a value indicating whether the request body is optional.
-                                                                                           /// </summary>
-                                                                                           public bool IsOptional { get; init; }
+                                                                                           public global::System.Type Type { get; }
 
                                                                                            /// <summary>
                                                                                            /// Gets the primary content type accepted by the endpoint.
@@ -390,14 +385,21 @@ internal static partial class Constants
                                                                                            public string[] AdditionalContentTypes { get; }
 
                                                                                            /// <summary>
+                                                                                           /// Gets a value indicating whether the request body is optional.
+                                                                                           /// </summary>
+                                                                                           public bool IsOptional { get; init; }
+
+                                                                                           /// <summary>
                                                                                            /// Initializes a new instance of the <see cref="{{AcceptsAttributeName}}"/> class.
                                                                                            /// </summary>
+                                                                                           /// <param name="type">The CLR type of the request body.</param>
                                                                                            /// <param name="contentType">The primary content type accepted by the endpoint.</param>
                                                                                            /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
-                                                                                           public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
+                                                                                           public {{AcceptsAttributeName}}(global::System.Type type, string contentType = "application/json", params string[] additionalContentTypes)
                                                                                            {
-                                                                                               ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
-                                                                                               AdditionalContentTypes = additionalContentTypes ?? [];
+                                                                                               Type = type;
+                                                                                               ContentType = contentType;
+                                                                                               AdditionalContentTypes = additionalContentTypes;
                                                                                            }
                                                                                        }
 
@@ -409,14 +411,9 @@ internal static partial class Constants
                                                                                        internal sealed class {{AcceptsAttributeName}}<TRequest> : global::System.Attribute
                                                                                        {
                                                                                            /// <summary>
-                                                                                           /// Gets the request type accepted by the endpoint.
+                                                                                           /// Gets the CLR type of the endpoint filter.
                                                                                            /// </summary>
-                                                                                           public global::System.Type RequestType => typeof(TRequest);
-
-                                                                                           /// <summary>
-                                                                                           /// Gets a value indicating whether the request body is optional.
-                                                                                           /// </summary>
-                                                                                           public bool IsOptional { get; init; }
+                                                                                           public global::System.Type Type => typeof(TRequest);
 
                                                                                            /// <summary>
                                                                                            /// Gets the primary content type accepted by the endpoint.
@@ -429,14 +426,19 @@ internal static partial class Constants
                                                                                            public string[] AdditionalContentTypes { get; }
 
                                                                                            /// <summary>
+                                                                                           /// Gets a value indicating whether the request body is optional.
+                                                                                           /// </summary>
+                                                                                           public bool IsOptional { get; init; }
+
+                                                                                           /// <summary>
                                                                                            /// Initializes a new instance of the generic Accepts attribute class.
                                                                                            /// </summary>
                                                                                            /// <param name="contentType">The primary content type accepted by the endpoint.</param>
                                                                                            /// <param name="additionalContentTypes">Additional content types accepted by the endpoint.</param>
                                                                                            public {{AcceptsAttributeName}}(string contentType = "application/json", params string[] additionalContentTypes)
                                                                                            {
-                                                                                               ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/json" : contentType;
-                                                                                               AdditionalContentTypes = additionalContentTypes ?? [];
+                                                                                               ContentType = contentType;
+                                                                                               AdditionalContentTypes = additionalContentTypes;
                                                                                            }
                                                                                        }
 
@@ -457,15 +459,15 @@ internal static partial class Constants
                                                                                                   /// <summary>
                                                                                                   /// Gets the CLR type of the endpoint filter.
                                                                                                   /// </summary>
-                                                                                                  public global::System.Type FilterType { get; }
+                                                                                                  public global::System.Type Type { get; }
 
                                                                                                   /// <summary>
                                                                                                   /// Initializes a new instance of the <see cref="{{EndpointFilterAttributeName}}"/> class.
                                                                                                   /// </summary>
-                                                                                                  /// <param name="filterType">The CLR type of the endpoint filter.</param>
-                                                                                                  public {{EndpointFilterAttributeName}}(global::System.Type filterType)
+                                                                                                  /// <param name="type">The CLR type of the endpoint filter.</param>
+                                                                                                  public {{EndpointFilterAttributeName}}(global::System.Type type)
                                                                                                   {
-                                                                                                      FilterType = filterType ?? throw new global::System.ArgumentNullException(nameof(filterType));
+                                                                                                      Type = type;
                                                                                                   }
                                                                                               }
 
@@ -479,7 +481,7 @@ internal static partial class Constants
                                                                                                   /// <summary>
                                                                                                   /// Gets the CLR type of the endpoint filter.
                                                                                                   /// </summary>
-                                                                                                  public global::System.Type FilterType => typeof(TFilter);
+                                                                                                  public global::System.Type Type => typeof(TFilter);
                                                                                               }
 
                                                                                               """, Encoding.UTF8
@@ -496,10 +498,10 @@ internal static partial class Constants
                                                                                                 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                                                                                                 internal sealed class {{ProducesResponseAttributeName}} : global::System.Attribute
                                                                                                 {
-                                                                                                /// <summary>
-                                                                                                /// Gets the response type produced by the endpoint.
-                                                                                                /// </summary>
-                                                                                                public global::System.Type? ResponseType { get; init; }
+                                                                                                    /// <summary>
+                                                                                                    /// Gets the response type produced by the endpoint.
+                                                                                                    /// </summary>
+                                                                                                    public global::System.Type Type { get; }
 
                                                                                                     /// <summary>
                                                                                                     /// Gets the HTTP status code returned by the endpoint.
@@ -519,11 +521,13 @@ internal static partial class Constants
                                                                                                     /// <summary>
                                                                                                     /// Initializes a new instance of the <see cref="{{ProducesResponseAttributeName}}"/> class.
                                                                                                     /// </summary>
+                                                                                                    /// <param name="type">The CLR type of the response body.</param>
                                                                                                     /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
                                                                                                     /// <param name="contentType">The primary content type produced by the endpoint.</param>
                                                                                                     /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
-                                                                                                    public {{ProducesResponseAttributeName}}(int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status200OK, string? contentType = null, params string[] additionalContentTypes)
+                                                                                                    public {{ProducesResponseAttributeName}}(global::System.Type type, int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status200OK, string? contentType = null, params string[] additionalContentTypes)
                                                                                                     {
+                                                                                                        Type = type;
                                                                                                         StatusCode = statusCode;
                                                                                                         ContentType = contentType;
                                                                                                         AdditionalContentTypes = additionalContentTypes ?? [];
@@ -540,7 +544,7 @@ internal static partial class Constants
                                                                                                     /// <summary>
                                                                                                     /// Gets the response type produced by the endpoint.
                                                                                                     /// </summary>
-                                                                                                    public global::System.Type ResponseType => typeof(TResponse);
+                                                                                                    public global::System.Type Type => typeof(TResponse);
 
                                                                                                     /// <summary>
                                                                                                     /// Gets the HTTP status code returned by the endpoint.

@@ -56,6 +56,14 @@ internal static class AttributeDataExtensions
         return null;
     }
 
+    public static ITypeSymbol? GetConstructorTypeSymbol(this AttributeData attribute, int position = 0)
+    {
+        if (attribute.ConstructorArguments.Length > position && attribute.ConstructorArguments[position].Value is ITypeSymbol typeSymbol)
+            return typeSymbol;
+
+        return null;
+    }
+
     public static ITypeSymbol? GetNamedTypeSymbol(this AttributeData attribute, string namedParameter)
     {
         foreach (var namedArg in attribute.NamedArguments)
