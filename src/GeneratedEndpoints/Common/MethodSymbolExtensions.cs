@@ -69,6 +69,10 @@ internal static class MethodSymbolExtensions
         return bindingPrefix;
     }
 
+    internal static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
+    internal static readonly string[] AspNetCoreMvcNamespaceParts = ["Microsoft", "AspNetCore", "Mvc"];
+    internal static readonly string[] ExtensionsDependencyInjectionNamespaceParts = ["Microsoft", "Extensions", "DependencyInjection"];
+
     private static BindingSource GetBindingSourceFromAttributeClass(INamedTypeSymbol attributeClass)
     {
         var definition = attributeClass.OriginalDefinition;

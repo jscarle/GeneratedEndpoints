@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static GeneratedEndpoints.Common.Constants;
 
 namespace GeneratedEndpoints.Common;
@@ -80,7 +79,7 @@ internal static class RequestHandlerClassHelper
         if (methodSymbol.Parameters.Length == 2)
         {
             var serviceProviderParameter = methodSymbol.Parameters[1];
-            if (!IsServiceProviderParameter(serviceProviderParameter.Type))
+            if (!serviceProviderParameter.Type.IsIServiceProvider())
                 return false;
 
             acceptsServiceProvider = true;
@@ -89,64 +88,9 @@ internal static class RequestHandlerClassHelper
         if (!methodSymbol.ReturnsVoid)
             return false;
 
-        if (!HasEndpointConventionBuilderConstraint(builderTypeParameter, methodSymbol))
+        if (!builderTypeParameter.ConstraintTypes.Any(x => x.IsIEndpointConventionBuilder()))
             return false;
 
         return true;
-    }
-
-    private static bool IsServiceProviderParameter(ITypeSymbol typeSymbol)
-    {
-        return MatchesServiceProvider(typeSymbol);
-    }
-
-    private static bool HasEndpointConventionBuilderConstraint(ITypeParameterSymbol builderTypeParameter, IMethodSymbol methodSymbol)
-    {
-        var symbolMatches = builderTypeParameter.ConstraintTypes.Any(MatchesEndpointConventionBuilder);
-        if (symbolMatches)
-            return true;
-
-        return methodSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax())
-            .OfType<MethodDeclarationSyntax>()
-            .SelectMany(methodSyntax => methodSyntax.ConstraintClauses)
-            .Where(clause => string.Equals(clause.Name.Identifier.ValueText, builderTypeParameter.Name, StringComparison.Ordinal))
-            .SelectMany(clause => clause.Constraints.OfType<TypeConstraintSyntax>())
-            .Any(constraint => IsEndpointConventionBuilderIdentifier(constraint.Type));
-    }
-
-    private static bool IsEndpointConventionBuilderIdentifier(TypeSyntax typeSyntax)
-    {
-        return typeSyntax switch
-        {
-            QualifiedNameSyntax qualified => IsEndpointConventionBuilderIdentifier(qualified.Right),
-            AliasQualifiedNameSyntax alias => IsEndpointConventionBuilderIdentifier(alias.Name),
-            SimpleNameSyntax simple => string.Equals(simple.Identifier.ValueText, "IEndpointConventionBuilder", StringComparison.Ordinal),
-            _ => false,
-        };
-    }
-
-    private static bool MatchesEndpointConventionBuilder(ITypeSymbol typeSymbol)
-    {
-        if (typeSymbol is not INamedTypeSymbol namedType)
-            return false;
-
-        if (!string.Equals(namedType.Name, "IEndpointConventionBuilder", StringComparison.Ordinal))
-            return false;
-
-        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? "";
-        return string.Equals(containingNamespace, "Microsoft.AspNetCore.Builder", StringComparison.Ordinal);
-    }
-
-    private static bool MatchesServiceProvider(ITypeSymbol typeSymbol)
-    {
-        if (typeSymbol is not INamedTypeSymbol namedType)
-            return false;
-
-        if (!string.Equals(namedType.Name, "IServiceProvider", StringComparison.Ordinal))
-            return false;
-
-        var containingNamespace = namedType.ContainingNamespace?.ToDisplayString() ?? "";
-        return string.Equals(containingNamespace, "System", StringComparison.Ordinal);
     }
 }

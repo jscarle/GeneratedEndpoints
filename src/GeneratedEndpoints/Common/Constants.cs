@@ -47,12 +47,6 @@ internal static partial class Constants
     internal const string SummaryAttributeName = "SummaryAttribute";
     internal const string SummaryAttributeHint = $"{SummaryAttributeFullyQualifiedName}.gs.cs";
 
-    internal const string DisplayNameAttributeName = nameof(DisplayNameAttribute);
-    internal const string DescriptionAttributeName = nameof(DescriptionAttribute);
-    internal const string AllowAnonymousAttributeName = "AllowAnonymousAttribute";
-    internal const string TagsAttributeName = "TagsAttribute";
-    internal const string ExcludeFromDescriptionAttributeName = "ExcludeFromDescriptionAttribute";
-
     internal const string EndpointFilterAttributeName = "EndpointFilterAttribute";
     internal const string EndpointFilterAttributeHint = $"{EndpointFilterAttributeFullyQualifiedName}.gs.cs";
 
@@ -82,15 +76,7 @@ internal static partial class Constants
     internal const string AsyncSuffix = "Async";
     internal const string ApplicationJsonContentType = "application/json";
     internal const string GlobalPrefix = "global::";
-    internal const string Dot = ".";
 
-    internal static readonly string[] AttributesNamespaceParts = AttributesNamespace.Split('.');
-    internal static readonly string[] AspNetCoreHttpNamespaceParts = ["Microsoft", "AspNetCore", "Http"];
-    internal static readonly string[] AspNetCoreMvcNamespaceParts = ["Microsoft", "AspNetCore", "Mvc"];
-    internal static readonly string[] AspNetCoreAuthorizationNamespaceParts = ["Microsoft", "AspNetCore", "Authorization"];
-    internal static readonly string[] AspNetCoreRoutingNamespaceParts = ["Microsoft", "AspNetCore", "Routing"];
-    internal static readonly string[] ExtensionsDependencyInjectionNamespaceParts = ["Microsoft", "Extensions", "DependencyInjection"];
-    internal static readonly string[] ComponentModelNamespaceParts = ["System", "ComponentModel"];
     private const string BaseNamespace = "Microsoft.AspNetCore.Generated";
     private const string AttributesNamespace = $"{BaseNamespace}.Attributes";
     private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";

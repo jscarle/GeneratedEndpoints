@@ -4,12 +4,36 @@ namespace GeneratedEndpoints.Common;
 
 internal static class TypeSymbolExtensions
 {
+    public static bool IsIEndpointConventionBuilder(this ITypeSymbol symbol)
+    {
+        return symbol is
+        {
+            MetadataName: "IEndpointConventionBuilder",
+            ContainingNamespace:
+            {
+                Name: "Builder",
+                ContainingNamespace: { Name: "AspNetCore", ContainingNamespace: { Name: "Microsoft", ContainingNamespace.IsGlobalNamespace: true } },
+            },
+        };
+    }
+
+    public static bool IsIServiceProvider(this ITypeSymbol symbol)
+    {
+        return symbol is
+        {
+            MetadataName: "IServiceProvider",
+            ContainingNamespace:
+            {
+                Name: "System", ContainingNamespace.IsGlobalNamespace: true,
+            },
+        };
+    }
+
     public static bool IsAwaitable(this ITypeSymbol symbol)
     {
         return symbol switch
         {
-            INamedTypeSymbol
-                {
+            {
                     MetadataName: "ValueTask`1",
                     ContainingNamespace:
                     {
@@ -17,7 +41,7 @@ internal static class TypeSymbolExtensions
                         ContainingNamespace: { Name: "Threading", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } },
                     },
                 }
-                or INamedTypeSymbol
+                or
                 {
                     MetadataName: "Task`1",
                     ContainingNamespace:
@@ -26,7 +50,7 @@ internal static class TypeSymbolExtensions
                         ContainingNamespace: { Name: "Threading", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } },
                     },
                 }
-                or INamedTypeSymbol
+                or
                 {
                     MetadataName: "ValueTask",
                     ContainingNamespace:
@@ -35,7 +59,7 @@ internal static class TypeSymbolExtensions
                         ContainingNamespace: { Name: "Threading", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } },
                     },
                 }
-                or INamedTypeSymbol
+                or
                 {
                     MetadataName: "Task",
                     ContainingNamespace:

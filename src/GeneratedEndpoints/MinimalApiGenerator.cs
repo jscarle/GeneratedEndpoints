@@ -17,42 +17,9 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         context.RegisterPostInitializationOutput(RegisterAttributes);
 
-        var requestHandlerProviders = ImmutableArray.CreateBuilder<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
-
-        for (var index = 0; index < HttpAttributeDefinitions.Length; index++)
-        {
-            var definition = HttpAttributeDefinitions[index];
-            var handlers = context.SyntaxProvider
-                .ForAttributeWithMetadataName(definition.FullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
-                .WhereNotNull()
-                .Collect();
-
-            requestHandlerProviders.Add(handlers);
-        }
-
-        var requestHandlers = CombineRequestHandlers(requestHandlerProviders);
+        var requestHandlers = GetRequestHandlers(context);
 
         context.RegisterSourceOutput(requestHandlers, GenerateSource);
-    }
-
-    private static IncrementalValueProvider<EquatableImmutableArray<RequestHandler>> CombineRequestHandlers(
-        ImmutableArray<IncrementalValueProvider<ImmutableArray<RequestHandler>>>.Builder builder
-    )
-    {
-        var handlerProvidersArray = builder.MoveToImmutable();
-
-        if (handlerProvidersArray.IsDefaultOrEmpty)
-            throw new InvalidOperationException("No HTTP attribute definitions were provided.");
-
-        var combined = handlerProvidersArray[0];
-        for (var i = 1; i < handlerProvidersArray.Length; i++)
-        {
-            combined = combined.Combine(handlerProvidersArray[i])
-                .Select(static (x, _) => x.Left.AddRange(x.Right));
-        }
-
-        return combined
-            .Select((x, _) => x.ToEquatableImmutableArray());
     }
 
     private static void RegisterAttributes(IncrementalGeneratorPostInitializationContext context)
@@ -77,6 +44,44 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         context.AddSource(RequireRateLimitingAttributeHint, RequireRateLimitingAttributeSourceText);
         context.AddSource(ShortCircuitAttributeHint, ShortCircuitAttributeSourceText);
         context.AddSource(SummaryAttributeHint, SummaryAttributeSourceText);
+    }
+
+    private static IncrementalValueProvider<EquatableImmutableArray<RequestHandler>> GetRequestHandlers(IncrementalGeneratorInitializationContext context)
+    {
+        var list = new List<IncrementalValueProvider<ImmutableArray<RequestHandler>>>(HttpAttributeDefinitions.Length);
+
+        for (var index = 0; index < HttpAttributeDefinitions.Length; index++)
+        {
+            var definition = HttpAttributeDefinitions[index];
+            var handlers = context.SyntaxProvider
+                .ForAttributeWithMetadataName(definition.FullyQualifiedName, RequestHandlerFilter, RequestHandlerTransform)
+                .WhereNotNull()
+                .Collect();
+
+            list.Add(handlers);
+        }
+
+        if (list.Count == 0)
+            throw new InvalidOperationException("No HTTP attribute definitions were provided.");
+
+        var combined = list[0];
+        for (var i = 1; i < list.Count; i++)
+        {
+            combined = combined.Combine(list[i])
+                .Select(static (x, ct) =>
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        return x.Left.AddRange(x.Right);
+                    }
+                );
+        }
+
+        return combined.Select((x, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return x.ToEquatableImmutableArray();
+            }
+        );
     }
 
     private static bool RequestHandlerFilter(SyntaxNode syntaxNode, CancellationToken cancellationToken)
@@ -135,30 +140,23 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var normalized = NormalizeRequestHandlers(requestHandlers);
+        ResolveEndpointNameCollisions(requestHandlers);
 
-        var grouped = normalized.GroupBy(x => x.Class).OrderBy(x => x.Key)
-            .ToImmutableSortedDictionary(x => x.Key, x => x.OrderBy(y => y.Method).ToImmutableArray());
+        var grouped = requestHandlers.GroupBy(x => x.Class)
+            .OrderBy(x => x.Key)
+            .ToImmutableSortedDictionary(x => x.Key, x => x.OrderBy(y => y.Method)
+                .ToImmutableArray()
+            );
 
         AddEndpointHandlersGenerator.GenerateSource(context, grouped);
         UseEndpointHandlersGenerator.GenerateSource(context, grouped);
     }
 
-    private static EquatableImmutableArray<RequestHandler> NormalizeRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
-        if (requestHandlers.Count <= 1)
-            return requestHandlers;
-
-        ResolveEndpointNameCollisions(requestHandlers);
-#pragma warning disable S125
-        //requestHandlers.SortInPlace(RequestHandlerComparer.Instance);
-#pragma warning restore S125
-
-        return requestHandlers;
-    }
-
     private static void ResolveEndpointNameCollisions(EquatableImmutableArray<RequestHandler> requestHandlers)
     {
+        if (requestHandlers.Count <= 1)
+            return;
+
         var raw = requestHandlers.AsArray();
         if (raw is null)
             return;
