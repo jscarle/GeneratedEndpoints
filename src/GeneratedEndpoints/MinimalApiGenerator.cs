@@ -176,22 +176,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         if (requestHandlers.Count <= 1)
             return requestHandlers;
 
-        var sorted = SortRequestHandlers(requestHandlers);
-        return EnsureUniqueEndpointNames(sorted);
-    }
+        var sorted = requestHandlers.SortInPlace(RequestHandlerComparer.Instance);
+        var unique = EnsureUniqueEndpointNames(sorted);
 
-    private static EquatableImmutableArray<RequestHandler> SortRequestHandlers(EquatableImmutableArray<RequestHandler> requestHandlers)
-    {
-        var count = requestHandlers.Count;
-
-        var builder = ImmutableArray.CreateBuilder<RequestHandler>(count);
-        for (var index = 0; index < count; index++)
-        {
-            builder.Add(requestHandlers[index]);
-        }
-
-        builder.Sort(RequestHandlerComparer.Instance);
-        return builder.ToEquatableImmutable();
+        return unique;
     }
 
     private static EquatableImmutableArray<RequestHandler> EnsureUniqueEndpointNames(EquatableImmutableArray<RequestHandler> requestHandlers)
@@ -237,7 +225,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             nameToCollision[key] = collision;
         }
 
-        return builder is null ? requestHandlers : builder.ToEquatableImmutable();
+        return builder?.ToEquatableImmutable() ?? requestHandlers;
     }
 
     private static string GetFullyQualifiedMethodDisplayName(RequestHandler requestHandler)
