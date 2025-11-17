@@ -171,17 +171,17 @@ public class GeneratedSourceTests
     }
 
     [Theory]
-    [InlineData(true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, "application/xml", "text/xml",
+    [InlineData(true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, "application/xml", "text/xml",
         "application/json", "text/json"
     )]
-    [InlineData(false, false, true, false, false, true, false, true, true, false, false, false, true, true, false, true, "application/custom", null,
+    [InlineData(false, false, true, false, false, true, false, true, false, true, false, false, true, true, false, true, false, "application/custom", null,
         "application/problem+json", null
     )]
-    [InlineData(true, true, false, true, true, false, true, false, false, true, true, true, false, false, true, true, null, null, null, null)]
-    [InlineData(false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, "application/xml", null,
+    [InlineData(true, true, false, true, true, false, true, false, false, false, true, true, true, false, false, true, true, null, null, null, null)]
+    [InlineData(false, true, false, true, false, true, false, true, false, true, false, false, true, false, true, false, true, "application/xml", null,
         "application/json", null
     )]
-    [InlineData(true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, null, "text/plain", null, "text/plain")]
+    [InlineData(true, false, true, false, true, false, true, false, true, false, true, false, true, true, false, true, false, null, "text/plain", null, "text/plain")]
     public async Task ContractsAndBindingMatrix(
         bool withNamespace,
         bool includeBindingNames,
@@ -191,6 +191,7 @@ public class GeneratedSourceTests
         bool includeAccepts,
         bool includeGenericAccepts,
         bool includeProducesResponse,
+        bool includeGenericProducesResponse,
         bool includeProducesProblem,
         bool includeProducesValidationProblem,
         bool includeSummaryAndDescription,
@@ -206,7 +207,7 @@ public class GeneratedSourceTests
     )
     {
         var source = SourceFactory.BuildContractsAndBindingSource(includeBindingNames, includeAsParameters, includeFromServices, includeFromKeyedServices,
-            includeAccepts, includeGenericAccepts, includeProducesResponse, includeProducesProblem, includeProducesValidationProblem,
+            includeAccepts, includeGenericAccepts, includeProducesResponse, includeGenericProducesResponse, includeProducesProblem, includeProducesValidationProblem,
             includeSummaryAndDescription, includeDisplayName, includeTags, excludeFromDescription, allowAnonymous, methodRequiresAuthorization,
             acceptsContentType1, acceptsContentType2, producesContentType1, producesContentType2
         );
