@@ -92,7 +92,7 @@ internal static class UseEndpointHandlersGenerator
         for (var index = 0; index < requestHandlers.Count; index++)
         {
             var handler = requestHandlers[index];
-            if (handler.Method.Configuration.RequireRateLimiting)
+            if (handler.Class.Configuration.RequireRateLimiting || handler.Method.Configuration.RequireRateLimiting)
                 return true;
         }
 
@@ -465,29 +465,37 @@ internal static class UseEndpointHandlersGenerator
         var displayName = methodConfiguration.DisplayName ?? classConfiguration.DisplayName;
         var summary = methodConfiguration.Summary ?? classConfiguration.Summary;
         var description = methodConfiguration.Description ?? classConfiguration.Description;
-        var tags = MergeDistinctStrings(classConfiguration.Tags, methodConfiguration.Tags);
-        var accepts = ConcatEquatable(classConfiguration.Accepts, methodConfiguration.Accepts);
-        var produces = ConcatEquatable(classConfiguration.Produces, methodConfiguration.Produces);
-        var producesProblem = ConcatEquatable(classConfiguration.ProducesProblem, methodConfiguration.ProducesProblem);
-        var producesValidationProblem = ConcatEquatable(classConfiguration.ProducesValidationProblem, methodConfiguration.ProducesValidationProblem);
-        var excludeFromDescription = classConfiguration.ExcludeFromDescription || methodConfiguration.ExcludeFromDescription;
-        var authorizationPolicies = MergeDistinctStrings(classConfiguration.AuthorizationPolicies, methodConfiguration.AuthorizationPolicies);
-        var requiredHosts = MergeDistinctStrings(classConfiguration.RequiredHosts, methodConfiguration.RequiredHosts);
-        var endpointFilterTypes = ConcatEquatable(classConfiguration.EndpointFilterTypes, methodConfiguration.EndpointFilterTypes);
-        var requireAuthorization = classConfiguration.RequireAuthorization || methodConfiguration.RequireAuthorization;
-        var disableAntiforgery = classConfiguration.DisableAntiforgery || methodConfiguration.DisableAntiforgery;
-        var allowAnonymous = classConfiguration.AllowAnonymous || methodConfiguration.AllowAnonymous;
-        var requireCors = classConfiguration.RequireCors || methodConfiguration.RequireCors;
+
+        var tags = MergeDistinctStrings(methodConfiguration.Tags, classConfiguration.Tags);
+        var accepts = ConcatEquatable(methodConfiguration.Accepts, classConfiguration.Accepts);
+        var produces = ConcatEquatable(methodConfiguration.Produces, classConfiguration.Produces);
+        var producesProblem = ConcatEquatable(methodConfiguration.ProducesProblem, classConfiguration.ProducesProblem);
+        var producesValidationProblem = ConcatEquatable(methodConfiguration.ProducesValidationProblem, classConfiguration.ProducesValidationProblem);
+
+        var excludeFromDescription = methodConfiguration.ExcludeFromDescription || classConfiguration.ExcludeFromDescription;
+
+        var authorizationPolicies = MergeDistinctStrings(methodConfiguration.AuthorizationPolicies, classConfiguration.AuthorizationPolicies);
+        var requiredHosts = MergeDistinctStrings(methodConfiguration.RequiredHosts, classConfiguration.RequiredHosts);
+        var endpointFilterTypes = ConcatEquatable(methodConfiguration.EndpointFilterTypes, classConfiguration.EndpointFilterTypes);
+
+        var requireAuthorization = methodConfiguration.RequireAuthorization || classConfiguration.RequireAuthorization;
+        var disableAntiforgery = methodConfiguration.DisableAntiforgery || classConfiguration.DisableAntiforgery;
+        var allowAnonymous = methodConfiguration.AllowAnonymous || classConfiguration.AllowAnonymous;
+
+        var requireCors = methodConfiguration.RequireCors || classConfiguration.RequireCors;
         var corsPolicyName = methodConfiguration.CorsPolicyName ?? classConfiguration.CorsPolicyName;
-        var requireRateLimiting = classConfiguration.RequireRateLimiting || methodConfiguration.RequireRateLimiting;
+
+        var requireRateLimiting = methodConfiguration.RequireRateLimiting || classConfiguration.RequireRateLimiting;
         var rateLimitingPolicyName = methodConfiguration.RateLimitingPolicyName ?? classConfiguration.RateLimitingPolicyName;
-        var shortCircuit = classConfiguration.ShortCircuit || methodConfiguration.ShortCircuit;
-        var disableValidation = classConfiguration.DisableValidation || methodConfiguration.DisableValidation;
-        var disableRequestTimeout = classConfiguration.DisableRequestTimeout || methodConfiguration.DisableRequestTimeout;
-        var withRequestTimeout = classConfiguration.WithRequestTimeout || methodConfiguration.WithRequestTimeout;
-        var groupIdentifier = classConfiguration.GroupIdentifier ?? methodConfiguration.GroupIdentifier;
-        var groupPattern = classConfiguration.GroupPattern ?? methodConfiguration.GroupPattern;
-        var groupName = classConfiguration.GroupName ?? methodConfiguration.GroupName;
+
+        var shortCircuit = methodConfiguration.ShortCircuit || classConfiguration.ShortCircuit;
+        var disableValidation = methodConfiguration.DisableValidation || classConfiguration.DisableValidation;
+        var disableRequestTimeout = methodConfiguration.DisableRequestTimeout || classConfiguration.DisableRequestTimeout;
+        var withRequestTimeout = methodConfiguration.WithRequestTimeout || classConfiguration.WithRequestTimeout;
+
+        var groupIdentifier = methodConfiguration.GroupIdentifier ?? classConfiguration.GroupIdentifier;
+        var groupPattern = methodConfiguration.GroupPattern ?? classConfiguration.GroupPattern;
+        var groupName = methodConfiguration.GroupName ?? classConfiguration.GroupName;
 
         string? requestTimeoutPolicyName = null;
         if (methodConfiguration.WithRequestTimeout)
