@@ -55,10 +55,13 @@ Minimal hosting setup:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddEndpointHandlers();
 
 var app = builder.Build();
+
 app.MapEndpointHandlers();
+
 app.Run();
 ```
 
