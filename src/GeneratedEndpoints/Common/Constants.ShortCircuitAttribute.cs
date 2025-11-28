@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string ShortCircuitAttributeFullyQualifiedName = $"{AttributesNamespace}.{ShortCircuitAttributeName}";
 
-    internal static readonly SourceText ShortCircuitAttributeSourceText;
+    internal static readonly SourceText ShortCircuitAttributeSourceText = CreateShortCircuitAttributeSourceText();
 
     private static SourceText CreateShortCircuitAttributeSourceText() => SourceText.From($$"""
                                                                                             {{FileHeader}}

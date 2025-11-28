@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string ProducesValidationProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesValidationProblemAttributeName}";
 
-    internal static readonly SourceText ProducesValidationProblemAttributeSourceText;
+    internal static readonly SourceText ProducesValidationProblemAttributeSourceText = CreateProducesValidationProblemAttributeSourceText();
 
     private static SourceText CreateProducesValidationProblemAttributeSourceText() => SourceText.From($$"""
                                                                                                          {{FileHeader}}

@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string EndpointFilterAttributeFullyQualifiedName = $"{AttributesNamespace}.{EndpointFilterAttributeName}";
 
-    internal static readonly SourceText EndpointFilterAttributeSourceText;
+    internal static readonly SourceText EndpointFilterAttributeSourceText = CreateEndpointFilterAttributeSourceText();
 
     private static SourceText CreateEndpointFilterAttributeSourceText() => SourceText.From($$"""
                                                                                               {{FileHeader}}

@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string DisableAntiforgeryAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableAntiforgeryAttributeName}";
 
-    internal static readonly SourceText DisableAntiforgeryAttributeSourceText;
+    internal static readonly SourceText DisableAntiforgeryAttributeSourceText = CreateDisableAntiforgeryAttributeSourceText();
 
     private static SourceText CreateDisableAntiforgeryAttributeSourceText() => SourceText.From($$"""
                                                                                                   {{FileHeader}}

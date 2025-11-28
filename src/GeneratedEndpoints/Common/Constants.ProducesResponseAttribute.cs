@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string ProducesResponseAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesResponseAttributeName}";
 
-    internal static readonly SourceText ProducesResponseAttributeSourceText;
+    internal static readonly SourceText ProducesResponseAttributeSourceText = CreateProducesResponseAttributeSourceText();
 
     private static SourceText CreateProducesResponseAttributeSourceText() => SourceText.From($$"""
                                                                                                 {{FileHeader}}

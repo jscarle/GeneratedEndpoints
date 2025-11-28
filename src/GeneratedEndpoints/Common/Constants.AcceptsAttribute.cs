@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string AcceptsAttributeFullyQualifiedName = $"{AttributesNamespace}.{AcceptsAttributeName}";
 
-    internal static readonly SourceText AcceptsAttributeSourceText;
+    internal static readonly SourceText AcceptsAttributeSourceText = CreateAcceptsAttributeSourceText();
 
     private static SourceText CreateAcceptsAttributeSourceText() => SourceText.From($$"""
                                                                                        {{FileHeader}}

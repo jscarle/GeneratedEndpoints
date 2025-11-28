@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string OrderAttributeFullyQualifiedName = $"{AttributesNamespace}.{OrderAttributeName}";
 
-    internal static readonly SourceText OrderAttributeSourceText;
+    internal static readonly SourceText OrderAttributeSourceText = CreateOrderAttributeSourceText();
 
     private static SourceText CreateOrderAttributeSourceText() => SourceText.From($$"""
                                                                                      {{FileHeader}}

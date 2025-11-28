@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string DisableRequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableRequestTimeoutAttributeName}";
 
-    internal static readonly SourceText DisableRequestTimeoutAttributeSourceText;
+    internal static readonly SourceText DisableRequestTimeoutAttributeSourceText = CreateDisableRequestTimeoutAttributeSourceText();
 
     private static SourceText CreateDisableRequestTimeoutAttributeSourceText() => SourceText.From($$"""
                                                                                                      {{FileHeader}}

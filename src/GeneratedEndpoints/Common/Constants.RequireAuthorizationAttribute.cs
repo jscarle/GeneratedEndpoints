@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string RequireAuthorizationAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireAuthorizationAttributeName}";
 
-    internal static readonly SourceText RequireAuthorizationAttributeSourceText;
+    internal static readonly SourceText RequireAuthorizationAttributeSourceText = CreateRequireAuthorizationAttributeSourceText();
 
     private static SourceText CreateRequireAuthorizationAttributeSourceText() => SourceText.From($$"""
                                                                                                     {{FileHeader}}

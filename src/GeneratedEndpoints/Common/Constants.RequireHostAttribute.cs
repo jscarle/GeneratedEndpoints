@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string RequireHostAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireHostAttributeName}";
 
-    internal static readonly SourceText RequireHostAttributeSourceText;
+    internal static readonly SourceText RequireHostAttributeSourceText = CreateRequireHostAttributeSourceText();
 
     private static SourceText CreateRequireHostAttributeSourceText() => SourceText.From($$"""
                                                                                            {{FileHeader}}
