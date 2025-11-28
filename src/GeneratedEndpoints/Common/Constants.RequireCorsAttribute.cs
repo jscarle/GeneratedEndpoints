@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string RequireCorsAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireCorsAttributeName}";
 
-    internal static readonly SourceText RequireCorsAttributeSourceText;
+    internal static readonly SourceText RequireCorsAttributeSourceText = CreateRequireCorsAttributeSourceText();
 
     private static SourceText CreateRequireCorsAttributeSourceText() => SourceText.From($$"""
                                                                                            {{FileHeader}}

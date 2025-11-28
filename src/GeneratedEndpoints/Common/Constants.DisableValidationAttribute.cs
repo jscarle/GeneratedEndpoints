@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string DisableValidationAttributeFullyQualifiedName = $"{AttributesNamespace}.{DisableValidationAttributeName}";
 
-    internal static readonly SourceText DisableValidationAttributeSourceText;
+    internal static readonly SourceText DisableValidationAttributeSourceText = CreateDisableValidationAttributeSourceText();
 
     private static SourceText CreateDisableValidationAttributeSourceText() => SourceText.From($$"""
                                                                                                  #if NET10_0_OR_GREATER

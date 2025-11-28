@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string RequireRateLimitingAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequireRateLimitingAttributeName}";
 
-    internal static readonly SourceText RequireRateLimitingAttributeSourceText;
+    internal static readonly SourceText RequireRateLimitingAttributeSourceText = CreateRequireRateLimitingAttributeSourceText();
 
     private static SourceText CreateRequireRateLimitingAttributeSourceText() => SourceText.From($$"""
                                                                                                    {{FileHeader}}

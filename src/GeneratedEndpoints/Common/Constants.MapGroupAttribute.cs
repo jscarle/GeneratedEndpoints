@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string MapGroupAttributeFullyQualifiedName = $"{AttributesNamespace}.{MapGroupAttributeName}";
 
-    internal static readonly SourceText MapGroupAttributeSourceText;
+    internal static readonly SourceText MapGroupAttributeSourceText = CreateMapGroupAttributeSourceText();
 
     private static SourceText CreateMapGroupAttributeSourceText() => SourceText.From($$"""
                                                                                         {{FileHeader}}
