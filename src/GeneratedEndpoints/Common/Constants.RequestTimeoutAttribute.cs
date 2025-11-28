@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string RequestTimeoutAttributeFullyQualifiedName = $"{AttributesNamespace}.{RequestTimeoutAttributeName}";
 
-    internal static readonly SourceText RequestTimeoutAttributeSourceText;
+    internal static readonly SourceText RequestTimeoutAttributeSourceText = CreateRequestTimeoutAttributeSourceText();
 
     private static SourceText CreateRequestTimeoutAttributeSourceText() => SourceText.From($$"""
                                                                                               {{FileHeader}}

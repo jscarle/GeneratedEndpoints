@@ -10,7 +10,7 @@ internal static partial class Constants
 
     private const string SummaryAttributeFullyQualifiedName = $"{AttributesNamespace}.{SummaryAttributeName}";
 
-    internal static readonly SourceText SummaryAttributeSourceText;
+    internal static readonly SourceText SummaryAttributeSourceText = CreateSummaryAttributeSourceText();
 
     private static SourceText CreateSummaryAttributeSourceText() => SourceText.From($$"""
                                                                                        {{FileHeader}}
