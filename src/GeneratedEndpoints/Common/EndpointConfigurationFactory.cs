@@ -207,8 +207,10 @@ internal static class EndpointConfigurationFactory
 
     private static void TryAddAcceptsMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<AcceptsMetadata>? accepts)
     {
+        var isGenericAttribute = attributeClass is { IsGenericType: true, TypeArguments.Length: 1 };
+
         string? requestType;
-        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
+        if (isGenericAttribute)
             requestType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else
@@ -218,8 +220,11 @@ internal static class EndpointConfigurationFactory
         if (requestType is null)
             return;
 
-        var contentType = attribute.GetConstructorStringValue() ?? ApplicationJsonContentType;
-        var additionalContentTypes = attribute.GetConstructorStringArray(1);
+        var contentTypeIndex = isGenericAttribute ? 0 : 1;
+        var additionalContentTypesIndex = isGenericAttribute ? 1 : 2;
+
+        var contentType = attribute.GetConstructorStringValue(contentTypeIndex) ?? ApplicationJsonContentType;
+        var additionalContentTypes = attribute.GetConstructorStringArray(additionalContentTypesIndex);
         var isOptional = attribute.GetNamedBoolValue(IsOptionalAttributeNamedParameter);
 
         var acceptMetadata = new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional);

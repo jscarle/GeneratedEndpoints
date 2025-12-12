@@ -23,7 +23,8 @@ internal static class EndpointRouteBuilderExtensions
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
         builder.MapGet("/contracts/{id:int}", global::GeneratedEndpointsTests.ContractEndpoints.Handle)
-            .WithName("Handle");
+            .WithName("Handle")
+            .Accepts<global::GeneratedEndpointsTests.RequestRecord>("application/json", "text/json");
 
         return builder;
     }
