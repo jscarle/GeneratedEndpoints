@@ -29,6 +29,20 @@ public static class SourceFactory
         return builder.ToString();
     }
 
+    public static string BuildAbstractEndpointsSource()
+    {
+        return """
+               internal abstract class AbstractEndpoints
+               {
+                   [MapGet("/abstract/static")]
+                   public static Ok Static() => TypedResults.Ok();
+
+                   [MapPost("/abstract/instance")]
+                   public Ok Instance() => TypedResults.Ok();
+               }
+               """;
+    }
+
     public static string BuildAuthorizationMatrixSource(
         bool classAllowAnonymous,
         bool methodAllowAnonymous,

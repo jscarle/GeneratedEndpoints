@@ -15,6 +15,7 @@ internal static class RequestHandlerClassHelper
 
         var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var isStatic = classSymbol.IsStatic;
+        var isAbstract = classSymbol.IsAbstract;
         var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken);
         var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
 
@@ -22,6 +23,7 @@ internal static class RequestHandlerClassHelper
         {
             Name = name,
             IsStatic = isStatic,
+            IsAbstract = isAbstract,
             HasConfigureMethod = configureMethodDetails.HasConfigureMethod,
             ConfigureMethodAcceptsServiceProvider = configureMethodDetails.ConfigureMethodAcceptsServiceProvider,
             Configuration = classConfiguration,
