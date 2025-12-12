@@ -28,6 +28,7 @@ internal static class EndpointRouteBuilderExtensions
             .WithSummary("Gets detailed content.")
             .WithDescription("Shows binding and contract combinations.")
             .WithTags("Contracts", "Bindings")
+            .Accepts<global::GeneratedEndpointsTests.RequestRecord>("application/xml", "text/xml")
             .Accepts<global::GeneratedEndpointsTests.RequestRecord>("application/xml")
             .Produces<global::GeneratedEndpointsTests.ResponseRecord>(200, "application/json", "text/json")
             .Produces<global::GeneratedEndpointsTests.ResponseRecord>(200, "application/json")

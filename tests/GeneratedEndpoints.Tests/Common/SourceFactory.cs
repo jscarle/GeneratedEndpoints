@@ -370,7 +370,7 @@ public static class SourceFactory
         if (includeAccepts)
         {
             var secondContentType = string.IsNullOrWhiteSpace(acceptsContentType2) ? "" : $", \"{acceptsContentType2}\"";
-            builder.AppendLine($"    [Accepts(\"{acceptsContentType1 ?? "application/json"}\"{secondContentType})]");
+            builder.AppendLine($"    [Accepts(typeof(RequestRecord), \"{acceptsContentType1 ?? "application/json"}\"{secondContentType})]");
         }
 
         if (includeGenericAccepts)
