@@ -4,6 +4,7 @@ internal readonly record struct RequestHandlerClass : IComparable<RequestHandler
 {
     public required string Name { get; init; }
     public required bool IsStatic { get; init; }
+    public required bool IsAbstract { get; init; }
     public required bool HasConfigureMethod { get; init; }
     public required bool ConfigureMethodAcceptsServiceProvider { get; init; }
     public required EndpointConfiguration Configuration { get; init; }

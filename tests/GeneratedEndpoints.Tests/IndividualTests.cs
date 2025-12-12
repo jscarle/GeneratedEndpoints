@@ -173,6 +173,13 @@ public class IndividualTests
     }
 
     [Fact]
+    public async Task AbstractClassSkipsInstanceHandlers()
+    {
+        var source = AbstractEndpoints();
+        await VerifyIndividualAsync(source, nameof(AbstractClassSkipsInstanceHandlers));
+    }
+
+    [Fact]
     public async Task ClassMapGroup()
     {
         var source = AuthorizationScenario(classRequireAuthorization: true, classTags: true, classHost: "*.individual.com", classRequireCors: true,
@@ -470,6 +477,11 @@ public class IndividualTests
     private static string FallbackScenario(bool includeDefault = false, bool includeCustom = false, string? customRoute = null)
     {
         return SourceFactory.BuildFallbackSource(includeDefault, includeCustom, customRoute);
+    }
+
+    private static string AbstractEndpoints()
+    {
+        return SourceFactory.BuildAbstractEndpointsSource();
     }
 
     private static string AuthorizationScenario(
