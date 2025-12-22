@@ -170,12 +170,7 @@ internal static class EndpointConfigurationFactory
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
             Group = groupIdentifier is not null && groupPattern is not null
-                ? new EndpointGroup
-                {
-                    Identifier = groupIdentifier,
-                    Pattern = groupPattern,
-                    Name = groupName,
-                }
+                ? new EndpointGroup { Identifier = groupIdentifier, Pattern = groupPattern, Name = groupName }
                 : null,
         };
     }
@@ -240,7 +235,7 @@ internal static class EndpointConfigurationFactory
         {
             var responseType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var statusCode = attribute.GetConstructorIntValue(0) ?? 200;
+            var statusCode = attribute.GetConstructorIntValue() ?? 200;
             var contentType = attribute.GetConstructorStringValue(1);
             var additionalContentTypes = attribute.GetConstructorStringArray(2);
             producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
