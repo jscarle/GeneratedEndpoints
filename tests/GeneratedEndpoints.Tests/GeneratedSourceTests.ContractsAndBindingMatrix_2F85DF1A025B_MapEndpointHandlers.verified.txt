@@ -26,6 +26,7 @@ internal static class EndpointRouteBuilderExtensions
             .WithName("Handle")
             .WithDisplayName("Contract endpoint")
             .ExcludeFromDescription()
+            .Accepts<global::RequestRecord>("application/xml")
             .Produces<global::ResponseRecord>(200, "application/json")
             .ProducesProblem(500, "application/json")
             .RequireAuthorization("ContractsPolicy");

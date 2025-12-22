@@ -27,7 +27,7 @@
         </PackageReference>
         <PackageReference Include="Microsoft.Bcl.HashCode" Version="6.0.0" PrivateAssets="all" GeneratePathProperty="true"/>
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all"/>
-        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848">
+        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.17.0.131074">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -36,9 +36,9 @@
     <!-- Output -->
     <PropertyGroup>
         <AssemblyName>GeneratedEndpoints</AssemblyName>
-        <Version>10.0.2</Version>
-        <AssemblyVersion>10.0.2.0</AssemblyVersion>
-        <FileVersion>10.0.2.0</FileVersion>
+        <Version>10.0.3</Version>
+        <AssemblyVersion>10.0.3.0</AssemblyVersion>
+        <FileVersion>10.0.3.0</FileVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <IncludeBuildOutput>false</IncludeBuildOutput>
     </PropertyGroup>

@@ -1,0 +1,56 @@
+using System.Text;
+using Microsoft.CodeAnalysis.Text;
+
+namespace GeneratedEndpoints.Common;
+
+internal static partial class Constants
+{
+    internal const string ProducesProblemAttributeName = "ProducesProblemAttribute";
+    internal const string ProducesProblemAttributeHint = $"{ProducesProblemAttributeFullyQualifiedName}.gs.cs";
+
+    private const string ProducesProblemAttributeFullyQualifiedName = $"{AttributesNamespace}.{ProducesProblemAttributeName}";
+
+    internal static readonly SourceText ProducesProblemAttributeSourceText = CreateProducesProblemAttributeSourceText();
+
+    private static SourceText CreateProducesProblemAttributeSourceText() => SourceText.From($$"""
+                                                                                               {{FileHeader}}
+
+                                                                                               namespace {{AttributesNamespace}};
+
+                                                                                               /// <summary>
+                                                                                               /// Specifies that the endpoint produces a problem details payload.
+                                                                                               /// </summary>
+                                                                                               [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                               internal sealed class {{ProducesProblemAttributeName}} : global::System.Attribute
+                                                                                               {
+                                                                                                   /// <summary>
+                                                                                                   /// Gets the HTTP status code returned by the endpoint.
+                                                                                                   /// </summary>
+                                                                                                   public int StatusCode { get; }
+
+                                                                                                   /// <summary>
+                                                                                                   /// Gets the primary content type produced by the endpoint.
+                                                                                                   /// </summary>
+                                                                                                   public string? ContentType { get; }
+
+                                                                                                   /// <summary>
+                                                                                                   /// Gets the additional content types produced by the endpoint.
+                                                                                                   /// </summary>
+                                                                                                   public string[] AdditionalContentTypes { get; }
+
+                                                                                                   /// <summary>
+                                                                                                   /// Initializes a new instance of the <see cref="{{ProducesProblemAttributeName}}"/> class.
+                                                                                                   /// </summary>
+                                                                                                   /// <param name="statusCode">The HTTP status code returned by the endpoint.</param>
+                                                                                                   /// <param name="contentType">The primary content type produced by the endpoint.</param>
+                                                                                                   /// <param name="additionalContentTypes">Additional content types produced by the endpoint.</param>
+                                                                                                   public {{ProducesProblemAttributeName}}(int statusCode = global::Microsoft.AspNetCore.Http.StatusCodes.Status500InternalServerError, string? contentType = null, params string[] additionalContentTypes)
+                                                                                                   {
+                                                                                                       StatusCode = statusCode;
+                                                                                                       ContentType = contentType;
+                                                                                                       AdditionalContentTypes = additionalContentTypes ?? [];
+                                                                                                   }
+                                                                                               }
+
+                                                                                               """, Encoding.UTF8);
+}

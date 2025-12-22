@@ -26,6 +26,7 @@ internal static class EndpointRouteBuilderExtensions
             .WithName("Handle")
             .WithDisplayName("Contract endpoint")
             .WithTags("Contracts", "Bindings")
+            .Accepts<global::RequestRecord>("application/custom")
             .Produces<global::ResponseRecord>(200, "application/problem+json")
             .ProducesProblem(500, "application/problem+json")
             .AllowAnonymous();

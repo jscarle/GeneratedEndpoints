@@ -29,6 +29,20 @@ public static class SourceFactory
         return builder.ToString();
     }
 
+    public static string BuildAbstractEndpointsSource()
+    {
+        return """
+               internal abstract class AbstractEndpoints
+               {
+                   [MapGet("/abstract/static")]
+                   public static Ok Static() => TypedResults.Ok();
+
+                   [MapPost("/abstract/instance")]
+                   public Ok Instance() => TypedResults.Ok();
+               }
+               """;
+    }
+
     public static string BuildAuthorizationMatrixSource(
         bool classAllowAnonymous,
         bool methodAllowAnonymous,
@@ -370,7 +384,7 @@ public static class SourceFactory
         if (includeAccepts)
         {
             var secondContentType = string.IsNullOrWhiteSpace(acceptsContentType2) ? "" : $", \"{acceptsContentType2}\"";
-            builder.AppendLine($"    [Accepts(\"{acceptsContentType1 ?? "application/json"}\"{secondContentType})]");
+            builder.AppendLine($"    [Accepts(typeof(RequestRecord), \"{acceptsContentType1 ?? "application/json"}\"{secondContentType})]");
         }
 
         if (includeGenericAccepts)

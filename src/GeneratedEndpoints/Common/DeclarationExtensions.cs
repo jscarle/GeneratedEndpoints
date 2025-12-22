@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace GeneratedEndpoints.Common;
 
 /// <summary>Provides extension methods for working with declarations.</summary>
@@ -10,7 +8,7 @@ internal static class DeclarationExtensions
     /// <returns>The namespace represented by the declarations.</returns>
     public static string ToNamespace(this EquatableImmutableArray<Declaration> declarations)
     {
-        var builder = new StringBuilder();
+        var builder = StringBuilderPool.Get();
 
         for (var index = 0; index < declarations.Count; index++)
         {
@@ -23,7 +21,7 @@ internal static class DeclarationExtensions
             builder.Append(declaration.Name);
         }
 
-        return builder.ToString();
+        return StringBuilderPool.ToStringAndReturn(builder);
     }
 
     /// <summary>Converts a list of declarations to their fully qualified name.</summary>
@@ -31,7 +29,7 @@ internal static class DeclarationExtensions
     /// <returns>The fully qualified name represented by the declarations.</returns>
     public static string ToFullyQualifiedName(this EquatableImmutableArray<Declaration> declarations)
     {
-        var builder = new StringBuilder();
+        var builder = StringBuilderPool.Get();
 
         for (var index = 0; index < declarations.Count; index++)
         {
@@ -48,7 +46,7 @@ internal static class DeclarationExtensions
             builder.Append(declaration.GenericParameters.Count);
         }
 
-        return builder.ToString();
+        return StringBuilderPool.ToStringAndReturn(builder);
     }
 
     public static EquatableImmutableArray<Declaration> Where(this EquatableImmutableArray<Declaration> declarations, Func<Declaration, bool> predicate)

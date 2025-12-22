@@ -170,12 +170,7 @@ internal static class EndpointConfigurationFactory
             RequestTimeoutPolicyName = requestTimeoutPolicyName,
             Order = order,
             Group = groupIdentifier is not null && groupPattern is not null
-                ? new EndpointGroup
-                {
-                    Identifier = groupIdentifier,
-                    Pattern = groupPattern,
-                    Name = groupName,
-                }
+                ? new EndpointGroup { Identifier = groupIdentifier, Pattern = groupPattern, Name = groupName }
                 : null,
         };
     }
@@ -207,8 +202,10 @@ internal static class EndpointConfigurationFactory
 
     private static void TryAddAcceptsMetadata(AttributeData attribute, INamedTypeSymbol attributeClass, ref List<AcceptsMetadata>? accepts)
     {
+        var isGenericAttribute = attributeClass is { IsGenericType: true, TypeArguments.Length: 1 };
+
         string? requestType;
-        if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
+        if (isGenericAttribute)
             requestType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         else
@@ -218,8 +215,11 @@ internal static class EndpointConfigurationFactory
         if (requestType is null)
             return;
 
-        var contentType = attribute.GetConstructorStringValue() ?? ApplicationJsonContentType;
-        var additionalContentTypes = attribute.GetConstructorStringArray(1);
+        var contentTypeIndex = isGenericAttribute ? 0 : 1;
+        var additionalContentTypesIndex = isGenericAttribute ? 1 : 2;
+
+        var contentType = attribute.GetConstructorStringValue(contentTypeIndex) ?? ApplicationJsonContentType;
+        var additionalContentTypes = attribute.GetConstructorStringArray(additionalContentTypesIndex);
         var isOptional = attribute.GetNamedBoolValue(IsOptionalAttributeNamedParameter);
 
         var acceptMetadata = new AcceptsMetadata(requestType, contentType, additionalContentTypes, isOptional);
@@ -235,7 +235,7 @@ internal static class EndpointConfigurationFactory
         {
             var responseType = attributeClass.TypeArguments[0]
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var statusCode = attribute.GetConstructorIntValue(0) ?? 200;
+            var statusCode = attribute.GetConstructorIntValue() ?? 200;
             var contentType = attribute.GetConstructorStringValue(1);
             var additionalContentTypes = attribute.GetConstructorStringArray(2);
             producesMetadata = new ProducesMetadata(responseType, statusCode, contentType, additionalContentTypes);
