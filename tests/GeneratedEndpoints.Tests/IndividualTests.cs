@@ -6,6 +6,8 @@ namespace GeneratedEndpoints.Tests;
 [UsesVerify]
 public class IndividualTests
 {
+    private const string MapEndpointHandlersHint = "Microsoft.AspNetCore.Generated.Routing.MapEndpointHandlers.g.cs";
+
     public IndividualTests()
     {
         ModuleInitializer.Initialize();
@@ -462,6 +464,86 @@ public class IndividualTests
         await VerifyIndividualAsync(source, nameof(AsyncMethodVariants));
     }
 
+    [Fact]
+    public void GroupedMethodAuthorizationOverridesClassAllowAnonymous()
+    {
+        var source = """
+                     [AllowAnonymous]
+                     [MapGroup("/group")]
+                     internal static class GroupedAuthorizationEndpoints
+                     {
+                         [RequireAuthorization("SecurePolicy")]
+                         [MapGet("/secure")]
+                         public static Ok Secure() => TypedResults.Ok();
+                     }
+                     """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("builder.MapGroup(\"/group\");", generated);
+        Assert.Contains(".RequireAuthorization(\"SecurePolicy\")", generated);
+        Assert.DoesNotContain(".AllowAnonymous()", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void EscapedKeywordParametersCompile()
+    {
+        const string source = """
+                              internal sealed class KeywordParameterEndpoints
+                              {
+                                  [MapGet("/keyword/{event}")]
+                                  public Ok<string> Get(string @event) => TypedResults.Ok(@event);
+                              }
+                              """;
+
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void StaticOverloadedHandlersCompile()
+    {
+        const string source = """
+                              internal static class OverloadedEndpoints
+                              {
+                                  [MapGet("/overload")]
+                                  public static Ok<string> Get() => TypedResults.Ok("ok");
+
+                                  [MapGet("/overload/{id:int}")]
+                                  public static Ok<string> Get(int id) => TypedResults.Ok(id.ToString());
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains(".WithName(\"GeneratedEndpointsTests.OverloadedEndpoints.Get()\")", generated);
+        Assert.Contains(".WithName(\"GeneratedEndpointsTests.OverloadedEndpoints.Get(int)\")", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void InstanceHandlerDefaultParameterValuesArePreserved()
+    {
+        const string source = """
+                              internal sealed class DefaultParameterEndpoints
+                              {
+                                  [MapGet("/default")]
+                                  public Ok<string> Get(int page = 1) => TypedResults.Ok(page.ToString());
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("int page = 1", generated);
+        AssertCompiles(source);
+    }
+
     private static async Task VerifyIndividualAsync(string source, string scenario, bool withNamespace = true)
     {
         var sources = TestHelpers.GetSources(source, withNamespace);
@@ -472,6 +554,12 @@ public class IndividualTests
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{scenario}_MapEndpointHandlers");
+    }
+
+    private static void AssertCompiles(string source, bool withNamespace = true)
+    {
+        var diagnostics = TestHelpers.GetCompilationErrors(TestHelpers.GetSources(source, withNamespace));
+        Assert.True(diagnostics.Length == 0, string.Join(Environment.NewLine, diagnostics));
     }
 
     private static string FallbackScenario(bool includeDefault = false, bool includeCustom = false, string? customRoute = null)

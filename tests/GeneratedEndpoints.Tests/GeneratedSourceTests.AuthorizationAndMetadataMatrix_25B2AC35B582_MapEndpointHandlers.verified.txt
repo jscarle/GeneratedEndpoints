@@ -23,23 +23,20 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("")
-            .WithGroupName("Reporting")
-            .WithOrder(5)
-            .ExcludeFromDescription()
-            .WithTags("Class", "Matrix")
-            .RequireAuthorization("ClassPolicy")
-            .RequireCors("NamedCorsPolicy")
-            .RequireHost("*.contoso.com")
-            .AllowAnonymous()
-            .ShortCircuit()
-            .WithRequestTimeout("TimeoutPolicy");
+        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("");
 
         _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
             .WithName("GetMatrix")
-            .WithTags("Method", "Matrix")
-            .RequireHost("api.contoso.com", "contoso.com")
-            .RequireRateLimiting("RatePolicy");
+            .WithGroupName("Reporting")
+            .WithOrder(5)
+            .ExcludeFromDescription()
+            .WithTags("Method", "Matrix", "Class")
+            .RequireAuthorization("ClassPolicy")
+            .RequireCors("NamedCorsPolicy")
+            .RequireHost("api.contoso.com", "contoso.com", "*.contoso.com")
+            .RequireRateLimiting("RatePolicy")
+            .ShortCircuit()
+            .WithRequestTimeout("TimeoutPolicy");
 
         return builder;
     }

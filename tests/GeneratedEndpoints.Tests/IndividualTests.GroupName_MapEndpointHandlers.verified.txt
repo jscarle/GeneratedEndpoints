@@ -22,11 +22,11 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("")
-            .WithGroupName("IndividualGroup");
+        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("");
 
         _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
-            .WithName("GetMatrix");
+            .WithName("GetMatrix")
+            .WithGroupName("IndividualGroup");
 
         return builder;
     }

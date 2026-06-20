@@ -165,11 +165,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return;
 
         var span = raw.AsSpan();
-        var seen = new Dictionary<string, int>(span.Length, StringComparer.Ordinal);
+        QualifyDuplicateNames(span, includeSignature: false);
+        QualifyDuplicateNames(span, includeSignature: true);
+    }
 
-        for (var index = 0; index < span.Length; index++)
+    private static void QualifyDuplicateNames(Span<RequestHandler> handlers, bool includeSignature)
+    {
+        var seen = new Dictionary<string, int>(handlers.Length, StringComparer.Ordinal);
+
+        for (var index = 0; index < handlers.Length; index++)
         {
-            ref var handler = ref span[index];
+            ref var handler = ref handlers[index];
             var name = handler.Name;
             if (string.IsNullOrEmpty(name))
                 continue;
@@ -184,12 +190,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             var firstIndex = state >= 0 ? state : ~state;
             if (state >= 0)
             {
-                ref var firstHandler = ref span[firstIndex];
-                firstHandler.SetFullyQualifiedName();
+                ref var firstHandler = ref handlers[firstIndex];
+                firstHandler.SetFullyQualifiedName(includeSignature);
                 seen[nonEmptyName] = ~firstIndex;
             }
 
-            handler.SetFullyQualifiedName();
+            handler.SetFullyQualifiedName(includeSignature);
         }
     }
 }

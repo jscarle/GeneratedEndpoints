@@ -68,9 +68,7 @@ internal static class UseEndpointHandlersGenerator
             source.Append(group.Identifier);
             source.Append(" = builder.MapGroup(");
             source.Append(group.Pattern.ToStringLiteral());
-            source.Append(')');
-            AppendEndpointConfiguration(source, "            ", configuration);
-            source.AppendLine(";");
+            source.AppendLine(");");
         }
 
         if (groupedClasses.Count > 0)
@@ -180,7 +178,7 @@ internal static class UseEndpointHandlersGenerator
                 source.Append("\" }, ");
             }
         }
-        if (requestHandler.Method.IsStatic)
+        if (requestHandler.Method is { IsStatic: true, RequiresDelegateWrapper: false })
         {
             source.Append(requestHandler.Class.Name);
             source.Append('.');
@@ -188,18 +186,40 @@ internal static class UseEndpointHandlersGenerator
         }
         else
         {
-            source.Append("static ([FromServices] ");
-            source.Append(requestHandler.Class.Name);
-            source.Append(" handler");
+            source.Append("static (");
+            var hasParameter = false;
+            if (!requestHandler.Method.IsStatic)
+            {
+                source.Append("[FromServices] ");
+                source.Append(requestHandler.Class.Name);
+                source.Append(" handler");
+                hasParameter = true;
+            }
+
             foreach (var parameter in requestHandler.Method.Parameters)
             {
-                source.Append(", ");
+                if (hasParameter)
+                    source.Append(", ");
+
                 source.Append(parameter.BindingPrefix);
                 source.Append(parameter.Type);
                 source.Append(' ');
                 source.Append(parameter.Name);
+                source.Append(parameter.DefaultValue);
+                hasParameter = true;
             }
-            source.Append(") => handler.");
+            source.Append(") => ");
+
+            if (requestHandler.Method.IsStatic)
+            {
+                source.Append(requestHandler.Class.Name);
+                source.Append('.');
+            }
+            else
+            {
+                source.Append("handler.");
+            }
+
             source.Append(requestHandler.Method.Name);
             source.Append('(');
             for (var index = 0; index < requestHandler.Method.Parameters.Count; index++)
@@ -213,9 +233,7 @@ internal static class UseEndpointHandlersGenerator
         }
         source.Append(')');
 
-        var configuration = requestHandler.Method.Configuration;
-        if (!requestHandler.Class.Configuration.Group.HasValue)
-            configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, configuration);
+        var configuration = MergeEndpointConfigurations(requestHandler.Class.Configuration, requestHandler.Method.Configuration);
 
         if (!string.IsNullOrEmpty(requestHandler.Name))
         {

@@ -4,6 +4,7 @@ internal readonly record struct RequestHandlerMethod : IComparable<RequestHandle
 {
     public required string Name { get; init; }
     public required bool IsStatic { get; init; }
+    public required bool RequiresDelegateWrapper { get; init; }
     public required EquatableImmutableArray<Parameter> Parameters { get; init; }
     public required EndpointConfiguration Configuration { get; init; }
 
