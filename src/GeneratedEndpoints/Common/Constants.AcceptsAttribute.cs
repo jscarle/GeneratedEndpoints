@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                        /// Specifies the request type and content types accepted by the annotated endpoint or class.
                                                                                        /// </summary>
                                                                                        [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                       {{GeneratedTypeAttributes}}
                                                                                        internal sealed class {{AcceptsAttributeName}} : global::System.Attribute
                                                                                        {
                                                                                            /// <summary>
@@ -62,6 +63,7 @@ internal static partial class Constants
                                                                                        /// </summary>
                                                                                        /// <typeparam name="TRequest">The CLR type of the request body.</typeparam>
                                                                                        [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                       {{GeneratedTypeAttributes}}
                                                                                        internal sealed class {{AcceptsAttributeName}}<TRequest> : global::System.Attribute
                                                                                        {
                                                                                            /// <summary>

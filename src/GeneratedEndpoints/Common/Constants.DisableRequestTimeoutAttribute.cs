@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                                      /// Disables the request timeout for the annotated endpoint or class.
                                                                                                      /// </summary>
                                                                                                      [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                                     {{GeneratedTypeAttributes}}
                                                                                                      internal sealed class {{DisableRequestTimeoutAttributeName}} : global::System.Attribute
                                                                                                      {
                                                                                                      }

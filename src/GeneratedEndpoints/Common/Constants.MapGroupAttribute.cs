@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                         /// Specifies the route group for the annotated class.
                                                                                         /// </summary>
                                                                                         [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+                                                                                        {{GeneratedTypeAttributes}}
                                                                                         internal sealed class {{MapGroupAttributeName}} : global::System.Attribute
                                                                                         {
                                                                                             /// <summary>

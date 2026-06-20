@@ -16,6 +16,8 @@ namespace Microsoft.AspNetCore.Generated.Attributes;
 /// Identifies a method as an HTTP CONNECT minimal API endpoint with the specified route pattern.
 /// </summary>
 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal sealed class MapConnectAttribute : global::System.Attribute
 {
     /// <summary>

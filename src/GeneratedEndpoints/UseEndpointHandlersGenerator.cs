@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Globalization;
 using System.Text;
 using GeneratedEndpoints.Common;
 using Microsoft.CodeAnalysis;
@@ -41,6 +42,7 @@ internal static class UseEndpointHandlersGenerator
 
         source.AppendLine();
 
+        source.AppendLine(GeneratedTypeAttributes);
         source.Append("internal static class ");
         source.Append(UseEndpointHandlersClassName);
         source.AppendLine();
@@ -54,6 +56,7 @@ internal static class UseEndpointHandlersGenerator
         source.AppendLine("    {");
 
         var groupedClasses = GetClassesWithGroups(requestHandlers);
+        var groupIdentifiers = GetGroupIdentifiers(groupedClasses);
 
         for (var index = 0; index < groupedClasses.Count; index++)
         {
@@ -63,9 +66,10 @@ internal static class UseEndpointHandlersGenerator
                 continue;
 
             var group = configuration.Group.Value;
+            var groupIdentifier = groupIdentifiers[groupedClass];
 
             source.Append("        var ");
-            source.Append(group.Identifier);
+            source.Append(groupIdentifier);
             source.Append(" = builder.MapGroup(");
             source.Append(group.Pattern.ToStringLiteral());
             source.AppendLine(");");
@@ -80,7 +84,7 @@ internal static class UseEndpointHandlersGenerator
                 source.AppendLine();
 
             var requestHandler = requestHandlers[index];
-            GenerateMapRequestHandler(source, requestHandler);
+            GenerateMapRequestHandler(source, requestHandler, groupIdentifiers);
         }
 
         source.AppendLine("""
@@ -132,13 +136,47 @@ internal static class UseEndpointHandlersGenerator
         return groupedClasses ?? [];
     }
 
-    private static void GenerateMapRequestHandler(StringBuilder source, RequestHandler requestHandler)
+    private static Dictionary<RequestHandlerClass, string> GetGroupIdentifiers(List<RequestHandlerClass> groupedClasses)
+    {
+        var identifiers = new Dictionary<RequestHandlerClass, string>(groupedClasses.Count);
+        var used = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var index = 0; index < groupedClasses.Count; index++)
+        {
+            var groupedClass = groupedClasses[index];
+            var configuration = groupedClass.Configuration;
+            if (!configuration.Group.HasValue)
+                continue;
+
+            var baseIdentifier = configuration.Group.Value.Identifier;
+            var identifier = baseIdentifier;
+            var suffix = 1;
+            while (!used.Add(identifier))
+            {
+                identifier = baseIdentifier + "_" + suffix.ToString(CultureInfo.InvariantCulture);
+                suffix++;
+            }
+
+            identifiers.Add(groupedClass, identifier);
+        }
+
+        return identifiers;
+    }
+
+    private static void GenerateMapRequestHandler(
+        StringBuilder source,
+        RequestHandler requestHandler,
+        Dictionary<RequestHandlerClass, string> groupIdentifiers
+    )
     {
         var wrapWithConfigure = requestHandler.Class.HasConfigureMethod;
         var configureAcceptsServiceProvider = requestHandler.Class.ConfigureMethodAcceptsServiceProvider;
         var indent = wrapWithConfigure ? "            " : "        ";
         var continuationIndent = indent + "    ";
-        var routeBuilderIdentifier = requestHandler.Class.Configuration.Group?.Identifier ?? "builder";
+        var routeBuilderIdentifier = requestHandler.Class.Configuration.Group.HasValue
+                                     && groupIdentifiers.TryGetValue(requestHandler.Class, out var groupIdentifier)
+            ? groupIdentifier
+            : "builder";
 
         if (wrapWithConfigure)
         {
@@ -201,6 +239,7 @@ internal static class UseEndpointHandlersGenerator
                 if (hasParameter)
                     source.Append(", ");
 
+                source.Append(parameter.AttributePrefix);
                 source.Append(parameter.BindingPrefix);
                 source.Append(parameter.Type);
                 source.Append(' ');

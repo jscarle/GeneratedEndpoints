@@ -16,6 +16,8 @@ namespace Microsoft.AspNetCore.Generated.Attributes;
 /// Specifies the request type and content types accepted by the annotated endpoint or class.
 /// </summary>
 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal sealed class AcceptsAttribute : global::System.Attribute
 {
     /// <summary>
@@ -57,6 +59,8 @@ internal sealed class AcceptsAttribute : global::System.Attribute
 /// </summary>
 /// <typeparam name="TRequest">The CLR type of the request body.</typeparam>
 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal sealed class AcceptsAttribute<TRequest> : global::System.Attribute
 {
     /// <summary>

@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                      /// Specifies the order for the annotated endpoint when building conventions.
                                                                                      /// </summary>
                                                                                      [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                     {{GeneratedTypeAttributes}}
                                                                                      internal sealed class {{OrderAttributeName}} : global::System.Attribute
                                                                                      {
                                                                                          /// <summary>

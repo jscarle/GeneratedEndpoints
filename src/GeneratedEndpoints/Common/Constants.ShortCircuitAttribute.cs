@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                             /// Marks the annotated endpoint or class to short-circuit the request pipeline.
                                                                                             /// </summary>
                                                                                             [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                            {{GeneratedTypeAttributes}}
                                                                                             internal sealed class {{ShortCircuitAttributeName}} : global::System.Attribute
                                                                                             {
                                                                                             }

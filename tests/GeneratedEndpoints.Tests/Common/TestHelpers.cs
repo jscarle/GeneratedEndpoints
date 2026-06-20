@@ -22,9 +22,9 @@ public static class TestHelpers
         return result;
     }
 
-    public static ImmutableArray<Diagnostic> GetCompilationErrors(IEnumerable<string> sources)
+    public static ImmutableArray<Diagnostic> GetCompilationErrors(IEnumerable<string> sources, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
-        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.Latest).WithPreprocessorSymbols("NET10_0_OR_GREATER");
+        var cSharpParseOptions = new CSharpParseOptions(languageVersion).WithPreprocessorSymbols("NET10_0_OR_GREATER");
         var syntaxTrees = sources.Select(source => CSharpSyntaxTree.ParseText(source, cSharpParseOptions));
         var compilation = CSharpCompilation.Create("GeneratedEndpoints.Tests.GeneratedCode", syntaxTrees, AspNet100.References.All, TestCompilationOptions);
 

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using static GeneratedEndpoints.Common.Constants;
@@ -25,9 +26,10 @@ internal static class MethodSymbolExtensions
             var parameterSymbol = methodSymbol.Parameters[index];
             var parameterName = EscapeIdentifier(parameterSymbol.Name);
             var parameterType = parameterSymbol.Type.ToDisplayString(SymbolExtensions.FullyQualifiedNullableTypeDisplayFormat);
+            var attributePrefix = GetNonBindingAttributePrefix(parameterSymbol);
             var bindingPrefix = GetBindingPrefix(parameterSymbol);
             var defaultValue = GetDefaultValue(parameterSymbol);
-            var parameter = new Parameter(parameterName, parameterType, bindingPrefix, defaultValue);
+            var parameter = new Parameter(parameterName, parameterType, attributePrefix, bindingPrefix, defaultValue);
 
             methodParameters.Add(parameter);
         }
@@ -51,7 +53,7 @@ internal static class MethodSymbolExtensions
     private static string GetDefaultValueLiteral(ITypeSymbol type, object? value)
     {
         if (value is null)
-            return "null";
+            return CanUseNullDefaultLiteral(type) ? "null" : "default";
 
         if (type.TypeKind == TypeKind.Enum)
             return GetEnumDefaultValueLiteral(type, value);
@@ -74,6 +76,14 @@ internal static class MethodSymbolExtensions
             SpecialType.System_UInt64 => ((ulong)value).ToString(CultureInfo.InvariantCulture) + "UL",
             _ => "default",
         };
+    }
+
+    private static bool CanUseNullDefaultLiteral(ITypeSymbol type)
+    {
+        if (!type.IsValueType)
+            return true;
+
+        return type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
     }
 
     private static string GetEnumDefaultValueLiteral(ITypeSymbol type, object? value)
@@ -186,6 +196,68 @@ internal static class MethodSymbolExtensions
         var bindingPrefix = GetBindingSourceAttribute(source, typedKey, bindingName, emptyBodyBehavior);
 
         return bindingPrefix;
+    }
+
+    private static string GetNonBindingAttributePrefix(IParameterSymbol parameter)
+    {
+        StringBuilder? builder = null;
+
+        foreach (var attribute in parameter.GetAttributes())
+        {
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass is null)
+                continue;
+
+            if (attributeClass.GetBindingSource() != BindingSource.None)
+                continue;
+
+            if (!attributeClass.IsTypeAccessibleFromGeneratedCode())
+                continue;
+
+            builder ??= StringBuilderPool.Get();
+            AppendAttribute(builder, attribute, attributeClass);
+            builder.Append(' ');
+        }
+
+        return builder is null ? "" : StringBuilderPool.ToStringAndReturn(builder);
+    }
+
+    private static void AppendAttribute(StringBuilder builder, AttributeData attribute, INamedTypeSymbol attributeClass)
+    {
+        builder.Append('[');
+        builder.Append(attributeClass.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat));
+
+        var hasConstructorArguments = attribute.ConstructorArguments.Length > 0;
+        var hasNamedArguments = attribute.NamedArguments.Length > 0;
+        if (hasConstructorArguments || hasNamedArguments)
+        {
+            builder.Append('(');
+
+            var hasArgument = false;
+            foreach (var argument in attribute.ConstructorArguments)
+            {
+                if (hasArgument)
+                    builder.Append(", ");
+
+                builder.Append(argument.ToConstLiteral());
+                hasArgument = true;
+            }
+
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (hasArgument)
+                    builder.Append(", ");
+
+                builder.Append(EscapeIdentifier(argument.Key));
+                builder.Append(" = ");
+                builder.Append(argument.Value.ToConstLiteral());
+                hasArgument = true;
+            }
+
+            builder.Append(')');
+        }
+
+        builder.Append(']');
     }
 
     private static string GetBindingSourceAttribute(BindingSource source, TypedConstant? typedKey, string? bindingName, string? emptyBodyBehavior)

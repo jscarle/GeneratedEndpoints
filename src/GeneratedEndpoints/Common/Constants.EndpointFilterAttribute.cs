@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                               /// Specifies an endpoint filter type to apply to the annotated endpoint or class.
                                                                                               /// </summary>
                                                                                               [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                              {{GeneratedTypeAttributes}}
                                                                                               internal sealed class {{EndpointFilterAttributeName}} : global::System.Attribute
                                                                                               {
                                                                                                   /// <summary>
@@ -43,6 +44,7 @@ internal static partial class Constants
                                                                                               /// </summary>
                                                                                               /// <typeparam name="TFilter">The CLR type of the endpoint filter.</typeparam>
                                                                                               [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                              {{GeneratedTypeAttributes}}
                                                                                               internal sealed class {{EndpointFilterAttributeName}}<TFilter> : global::System.Attribute
                                                                                               {
                                                                                                   /// <summary>

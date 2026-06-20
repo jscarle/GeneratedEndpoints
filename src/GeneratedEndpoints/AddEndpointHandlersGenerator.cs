@@ -36,6 +36,7 @@ internal static class AddEndpointHandlersGenerator
 
         source.AppendLine();
 
+        source.AppendLine(GeneratedTypeAttributes);
         source.Append("internal static class ");
         source.Append(AddEndpointHandlersClassName);
         source.AppendLine();

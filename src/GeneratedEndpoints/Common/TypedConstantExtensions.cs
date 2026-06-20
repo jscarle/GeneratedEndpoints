@@ -11,6 +11,10 @@ internal static class TypedConstantExtensions
     {
         if (tc.IsNull)
             return "null";
+
+        if (tc.Kind == TypedConstantKind.Array)
+            return ToArrayLiteral(tc);
+
         var v = tc.Value;
         var t = tc.Type;
         if (t is null)
@@ -50,6 +54,30 @@ internal static class TypedConstantExtensions
         var underlying = ((INamedTypeSymbol)t).EnumUnderlyingType!;
         var num = IntegralLiteral(v, underlying.SpecialType);
         return $"({t.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat)}){num}";
+    }
+
+    private static string ToArrayLiteral(TypedConstant tc)
+    {
+        var arrayType = tc.Type?.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat) ?? "object[]";
+        var builder = StringBuilderPool.Get();
+        builder.Append("new ");
+        builder.Append(arrayType);
+        builder.Append(" {");
+
+        for (var index = 0; index < tc.Values.Length; index++)
+        {
+            if (index > 0)
+                builder.Append(',');
+
+            builder.Append(' ');
+            builder.Append(tc.Values[index].ToConstLiteral());
+        }
+
+        if (tc.Values.Length > 0)
+            builder.Append(' ');
+
+        builder.Append('}');
+        return StringBuilderPool.ToStringAndReturn(builder);
     }
 
     private static string EscapeChar(char c)
