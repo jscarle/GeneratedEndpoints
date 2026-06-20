@@ -24,7 +24,7 @@ internal static class MethodSymbolExtensions
 
             var parameterSymbol = methodSymbol.Parameters[index];
             var parameterName = EscapeIdentifier(parameterSymbol.Name);
-            var parameterType = parameterSymbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var parameterType = parameterSymbol.Type.ToDisplayString(SymbolExtensions.FullyQualifiedNullableTypeDisplayFormat);
             var bindingPrefix = GetBindingPrefix(parameterSymbol);
             var defaultValue = GetDefaultValue(parameterSymbol);
             var parameter = new Parameter(parameterName, parameterType, bindingPrefix, defaultValue);
@@ -35,7 +35,7 @@ internal static class MethodSymbolExtensions
         return methodParameters.ToEquatableImmutable();
     }
 
-    private static string EscapeIdentifier(string identifier)
+    internal static string EscapeIdentifier(string identifier)
     {
         return SyntaxFacts.GetKeywordKind(identifier) == SyntaxKind.None ? identifier : $"@{identifier}";
     }
@@ -82,7 +82,7 @@ internal static class MethodSymbolExtensions
             .OfType<IFieldSymbol>()
             .FirstOrDefault(f => f.HasConstantValue && Equals(f.ConstantValue, value));
 
-        var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var typeName = type.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
         if (field is not null)
             return $"{typeName}.{field.Name}";
 
@@ -153,6 +153,7 @@ internal static class MethodSymbolExtensions
         var source = BindingSource.None;
         TypedConstant? typedKey = null;
         string? bindingName = null;
+        string? emptyBodyBehavior = null;
 
         foreach (var attribute in parameter.GetAttributes())
         {
@@ -173,18 +174,21 @@ internal static class MethodSymbolExtensions
                 case BindingSource.FromForm:
                     bindingName = attribute.GetNamedStringValue(NameAttributeNamedParameter);
                     break;
+                case BindingSource.FromBody:
+                    emptyBodyBehavior = attribute.GetNamedConstantValue(EmptyBodyBehaviorAttributeNamedParameter);
+                    break;
                 case BindingSource.FromKeyedServices:
                     typedKey = attribute.ConstructorArguments.Length > 0 ? attribute.ConstructorArguments[0] : null;
                     break;
             }
         }
 
-        var bindingPrefix = GetBindingSourceAttribute(source, typedKey, bindingName);
+        var bindingPrefix = GetBindingSourceAttribute(source, typedKey, bindingName, emptyBodyBehavior);
 
         return bindingPrefix;
     }
 
-    private static string GetBindingSourceAttribute(BindingSource source, TypedConstant? typedKey, string? bindingName)
+    private static string GetBindingSourceAttribute(BindingSource source, TypedConstant? typedKey, string? bindingName, string? emptyBodyBehavior)
     {
         switch (source)
         {
@@ -197,7 +201,7 @@ internal static class MethodSymbolExtensions
             case BindingSource.FromHeader:
                 return FormatBindingAttribute("FromHeader", bindingName);
             case BindingSource.FromBody:
-                return FormatBindingAttribute("FromBody", bindingName);
+                return FormatFromBodyAttribute(emptyBodyBehavior);
             case BindingSource.FromForm:
                 return FormatBindingAttribute("FromForm", bindingName);
             case BindingSource.FromServices:
@@ -218,5 +222,13 @@ internal static class MethodSymbolExtensions
             return $"[{attributeName}] ";
 
         return $"[{attributeName}(Name = {bindingName.ToStringLiteral()})] ";
+    }
+
+    private static string FormatFromBodyAttribute(string? emptyBodyBehavior)
+    {
+        if (emptyBodyBehavior is null)
+            return "[FromBody] ";
+
+        return $"[FromBody(EmptyBodyBehavior = {emptyBodyBehavior})] ";
     }
 }

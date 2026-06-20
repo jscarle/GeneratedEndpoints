@@ -13,7 +13,10 @@ internal static class RequestHandlerClassHelper
         if (classSymbol.TypeKind != TypeKind.Class)
             return null;
 
-        var name = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (!classSymbol.IsTypeAccessibleFromGeneratedCode() || classSymbol.HasGenericContainingType())
+            return null;
+
+        var name = classSymbol.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
         var isStatic = classSymbol.IsStatic;
         var isAbstract = classSymbol.IsAbstract;
         var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken);
@@ -62,6 +65,9 @@ internal static class RequestHandlerClassHelper
     private static bool IsConfigureMethod(IMethodSymbol methodSymbol, out bool acceptsServiceProvider)
     {
         acceptsServiceProvider = false;
+
+        if (!methodSymbol.IsAccessibleFromGeneratedCode())
+            return false;
 
         if (!methodSymbol.IsStatic)
             return false;

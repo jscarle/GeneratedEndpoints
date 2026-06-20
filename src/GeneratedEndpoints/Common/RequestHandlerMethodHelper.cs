@@ -4,9 +4,12 @@ namespace GeneratedEndpoints.Common;
 
 internal static class RequestHandlerMethodHelper
 {
-    public static RequestHandlerMethod Create(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
+    public static RequestHandlerMethod? Create(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (methodSymbol.MethodKind != MethodKind.Ordinary || methodSymbol.TypeParameters.Length > 0 || !methodSymbol.IsAccessibleFromGeneratedCode())
+            return null;
 
         var name = methodSymbol.Name;
         var isStatic = methodSymbol.IsStatic;

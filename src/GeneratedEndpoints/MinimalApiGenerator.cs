@@ -104,8 +104,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
 
         var requestHandlerMethod = RequestHandlerMethodHelper.Create(methodSymbol, cancellationToken);
+        if (requestHandlerMethod is null)
+            return null;
 
-        if (requestHandlerClass.Value.IsAbstract && !requestHandlerMethod.IsStatic)
+        if (requestHandlerClass.Value.IsAbstract && !requestHandlerMethod.Value.IsStatic)
             return null;
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(methodSymbol, attribute, cancellationToken);
@@ -113,7 +115,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var requestHandler = new RequestHandler
         {
             Class = requestHandlerClass.Value,
-            Method = requestHandlerMethod,
+            Method = requestHandlerMethod.Value,
             HttpMethod = httpMethod,
             Pattern = pattern,
             Name = name,

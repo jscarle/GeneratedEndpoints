@@ -544,6 +544,189 @@ public class IndividualTests
         AssertCompiles(source);
     }
 
+    [Fact]
+    public void UnsupportedHandlerShapesAreIgnored()
+    {
+        const string source = """
+                              file sealed class FileLocalEndpoint
+                              {
+                                  [MapGet("/file-local")]
+                                  public IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class PrivateStaticEndpoint
+                              {
+                                  [MapGet("/private-static")]
+                                  private static IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal sealed class PrivateInstanceEndpoint
+                              {
+                                  [MapGet("/private-instance")]
+                                  private IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class Container
+                              {
+                                  private sealed class NestedPrivateEndpoint
+                                  {
+                                      [MapGet("/nested-private")]
+                                      public IResult Get() => TypedResults.Ok();
+                                  }
+                              }
+
+                              internal sealed class GenericEndpoint<T>
+                              {
+                                  [MapGet("/generic")]
+                                  public IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class GenericStaticEndpoint<T>
+                              {
+                                  [MapGet("/generic-static")]
+                                  public static IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class GenericMethodEndpoint
+                              {
+                                  [MapGet("/generic-method")]
+                                  public static T Get<T>() => default!;
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.DoesNotContain("/file-local", generated);
+        Assert.DoesNotContain("/private-static", generated);
+        Assert.DoesNotContain("/private-instance", generated);
+        Assert.DoesNotContain("/nested-private", generated);
+        Assert.DoesNotContain("/generic", generated);
+        Assert.DoesNotContain("/generic-static", generated);
+        Assert.DoesNotContain("/generic-method", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void PrivateConfigureMethodIsIgnored()
+    {
+        const string source = """
+                              using Microsoft.AspNetCore.Builder;
+
+                              internal static class PrivateConfigureEndpoint
+                              {
+                                  [MapGet("/private-configure")]
+                                  public static IResult Get() => TypedResults.Ok();
+
+                                  private static void Configure<TBuilder>(TBuilder builder)
+                                      where TBuilder : IEndpointConventionBuilder
+                                  {
+                                      _ = builder;
+                                  }
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("builder.MapGet(\"/private-configure\", global::GeneratedEndpointsTests.PrivateConfigureEndpoint.Get)", generated);
+        Assert.DoesNotContain("PrivateConfigureEndpoint.Configure", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void WrapperParametersPreserveBindingMetadata()
+    {
+        const string source = """
+                              using Microsoft.AspNetCore.Mvc;
+                              using Microsoft.AspNetCore.Mvc.ModelBinding;
+                              using Microsoft.Extensions.DependencyInjection;
+
+                              internal sealed record BodyPayload(string Value);
+
+                              internal sealed class WrapperMetadataEndpoint
+                              {
+                                  [MapPost("/wrapper")]
+                                  public IResult Post(
+                                      [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BodyPayload? body,
+                                      [FromQuery] string? filter,
+                                      [FromKeyedServices(typeof(WrapperMetadataEndpoint))] object keyed)
+                                      => TypedResults.Ok();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("[FromBody(EmptyBodyBehavior = global::Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] global::GeneratedEndpointsTests.BodyPayload? body", generated);
+        Assert.Contains("[FromQuery] string? filter", generated);
+        Assert.Contains("[FromKeyedServices(typeof(global::GeneratedEndpointsTests.WrapperMetadataEndpoint))] object keyed", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void EscapedKeywordMethodNamesCompile()
+    {
+        const string source = """
+                              internal sealed class KeywordMethodEndpoints
+                              {
+                                  [MapGet("/keyword-method")]
+                                  public IResult @event() => TypedResults.Ok();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("handler.@event()", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void RequestTimeoutNamedPropertyUsesPolicy()
+    {
+        const string source = """
+                              internal static class RequestTimeoutNamedPropertyEndpoint
+                              {
+                                  [RequestTimeout(PolicyName = "NamedPolicy")]
+                                  [MapGet("/timeout-named-property")]
+                                  public static IResult Get() => TypedResults.Ok();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains(".WithRequestTimeout(\"NamedPolicy\")", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void ProducesVoidResponseUsesNonGenericOverload()
+    {
+        const string source = """
+                              internal static class ProducesVoidEndpoint
+                              {
+                                  [ProducesResponse(typeof(void), StatusCodes.Status204NoContent)]
+                                  [MapDelete("/produces-void")]
+                                  public static IResult Delete() => TypedResults.NoContent();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains(".Produces(204)", generated);
+        Assert.DoesNotContain(".Produces<void>", generated);
+        AssertCompiles(source);
+    }
+
     private static async Task VerifyIndividualAsync(string source, string scenario, bool withNamespace = true)
     {
         var sources = TestHelpers.GetSources(source, withNamespace);

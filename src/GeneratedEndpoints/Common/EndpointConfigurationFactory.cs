@@ -58,7 +58,7 @@ internal static class EndpointConfigurationFactory
                     disableRequestTimeout = true;
                     continue;
                 case RequestHandlerAttributeKind.RequestTimeout:
-                    requestTimeoutPolicyName = attribute.GetConstructorStringValue();
+                    requestTimeoutPolicyName = attribute.GetConstructorStringValue() ?? attribute.GetNamedStringValue(PolicyNameAttributeNamedParameter);
                     withRequestTimeout = true;
                     continue;
                 case RequestHandlerAttributeKind.Order:
@@ -180,7 +180,7 @@ internal static class EndpointConfigurationFactory
         if (symbol is not INamedTypeSymbol namedTypeSymbol)
             return null;
 
-        var className = namedTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var className = namedTypeSymbol.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
 
         if (className.StartsWith(GlobalPrefix, StringComparison.Ordinal))
             className = className[GlobalPrefix.Length..];
@@ -207,10 +207,10 @@ internal static class EndpointConfigurationFactory
         string? requestType;
         if (isGenericAttribute)
             requestType = attributeClass.TypeArguments[0]
-                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                .ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
         else
             requestType = attribute.GetConstructorTypeSymbol()
-                ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                ?.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
 
         if (requestType is null)
             return;
@@ -234,7 +234,7 @@ internal static class EndpointConfigurationFactory
         if (attributeClass is { IsGenericType: true, TypeArguments.Length: 1 })
         {
             var responseType = attributeClass.TypeArguments[0]
-                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                .ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
             var statusCode = attribute.GetConstructorIntValue() ?? 200;
             var contentType = attribute.GetConstructorStringValue(1);
             var additionalContentTypes = attribute.GetConstructorStringArray(2);
@@ -243,7 +243,7 @@ internal static class EndpointConfigurationFactory
         else
         {
             var responseType = attribute.GetConstructorTypeSymbol()
-                                   ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                   ?.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat)
                                ?? "";
             var statusCode = attribute.GetConstructorIntValue(1) ?? 200;
             var contentType = attribute.GetConstructorStringValue(2);
@@ -280,7 +280,7 @@ internal static class EndpointConfigurationFactory
         if (typeSymbol is null or ITypeParameterSymbol or IErrorTypeSymbol)
             return;
 
-        var displayString = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var displayString = typeSymbol.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat);
         if (string.IsNullOrWhiteSpace(displayString))
             return;
 

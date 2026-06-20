@@ -16,6 +16,9 @@ internal static class TypedConstantExtensions
         if (t is null)
             return "null";
 
+        if (v is ITypeSymbol typeSymbol)
+            return $"typeof({typeSymbol.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat)})";
+
         if (t.TypeKind != TypeKind.Enum)
             return t.SpecialType switch
             {
@@ -42,11 +45,11 @@ internal static class TypedConstantExtensions
             .FirstOrDefault(f => f.HasConstantValue && Equals(f.ConstantValue, v));
 
         if (field is not null)
-            return $"{t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{field.Name}";
+            return $"{t.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat)}.{field.Name}";
 
         var underlying = ((INamedTypeSymbol)t).EnumUnderlyingType!;
         var num = IntegralLiteral(v, underlying.SpecialType);
-        return $"({t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}){num}";
+        return $"({t.ToDisplayString(SymbolExtensions.FullyQualifiedTypeDisplayFormat)}){num}";
     }
 
     private static string EscapeChar(char c)

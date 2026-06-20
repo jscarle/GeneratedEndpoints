@@ -19,6 +19,8 @@ internal static partial class Constants
 
     internal const string NameAttributeNamedParameter = "Name";
     internal const string IsOptionalAttributeNamedParameter = "IsOptional";
+    internal const string PolicyNameAttributeNamedParameter = "PolicyName";
+    internal const string EmptyBodyBehaviorAttributeNamedParameter = "EmptyBodyBehavior";
 
     internal const string RoutingNamespace = $"{BaseNamespace}.Routing";
 

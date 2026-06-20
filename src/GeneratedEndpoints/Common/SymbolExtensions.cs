@@ -5,6 +5,39 @@ namespace GeneratedEndpoints.Common;
 /// <summary>Provides extension methods for working with symbols.</summary>
 internal static class SymbolExtensions
 {
+    internal static SymbolDisplayFormat FullyQualifiedTypeDisplayFormat { get; } = SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+        SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
+    );
+
+    internal static SymbolDisplayFormat FullyQualifiedNullableTypeDisplayFormat { get; } = FullyQualifiedTypeDisplayFormat.WithMiscellaneousOptions(
+        FullyQualifiedTypeDisplayFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+    );
+
+    internal static bool IsAccessibleFromGeneratedCode(this ISymbol symbol)
+    {
+        return symbol.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
+    }
+
+    internal static bool IsTypeAccessibleFromGeneratedCode(this INamedTypeSymbol symbol)
+    {
+        for (var current = symbol; current is not null; current = current.ContainingType)
+        {
+            if (current.IsFileLocal || !current.IsAccessibleFromGeneratedCode())
+                return false;
+        }
+
+        return true;
+    }
+
+    internal static bool HasGenericContainingType(this INamedTypeSymbol symbol)
+    {
+        for (var current = symbol; current is not null; current = current.ContainingType)
+            if (current.TypeParameters.Length > 0)
+                return true;
+
+        return false;
+    }
+
     /// <summary>Gets a list of declarations representing the hierarchy containing the given symbol.</summary>
     /// <param name="symbol">The <see cref="ISymbol"/> to get the containing declarations for.</param>
     /// <param name="cancellationToken">The cancellation token.</param>

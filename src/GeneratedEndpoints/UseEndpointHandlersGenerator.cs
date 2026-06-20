@@ -182,7 +182,7 @@ internal static class UseEndpointHandlersGenerator
         {
             source.Append(requestHandler.Class.Name);
             source.Append('.');
-            source.Append(requestHandler.Method.Name);
+            source.Append(MethodSymbolExtensions.EscapeIdentifier(requestHandler.Method.Name));
         }
         else
         {
@@ -220,7 +220,7 @@ internal static class UseEndpointHandlersGenerator
                 source.Append("handler.");
             }
 
-            source.Append(requestHandler.Method.Name);
+            source.Append(MethodSymbolExtensions.EscapeIdentifier(requestHandler.Method.Name));
             source.Append('(');
             for (var index = 0; index < requestHandler.Method.Parameters.Count; index++)
             {
@@ -348,10 +348,17 @@ internal static class UseEndpointHandlersGenerator
             {
                 source.AppendLine();
                 source.Append(indent);
-                source.Append(".Produces<");
-                source.Append(produces.ResponseType);
-                source.Append('>');
-                source.Append('(');
+                if (IsVoidResponseType(produces.ResponseType))
+                {
+                    source.Append(".Produces(");
+                }
+                else
+                {
+                    source.Append(".Produces<");
+                    source.Append(produces.ResponseType);
+                    source.Append('>');
+                    source.Append('(');
+                }
                 source.Append(produces.StatusCode);
                 AppendOptionalContentTypes(source, produces.ContentType, produces.AdditionalContentTypes);
                 source.Append(')');
@@ -719,6 +726,11 @@ internal static class UseEndpointHandlersGenerator
             "PATCH" => "Patch",
             _ => null,
         };
+    }
+
+    private static bool IsVoidResponseType(string responseType)
+    {
+        return string.Equals(responseType, "void", StringComparison.Ordinal) || string.Equals(responseType, "global::System.Void", StringComparison.Ordinal);
     }
 
     private static void AppendAdditionalContentTypes(StringBuilder source, EquatableImmutableArray<string>? additionalContentTypes)
