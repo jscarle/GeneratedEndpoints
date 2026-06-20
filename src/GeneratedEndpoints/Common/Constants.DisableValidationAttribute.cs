@@ -22,6 +22,7 @@ internal static partial class Constants
                                                                                                  /// Disables request validation for the annotated endpoint or class when targeting .NET 10 or later.
                                                                                                  /// </summary>
                                                                                                  [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                                 {{GeneratedTypeAttributes}}
                                                                                                  internal sealed class {{DisableValidationAttributeName}} : global::System.Attribute
                                                                                                  {
                                                                                                  }

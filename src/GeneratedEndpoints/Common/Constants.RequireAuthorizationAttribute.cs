@@ -22,6 +22,7 @@ internal static partial class Constants
                                                                                                     /// Optionally restricts access to the specified authorization policies.
                                                                                                     /// </summary>
                                                                                                     [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                                    {{GeneratedTypeAttributes}}
                                                                                                     internal sealed class {{RequireAuthorizationAttributeName}} : global::System.Attribute
                                                                                                     {
                                                                                                         /// <summary>
@@ -34,7 +35,7 @@ internal static partial class Constants
                                                                                                         /// </summary>
                                                                                                         public {{RequireAuthorizationAttributeName}}()
                                                                                                         {
-                                                                                                            PolicyNames = [];
+                                                                                                            PolicyNames = global::System.Array.Empty<string>();
                                                                                                         }
 
                                                                                                         /// <summary>
@@ -42,7 +43,7 @@ internal static partial class Constants
                                                                                                         /// </summary>
                                                                                                         public {{RequireAuthorizationAttributeName}}(params string[] policyNames)
                                                                                                         {
-                                                                                                            PolicyNames = policyNames ?? [];
+                                                                                                            PolicyNames = policyNames ?? global::System.Array.Empty<string>();
                                                                                                         }
                                                                                                     }
                                                                                                     """, Encoding.UTF8);

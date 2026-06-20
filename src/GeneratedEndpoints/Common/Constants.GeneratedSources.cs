@@ -45,6 +45,7 @@ internal static partial class Constants
                  /// Identifies a method as an HTTP {{summaryVerb}} minimal API endpoint with the specified route pattern.
                  /// </summary>
                  [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                 {{GeneratedTypeAttributes}}
                  internal sealed class {{attributeName}} : global::System.Attribute
                  {
                      /// <summary>

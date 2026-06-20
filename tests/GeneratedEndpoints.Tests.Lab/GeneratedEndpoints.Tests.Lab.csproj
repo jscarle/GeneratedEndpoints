@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -16,6 +16,7 @@
     <ItemGroup>
         <Content Update="appsettings.Development.json">
             <DependentUpon>appsettings.json</DependentUpon>
+            <CopyToPublishDirectory>Never</CopyToPublishDirectory>
         </Content>
     </ItemGroup>
 

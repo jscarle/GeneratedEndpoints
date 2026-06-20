@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                            /// Specifies that the annotated endpoint requires a configured CORS policy.
                                                                                            /// </summary>
                                                                                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                           {{GeneratedTypeAttributes}}
                                                                                            internal sealed class {{RequireCorsAttributeName}} : global::System.Attribute
                                                                                            {
                                                                                                /// <summary>

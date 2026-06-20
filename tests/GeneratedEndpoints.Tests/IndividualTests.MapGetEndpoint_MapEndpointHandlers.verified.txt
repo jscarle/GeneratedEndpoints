@@ -18,6 +18,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.AspNetCore.Generated.Routing;
 
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)

@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                                 /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
                                                                                                 /// </summary>
                                                                                                 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                                {{GeneratedTypeAttributes}}
                                                                                                 internal sealed class {{ProducesResponseAttributeName}} : global::System.Attribute
                                                                                                 {
                                                                                                     /// <summary>
@@ -55,7 +56,7 @@ internal static partial class Constants
                                                                                                         Type = type;
                                                                                                         StatusCode = statusCode;
                                                                                                         ContentType = contentType;
-                                                                                                        AdditionalContentTypes = additionalContentTypes ?? [];
+                                                                                                        AdditionalContentTypes = additionalContentTypes ?? global::System.Array.Empty<string>();
                                                                                                     }
                                                                                                 }
 
@@ -64,6 +65,7 @@ internal static partial class Constants
                                                                                                 /// </summary>
                                                                                                 /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
                                                                                                 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                                {{GeneratedTypeAttributes}}
                                                                                                 internal sealed class {{ProducesResponseAttributeName}}<TResponse> : global::System.Attribute
                                                                                                 {
                                                                                                     /// <summary>
@@ -96,7 +98,7 @@ internal static partial class Constants
                                                                                                     {
                                                                                                         StatusCode = statusCode;
                                                                                                         ContentType = contentType;
-                                                                                                        AdditionalContentTypes = additionalContentTypes ?? [];
+                                                                                                        AdditionalContentTypes = additionalContentTypes ?? global::System.Array.Empty<string>();
                                                                                                     }
                                                                                                 }
 

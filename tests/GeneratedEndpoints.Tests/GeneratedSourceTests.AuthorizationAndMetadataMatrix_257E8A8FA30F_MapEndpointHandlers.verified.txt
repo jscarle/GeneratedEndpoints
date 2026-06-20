@@ -19,25 +19,25 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.AspNetCore.Generated.Routing;
 
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapEndpointHandlers(this IEndpointRouteBuilder builder)
     {
-        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("")
-            .WithGroupName("Docs")
-            .WithOrder(-5)
-            .ExcludeFromDescription()
-            .RequireCors()
-            .RequireHost("api.alt.com")
-            .DisableRequestTimeout();
+        var _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group = builder.MapGroup("");
 
         _GeneratedEndpointsTests_AuthorizationMatrixEndpoints_Group.MapGet("/matrix/{id:int}", global::GeneratedEndpointsTests.AuthorizationMatrixEndpoints.Handle)
             .WithName("GetMatrix")
+            .WithGroupName("Docs")
+            .WithOrder(-5)
+            .ExcludeFromDescription()
             .WithTags("Method", "Matrix")
             .RequireAuthorization("MethodPolicy")
             .RequireCors("MethodCors")
+            .RequireHost("api.alt.com")
             .RequireRateLimiting("BurstPolicy")
-            .AllowAnonymous();
+            .WithRequestTimeout("TimeoutPolicy");
 
         return builder;
     }

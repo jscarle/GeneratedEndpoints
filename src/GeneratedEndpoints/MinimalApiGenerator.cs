@@ -104,8 +104,10 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return null;
 
         var requestHandlerMethod = RequestHandlerMethodHelper.Create(methodSymbol, cancellationToken);
+        if (requestHandlerMethod is null)
+            return null;
 
-        if (requestHandlerClass.Value.IsAbstract && !requestHandlerMethod.IsStatic)
+        if (requestHandlerClass.Value.IsAbstract && !requestHandlerMethod.Value.IsStatic)
             return null;
 
         var (httpMethod, pattern, name) = GetRequestHandlerAttribute(methodSymbol, attribute, cancellationToken);
@@ -113,7 +115,7 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
         var requestHandler = new RequestHandler
         {
             Class = requestHandlerClass.Value,
-            Method = requestHandlerMethod,
+            Method = requestHandlerMethod.Value,
             HttpMethod = httpMethod,
             Pattern = pattern,
             Name = name,
@@ -165,11 +167,17 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             return;
 
         var span = raw.AsSpan();
-        var seen = new Dictionary<string, int>(span.Length, StringComparer.Ordinal);
+        QualifyDuplicateNames(span, includeSignature: false);
+        QualifyDuplicateNames(span, includeSignature: true);
+    }
 
-        for (var index = 0; index < span.Length; index++)
+    private static void QualifyDuplicateNames(Span<RequestHandler> handlers, bool includeSignature)
+    {
+        var seen = new Dictionary<string, int>(handlers.Length, StringComparer.Ordinal);
+
+        for (var index = 0; index < handlers.Length; index++)
         {
-            ref var handler = ref span[index];
+            ref var handler = ref handlers[index];
             var name = handler.Name;
             if (string.IsNullOrEmpty(name))
                 continue;
@@ -184,12 +192,12 @@ public sealed class MinimalApiGenerator : IIncrementalGenerator
             var firstIndex = state >= 0 ? state : ~state;
             if (state >= 0)
             {
-                ref var firstHandler = ref span[firstIndex];
-                firstHandler.SetFullyQualifiedName();
+                ref var firstHandler = ref handlers[firstIndex];
+                firstHandler.SetFullyQualifiedName(includeSignature);
                 seen[nonEmptyName] = ~firstIndex;
             }
 
-            handler.SetFullyQualifiedName();
+            handler.SetFullyQualifiedName(includeSignature);
         }
     }
 }

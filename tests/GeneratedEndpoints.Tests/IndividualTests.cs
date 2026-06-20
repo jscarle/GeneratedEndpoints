@@ -1,4 +1,5 @@
 ﻿using GeneratedEndpoints.Tests.Common;
+using Microsoft.CodeAnalysis.CSharp;
 using SourceGeneratorTestHelpers.XUnit;
 
 namespace GeneratedEndpoints.Tests;
@@ -6,6 +7,8 @@ namespace GeneratedEndpoints.Tests;
 [UsesVerify]
 public class IndividualTests
 {
+    private const string MapEndpointHandlersHint = "Microsoft.AspNetCore.Generated.Routing.MapEndpointHandlers.g.cs";
+
     public IndividualTests()
     {
         ModuleInitializer.Initialize();
@@ -462,6 +465,367 @@ public class IndividualTests
         await VerifyIndividualAsync(source, nameof(AsyncMethodVariants));
     }
 
+    [Fact]
+    public void GroupedMethodAuthorizationOverridesClassAllowAnonymous()
+    {
+        var source = """
+                     [AllowAnonymous]
+                     [MapGroup("/group")]
+                     internal static class GroupedAuthorizationEndpoints
+                     {
+                         [RequireAuthorization("SecurePolicy")]
+                         [MapGet("/secure")]
+                         public static Ok Secure() => TypedResults.Ok();
+                     }
+                     """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("builder.MapGroup(\"/group\");", generated);
+        Assert.Contains(".RequireAuthorization(\"SecurePolicy\")", generated);
+        Assert.DoesNotContain(".AllowAnonymous()", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void EscapedKeywordParametersCompile()
+    {
+        const string source = """
+                              internal sealed class KeywordParameterEndpoints
+                              {
+                                  [MapGet("/keyword/{event}")]
+                                  public Ok<string> Get(string @event) => TypedResults.Ok(@event);
+                              }
+                              """;
+
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void StaticOverloadedHandlersCompile()
+    {
+        const string source = """
+                              internal static class OverloadedEndpoints
+                              {
+                                  [MapGet("/overload")]
+                                  public static Ok<string> Get() => TypedResults.Ok("ok");
+
+                                  [MapGet("/overload/{id:int}")]
+                                  public static Ok<string> Get(int id) => TypedResults.Ok(id.ToString());
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains(".WithName(\"GeneratedEndpointsTests.OverloadedEndpoints.Get()\")", generated);
+        Assert.Contains(".WithName(\"GeneratedEndpointsTests.OverloadedEndpoints.Get(int)\")", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void InstanceHandlerDefaultParameterValuesArePreserved()
+    {
+        const string source = """
+                              internal sealed class DefaultParameterEndpoints
+                              {
+                                  [MapGet("/default")]
+                                  public Ok<string> Get(int page = 1) => TypedResults.Ok(page.ToString());
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("int page = 1", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void UnsupportedHandlerShapesAreIgnored()
+    {
+        const string source = """
+                              file sealed class FileLocalEndpoint
+                              {
+                                  [MapGet("/file-local")]
+                                  public IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class PrivateStaticEndpoint
+                              {
+                                  [MapGet("/private-static")]
+                                  private static IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal sealed class PrivateInstanceEndpoint
+                              {
+                                  [MapGet("/private-instance")]
+                                  private IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class Container
+                              {
+                                  private sealed class NestedPrivateEndpoint
+                                  {
+                                      [MapGet("/nested-private")]
+                                      public IResult Get() => TypedResults.Ok();
+                                  }
+                              }
+
+                              internal sealed class GenericEndpoint<T>
+                              {
+                                  [MapGet("/generic")]
+                                  public IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class GenericStaticEndpoint<T>
+                              {
+                                  [MapGet("/generic-static")]
+                                  public static IResult Get() => TypedResults.Ok();
+                              }
+
+                              internal static class GenericMethodEndpoint
+                              {
+                                  [MapGet("/generic-method")]
+                                  public static T Get<T>() => default!;
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.DoesNotContain("/file-local", generated);
+        Assert.DoesNotContain("/private-static", generated);
+        Assert.DoesNotContain("/private-instance", generated);
+        Assert.DoesNotContain("/nested-private", generated);
+        Assert.DoesNotContain("/generic", generated);
+        Assert.DoesNotContain("/generic-static", generated);
+        Assert.DoesNotContain("/generic-method", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void PrivateConfigureMethodIsIgnored()
+    {
+        const string source = """
+                              using Microsoft.AspNetCore.Builder;
+
+                              internal static class PrivateConfigureEndpoint
+                              {
+                                  [MapGet("/private-configure")]
+                                  public static IResult Get() => TypedResults.Ok();
+
+                                  private static void Configure<TBuilder>(TBuilder builder)
+                                      where TBuilder : IEndpointConventionBuilder
+                                  {
+                                      _ = builder;
+                                  }
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("builder.MapGet(\"/private-configure\", global::GeneratedEndpointsTests.PrivateConfigureEndpoint.Get)", generated);
+        Assert.DoesNotContain("PrivateConfigureEndpoint.Configure", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void WrapperParametersPreserveBindingMetadata()
+    {
+        const string source = """
+                              using Microsoft.AspNetCore.Mvc;
+                              using Microsoft.AspNetCore.Mvc.ModelBinding;
+                              using Microsoft.Extensions.DependencyInjection;
+
+                              internal sealed record BodyPayload(string Value);
+
+                              internal sealed class WrapperMetadataEndpoint
+                              {
+                                  [MapPost("/wrapper")]
+                                  public IResult Post(
+                                      [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BodyPayload? body,
+                                      [FromQuery] string? filter,
+                                      [FromKeyedServices(typeof(WrapperMetadataEndpoint))] object keyed)
+                                      => TypedResults.Ok();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("[FromBody(EmptyBodyBehavior = global::Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] global::GeneratedEndpointsTests.BodyPayload? body", generated);
+        Assert.Contains("[FromQuery] string? filter", generated);
+        Assert.Contains("[FromKeyedServices(typeof(global::GeneratedEndpointsTests.WrapperMetadataEndpoint))] object keyed", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void EscapedKeywordMethodNamesCompile()
+    {
+        const string source = """
+                              internal sealed class KeywordMethodEndpoints
+                              {
+                                  [MapGet("/keyword-method")]
+                                  public IResult @event() => TypedResults.Ok();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("handler.@event()", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void RequestTimeoutNamedPropertyUsesPolicy()
+    {
+        const string source = """
+                              internal static class RequestTimeoutNamedPropertyEndpoint
+                              {
+                                  [RequestTimeout(PolicyName = "NamedPolicy")]
+                                  [MapGet("/timeout-named-property")]
+                                  public static IResult Get() => TypedResults.Ok();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains(".WithRequestTimeout(\"NamedPolicy\")", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void ProducesVoidResponseUsesNonGenericOverload()
+    {
+        const string source = """
+                              internal static class ProducesVoidEndpoint
+                              {
+                                  [ProducesResponse(typeof(void), StatusCodes.Status204NoContent)]
+                                  [MapDelete("/produces-void")]
+                                  public static IResult Delete() => TypedResults.NoContent();
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains(".Produces(204)", generated);
+        Assert.DoesNotContain(".Produces<void>", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void InstanceHandlerDefaultStructParameterCompiles()
+    {
+        const string source = """
+                              using System.Threading;
+
+                              internal sealed class DefaultStructParameterEndpoint
+                              {
+                                  [MapGet("/default-struct")]
+                                  public IResult Get(CancellationToken cancellationToken = default)
+                                      => TypedResults.Ok(cancellationToken.CanBeCanceled);
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("global::System.Threading.CancellationToken cancellationToken = default", generated);
+        AssertCompiles(source);
+    }
+
+    [Fact]
+    public void CollidingMapGroupIdentifiersCompile()
+    {
+        const string source = """
+                              namespace Collision.A_B
+                              {
+                                  [MapGroup("/one")]
+                                  internal static class Endpoint
+                                  {
+                                      [MapGet("/value")]
+                                      public static IResult Get() => TypedResults.Ok();
+                                  }
+                              }
+
+                              namespace Collision.A.B
+                              {
+                                  [MapGroup("/two")]
+                                  internal static class Endpoint
+                                  {
+                                      [MapGet("/value")]
+                                      public static IResult Get() => TypedResults.Ok();
+                                  }
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, false);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("var _Collision_A_B_Endpoint_Group = builder.MapGroup(\"/two\");", generated);
+        Assert.Contains("var _Collision_A_B_Endpoint_Group_1 = builder.MapGroup(\"/one\");", generated);
+        AssertCompiles(source, withNamespace: false);
+    }
+
+    [Fact]
+    public void GeneratedAttributesCompileWithCSharp11()
+    {
+        const string source = """
+                              [RequireAuthorization]
+                              internal static class CSharp11AttributeEndpoint
+                              {
+                                  [ProducesResponse(typeof(string))]
+                                  [ProducesProblem]
+                                  [ProducesValidationProblem]
+                                  [RequireHost]
+                                  [MapGet("/csharp11")]
+                                  public static IResult Get() => TypedResults.Ok("ok");
+                              }
+                              """;
+
+        AssertCompiles(source, languageVersion: LanguageVersion.CSharp11);
+    }
+
+    [Fact]
+    public void WrapperParametersPreserveNonBindingAttributes()
+    {
+        const string source = """
+                              using System.ComponentModel.DataAnnotations;
+
+                              internal sealed class ValidationAttributeEndpoint
+                              {
+                                  [MapGet("/validation")]
+                                  public IResult Get([Range(1, 10)] int page, [Required] string term)
+                                      => TypedResults.Ok(new { page, term });
+                              }
+                              """;
+
+        var sources = TestHelpers.GetSources(source, true);
+        var result = TestHelpers.RunGenerator(sources);
+        var generated = TestHelpers.GetGeneratedSource(result, MapEndpointHandlersHint);
+
+        Assert.Contains("[global::System.ComponentModel.DataAnnotations.RangeAttribute(1, 10)] int page", generated);
+        Assert.Contains("[global::System.ComponentModel.DataAnnotations.RequiredAttribute] string term", generated);
+        AssertCompiles(source);
+    }
+
     private static async Task VerifyIndividualAsync(string source, string scenario, bool withNamespace = true)
     {
         var sources = TestHelpers.GetSources(source, withNamespace);
@@ -472,6 +836,12 @@ public class IndividualTests
 
         await result.VerifyAsync("MapEndpointHandlers.g.cs")
             .UseMethodName($"{scenario}_MapEndpointHandlers");
+    }
+
+    private static void AssertCompiles(string source, bool withNamespace = true, LanguageVersion languageVersion = LanguageVersion.Latest)
+    {
+        var diagnostics = TestHelpers.GetCompilationErrors(TestHelpers.GetSources(source, withNamespace), languageVersion);
+        Assert.True(diagnostics.Length == 0, string.Join(Environment.NewLine, diagnostics));
     }
 
     private static string FallbackScenario(bool includeDefault = false, bool includeCustom = false, string? customRoute = null)

@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                                          /// Specifies that the endpoint produces a validation problem details payload.
                                                                                                          /// </summary>
                                                                                                          [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                                                                                                         {{GeneratedTypeAttributes}}
                                                                                                          internal sealed class {{ProducesValidationProblemAttributeName}} : global::System.Attribute
                                                                                                          {
                                                                                                              /// <summary>
@@ -48,7 +49,7 @@ internal static partial class Constants
                                                                                                              {
                                                                                                                  StatusCode = statusCode;
                                                                                                                  ContentType = contentType;
-                                                                                                                 AdditionalContentTypes = additionalContentTypes ?? [];
+                                                                                                                 AdditionalContentTypes = additionalContentTypes ?? global::System.Array.Empty<string>();
                                                                                                              }
                                                                                                          }
 

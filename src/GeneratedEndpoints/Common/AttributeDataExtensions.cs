@@ -96,4 +96,13 @@ internal static class AttributeDataExtensions
 
         return null;
     }
+
+    public static string? GetNamedConstantValue(this AttributeData attribute, string namedParameter)
+    {
+        foreach (var namedArg in attribute.NamedArguments)
+            if (namedArg.Key == namedParameter)
+                return namedArg.Value.ToConstLiteral();
+
+        return null;
+    }
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <!-- Compilation -->
     <PropertyGroup>
@@ -26,7 +26,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Bcl.HashCode" Version="6.0.0" PrivateAssets="all" GeneratePathProperty="true"/>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.103" PrivateAssets="All"/>
         <PackageReference Include="SonarAnalyzer.CSharp" Version="10.17.0.131074">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -36,11 +36,12 @@
     <!-- Output -->
     <PropertyGroup>
         <AssemblyName>GeneratedEndpoints</AssemblyName>
-        <Version>10.0.3</Version>
-        <AssemblyVersion>10.0.3.0</AssemblyVersion>
-        <FileVersion>10.0.3.0</FileVersion>
+        <Version>10.0.4</Version>
+        <AssemblyVersion>10.0.4.0</AssemblyVersion>
+        <FileVersion>10.0.4.0</FileVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <IncludeBuildOutput>false</IncludeBuildOutput>
+        <DebugType>embedded</DebugType>
     </PropertyGroup>
 
     <!-- Package -->
@@ -84,5 +85,8 @@
     <ItemGroup>
         <InternalsVisibleTo Include="GeneratedEndpoints.Tests"/>
     </ItemGroup>
-
+    <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    </PropertyGroup>
 </Project>

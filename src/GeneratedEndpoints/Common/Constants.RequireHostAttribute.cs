@@ -21,6 +21,7 @@ internal static partial class Constants
                                                                                            /// Specifies the allowed hosts for the annotated endpoint or class.
                                                                                            /// </summary>
                                                                                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+                                                                                           {{GeneratedTypeAttributes}}
                                                                                            internal sealed class {{RequireHostAttributeName}} : global::System.Attribute
                                                                                            {
                                                                                                /// <summary>
@@ -29,7 +30,7 @@ internal static partial class Constants
                                                                                                /// <param name="hosts">The hosts that are allowed to access the endpoint.</param>
                                                                                                public {{RequireHostAttributeName}}(params string[] hosts)
                                                                                                {
-                                                                                                   Hosts = hosts ?? [];
+                                                                                                   Hosts = hosts ?? global::System.Array.Empty<string>();
                                                                                                }
 
                                                                                                /// <summary>
