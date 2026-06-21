@@ -4,7 +4,6 @@ using SourceGeneratorTestHelpers.XUnit;
 
 namespace GeneratedEndpoints.Tests;
 
-[UsesVerify]
 public class IndividualTests
 {
     private const string MapEndpointHandlersHint = "Microsoft.AspNetCore.Generated.Routing.MapEndpointHandlers.g.cs";
@@ -831,11 +830,9 @@ public class IndividualTests
         var sources = TestHelpers.GetSources(source, withNamespace);
         var result = TestHelpers.RunGenerator(sources);
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs")
-            .UseMethodName($"{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(IndividualTests)}.{scenario}_AddEndpointHandlers");
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs")
-            .UseMethodName($"{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(IndividualTests)}.{scenario}_MapEndpointHandlers");
     }
 
     private static void AssertCompiles(string source, bool withNamespace = true, LanguageVersion languageVersion = LanguageVersion.Latest)

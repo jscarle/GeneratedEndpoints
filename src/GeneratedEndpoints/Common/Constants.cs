@@ -3,7 +3,7 @@ namespace GeneratedEndpoints.Common;
 internal static partial class Constants
 {
     private const string GeneratorName = "GeneratedEndpoints.MinimalApiGenerator";
-    private static string GeneratorVersion => typeof(GeneratedEndpoints.MinimalApiGenerator).Assembly.GetName().Version?.ToString() ?? "";
+    private static string GeneratorVersion => typeof(MinimalApiGenerator).Assembly.GetName().Version?.ToString() ?? "";
 
     internal const string FileHeader =
         "//-----------------------------------------------------------------------------\n" +
