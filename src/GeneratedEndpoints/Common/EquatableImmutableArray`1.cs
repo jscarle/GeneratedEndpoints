@@ -71,12 +71,14 @@ public readonly struct EquatableImmutableArray<T> : IEquatable<EquatableImmutabl
     /// <inheritdoc/>
     public override int GetHashCode()
     {
-        var hashCode = new HashCode();
+        unchecked
+        {
+            var hashCode = 17;
+            foreach (var item in Array)
+                hashCode = (hashCode * 31) + EqualityComparer<T>.Default.GetHashCode(item);
 
-        foreach (var item in Array)
-            hashCode.Add(item);
-
-        return hashCode.ToHashCode();
+            return hashCode;
+        }
     }
 
     /// <summary>Determines whether two <see cref="EquatableImmutableArray{T}"/> instances are equal.</summary>

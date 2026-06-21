@@ -4,7 +4,6 @@ using SourceGeneratorTestHelpers.XUnit;
 
 namespace GeneratedEndpoints.Tests;
 
-[UsesVerify]
 public class AttributeGenerationTests
 {
     private const string AttributeTestSource = "internal static class AttributeTestEndpoints { }";

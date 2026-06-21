@@ -17,7 +17,7 @@ public static class TestHelpers
     public static GeneratorDriverRunResult RunGenerator(IEnumerable<string> sources)
     {
         var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp11).WithPreprocessorSymbols("NET10_0_OR_GREATER");
-        var (_, result) =
+        var (_, result, _) =
             IncrementalGenerator.RunWithDiagnostics<MinimalApiGenerator>(sources, cSharpParseOptions, AspNet100.References.All, GeneratorCompilationOptions);
         return result;
     }
@@ -38,12 +38,27 @@ public static class TestHelpers
 
     public static string GetGeneratedSource(GeneratorDriverRunResult result, string hintName)
     {
+        foreach (var generatedTree in result.GeneratedTrees)
+            if (generatedTree.FilePath.EndsWith(hintName, StringComparison.OrdinalIgnoreCase))
+                return generatedTree.GetText()
+                    .ToString();
+
         foreach (var generatorResult in result.Results)
         foreach (var generatedSource in generatorResult.GeneratedSources)
-            if (generatedSource.HintName == hintName)
+            if (generatedSource.HintName.Equals(hintName, StringComparison.OrdinalIgnoreCase)
+                || generatedSource.HintName.EndsWith(hintName, StringComparison.OrdinalIgnoreCase))
                 return generatedSource.SourceText.ToString();
 
-        throw new InvalidOperationException($"Generated source '{hintName}' was not found.");
+        var availableHintNames = result.GeneratedTrees
+            .Select(generatedTree => generatedTree.FilePath)
+            .Concat(result.Results
+                .SelectMany(generatorResult => generatorResult.GeneratedSources)
+                .Select(generatedSource => generatedSource.HintName)
+            );
+
+        throw new InvalidOperationException(
+            $"Generated source '{hintName}' was not found. Available sources: {string.Join(", ", availableHintNames)}. Diagnostics: {string.Join(", ", result.Diagnostics)}"
+        );
     }
 
     public static IEnumerable<string> GetSources(string source, bool withNamespace)

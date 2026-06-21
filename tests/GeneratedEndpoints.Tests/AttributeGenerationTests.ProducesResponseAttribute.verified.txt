@@ -16,7 +16,7 @@ namespace Microsoft.AspNetCore.Generated.Attributes;
 /// Specifies a response type, status code, and content types produced by the annotated endpoint or class.
 /// </summary>
 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.5.0")]
 [global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal sealed class ProducesResponseAttribute : global::System.Attribute
 {
@@ -61,7 +61,7 @@ internal sealed class ProducesResponseAttribute : global::System.Attribute
 /// </summary>
 /// <typeparam name="TResponse">The CLR type of the response body.</typeparam>
 [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
-[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.5.0")]
 [global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal sealed class ProducesResponseAttribute<TResponse> : global::System.Attribute
 {

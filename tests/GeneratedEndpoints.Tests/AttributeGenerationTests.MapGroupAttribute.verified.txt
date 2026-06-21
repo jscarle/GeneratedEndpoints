@@ -16,7 +16,7 @@ namespace Microsoft.AspNetCore.Generated.Attributes;
 /// Specifies the route group for the annotated class.
 /// </summary>
 [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.3.0")]
+[global::System.CodeDom.Compiler.GeneratedCodeAttribute("GeneratedEndpoints.MinimalApiGenerator", "10.0.5.0")]
 [global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
 internal sealed class MapGroupAttribute : global::System.Attribute
 {

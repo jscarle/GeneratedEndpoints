@@ -20,14 +20,13 @@
 
     <!-- References -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all"/>
-        <PackageReference Include="PolySharp" Version="1.15.0">
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="[4.14.0]" PrivateAssets="all" />
+        <PackageReference Include="PolySharp" Version="1.16.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Bcl.HashCode" Version="6.0.0" PrivateAssets="all" GeneratePathProperty="true"/>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.103" PrivateAssets="All"/>
-        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.17.0.131074">
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.27.0.140913">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -36,9 +35,9 @@
     <!-- Output -->
     <PropertyGroup>
         <AssemblyName>GeneratedEndpoints</AssemblyName>
-        <Version>10.0.4</Version>
-        <AssemblyVersion>10.0.4.0</AssemblyVersion>
-        <FileVersion>10.0.4.0</FileVersion>
+        <Version>10.0.5</Version>
+        <AssemblyVersion>10.0.5.0</AssemblyVersion>
+        <FileVersion>10.0.5.0</FileVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <DebugType>embedded</DebugType>
@@ -66,20 +65,12 @@
         <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" Visible="false"/>
         <None Include="..\..\Icon.png" Pack="true" PackagePath="\" Visible="false"/>
         <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
-        <None Include="$(PKGMicrosoft_Bcl_HashCode)\lib\netstandard2.0\Microsoft.Bcl.HashCode.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
     </ItemGroup>
 
     <!-- Development -->
     <PropertyGroup>
         <IsRoslynComponent>true</IsRoslynComponent>
-        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
     </PropertyGroup>
-
-    <Target Name="GetDependencyTargetPaths">
-        <ItemGroup>
-            <TargetPathWithTargetPlatformMoniker Include="$(PKGMicrosoft_Bcl_HashCode)\lib\netstandard2.0\Microsoft.Bcl.HashCode.dll" IncludeRuntimeDependency="false"/>
-        </ItemGroup>
-    </Target>
 
     <!-- Testing -->
     <ItemGroup>
