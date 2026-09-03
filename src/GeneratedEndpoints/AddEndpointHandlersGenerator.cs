@@ -17,10 +17,10 @@ internal static class AddEndpointHandlersGenerator
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        var nonStaticClassNames = grouped.Keys
+        var nonStaticClasses = grouped.Keys
             .Where(x => !x.IsStatic && !x.IsAbstract)
-            .Select(x => x.Name)
             .ToList();
+
         var source = new StringBuilder();
         source.AppendLine(FileHeader);
 
@@ -49,11 +49,23 @@ internal static class AddEndpointHandlersGenerator
 
         source.AppendLine("    {");
 
-        foreach (var className in nonStaticClassNames)
+        foreach (var handlerClass in nonStaticClasses)
         {
             source.Append("        services.TryAddScoped<");
-            source.Append(className);
-            source.Append(">();");
+
+            if (!string.IsNullOrEmpty(handlerClass.InterfaceName))
+            {
+                source.Append(handlerClass.InterfaceName);
+                source.Append(", ");
+                source.Append(handlerClass.Name);
+                source.Append(">();");
+            }
+            else
+            {
+                source.Append(handlerClass.Name);
+                source.Append(">();");
+            }
+
             source.AppendLine();
         }
 
