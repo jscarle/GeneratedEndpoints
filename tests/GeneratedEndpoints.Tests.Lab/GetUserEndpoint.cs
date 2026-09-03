@@ -18,7 +18,7 @@ namespace GeneratedEndpoints.Tests.Lab;
 [Tags("Users", "Profiles")]
 [RequireAuthorization("Users.Read", "Administrators")]
 [DisableAntiforgery]
-internal sealed class GetUserEndpoint(IServiceProvider serviceProvider)
+internal sealed class GetUserEndpoint(IServiceProvider serviceProvider) : IUserEndpoints
 {
     [Tags("Featured")]
     [AllowAnonymous]
@@ -69,3 +69,10 @@ internal sealed record GetUserRequest(int Id);
 internal sealed record GetUserMetadata(string RequestedBy, string Purpose);
 
 internal sealed record UserProfile(int Id, string DisplayName, string Email);
+
+internal interface IUserEndpoints
+{
+    ValueTask<Results<Ok<UserProfile>, NotFound, ValidationProblem, ProblemHttpResult>> GetUser(
+        int id,
+        IServiceCollection services);
+}
