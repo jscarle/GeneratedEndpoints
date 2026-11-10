@@ -8,11 +8,6 @@ public class IndividualTests
 {
     private const string MapEndpointHandlersHint = "Microsoft.AspNetCore.Generated.Routing.MapEndpointHandlers.g.cs";
 
-    public IndividualTests()
-    {
-        ModuleInitializer.Initialize();
-    }
-
     [Fact]
     public async Task DefaultFallbackOnly()
     {
@@ -830,9 +825,13 @@ public class IndividualTests
         var sources = TestHelpers.GetSources(source, withNamespace);
         var result = TestHelpers.RunGenerator(sources);
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(IndividualTests)}.{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(IndividualTests)}.{scenario}_AddEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(IndividualTests)}.{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(IndividualTests)}.{scenario}_MapEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
     }
 
     private static void AssertCompiles(string source, bool withNamespace = true, LanguageVersion languageVersion = LanguageVersion.Latest)

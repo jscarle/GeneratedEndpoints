@@ -12,6 +12,9 @@ obj/
 # Backup files
 *.bak
 
+# Unapproved generated-source snapshots
+*.received.txt
+
 # Docs
 docfx/_site/**
 docfx/netstandard2.0/**

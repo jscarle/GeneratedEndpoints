@@ -18,10 +18,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup .NET 10.0
-        uses: actions/setup-dotnet@v5
+      - name: Setup .NET 11.0
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.x
+          dotnet-version: 11.0.x
 
       - name: Restore dependencies
         run: dotnet restore
@@ -39,4 +39,4 @@ jobs:
           user: ${{secrets.NUGET_USER}}
 
       - name: Push to NuGet
-        run: dotnet nuget push "*.nupkg" --api-key ${{steps.nuget-login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push "*.nupkg" --api-key ${{steps.nuget-login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate

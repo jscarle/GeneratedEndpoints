@@ -5,11 +5,6 @@ namespace GeneratedEndpoints.Tests;
 
 public class GeneratedSourceTests
 {
-    public GeneratedSourceTests()
-    {
-        ModuleInitializer.Initialize();
-    }
-
     [Theory]
     [InlineData(true, true, true, "/custom-fallback")]
     [InlineData(false, true, false, null)]
@@ -24,9 +19,13 @@ public class GeneratedSourceTests
             ("Custom", includeCustomFallback), ("Route", customRoute ?? "default")
         );
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
     }
 
     [Theory]
@@ -86,9 +85,13 @@ public class GeneratedSourceTests
             ("Exclude", excludeFromDescription)
         );
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
     }
 
     [Theory]
@@ -119,9 +122,13 @@ public class GeneratedSourceTests
             ("GenericFilter", includeGenericFilter), ("ConfigureFilter", configureRegistersFilter), ("Value", metadataValue)
         );
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
     }
 
     [Theory]
@@ -156,9 +163,13 @@ public class GeneratedSourceTests
             ("Query", includeQuery), ("Trace", includeTrace), ("Connect", includeConnect), ("Collision", includeMethodNameCollision)
         );
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
     }
 
     [Theory]
@@ -214,8 +225,12 @@ public class GeneratedSourceTests
             ("Tags", includeTags), ("Exclude", excludeFromDescription), ("AllowAnon", allowAnonymous), ("MethodAuth", methodRequiresAuthorization)
         );
 
-        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers");
+        await result.VerifyAsync("AddEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_AddEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
-        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers");
+        await result.VerifyAsync("MapEndpointHandlers.g.cs", snapshotName: $"{nameof(GeneratedSourceTests)}.{scenario}_MapEndpointHandlers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
     }
 }

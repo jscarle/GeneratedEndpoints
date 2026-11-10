@@ -10,11 +10,6 @@ public class AttributeGenerationTests
 
     private static readonly GeneratorDriverRunResult GeneratorResult = TestHelpers.RunGenerator(TestHelpers.GetSources(AttributeTestSource, true));
 
-    public AttributeGenerationTests()
-    {
-        ModuleInitializer.Initialize();
-    }
-
     [Fact]
     public Task MapGetAttribute()
     {
@@ -185,6 +180,6 @@ public class AttributeGenerationTests
 
     private static Task VerifyAttributeAsync(string fileName)
     {
-        return GeneratorResult.VerifyAsync(fileName);
+        return GeneratorResult.VerifyAsync(fileName, cancellationToken: TestContext.Current.CancellationToken);
     }
 }
