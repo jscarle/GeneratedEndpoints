@@ -16,17 +16,17 @@ public static class TestHelpers
 
     public static GeneratorDriverRunResult RunGenerator(IEnumerable<string> sources)
     {
-        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp11).WithPreprocessorSymbols("NET10_0_OR_GREATER");
+        var cSharpParseOptions = new CSharpParseOptions(LanguageVersion.CSharp11).WithPreprocessorSymbols("NET10_0_OR_GREATER", "NET11_0_OR_GREATER");
         var (_, result, _) =
-            IncrementalGenerator.RunWithDiagnostics<MinimalApiGenerator>(sources, cSharpParseOptions, AspNet100.References.All, GeneratorCompilationOptions);
+            IncrementalGenerator.RunWithDiagnostics<MinimalApiGenerator>(sources, cSharpParseOptions, AspNet110.References.All, GeneratorCompilationOptions);
         return result;
     }
 
     public static ImmutableArray<Diagnostic> GetCompilationErrors(IEnumerable<string> sources, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
-        var cSharpParseOptions = new CSharpParseOptions(languageVersion).WithPreprocessorSymbols("NET10_0_OR_GREATER");
+        var cSharpParseOptions = new CSharpParseOptions(languageVersion).WithPreprocessorSymbols("NET10_0_OR_GREATER", "NET11_0_OR_GREATER");
         var syntaxTrees = sources.Select(source => CSharpSyntaxTree.ParseText(source, cSharpParseOptions));
-        var compilation = CSharpCompilation.Create("GeneratedEndpoints.Tests.GeneratedCode", syntaxTrees, AspNet100.References.All, TestCompilationOptions);
+        var compilation = CSharpCompilation.Create("GeneratedEndpoints.Tests.GeneratedCode", syntaxTrees, AspNet110.References.All, TestCompilationOptions);
 
         var driver = CSharpGeneratorDriver.Create([new MinimalApiGenerator().AsSourceGenerator()], parseOptions: cSharpParseOptions);
         driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var generatorDiagnostics);

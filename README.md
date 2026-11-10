@@ -12,6 +12,8 @@ by keeping endpoint definitions inside their features while generating the boile
 
 ## Setup
 
+Development builds and tests use the .NET 11 SDK. The generator targets .NET Standard 2.0 and retains its Roslyn 4.14 dependency for compiler compatibility.
+
 Add the package to any ASP.NET Core project that hosts Minimal APIs:
 
 ```bash
