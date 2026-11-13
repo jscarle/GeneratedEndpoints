@@ -21,6 +21,7 @@ internal static class RequestHandlerClassHelper
         var isAbstract = classSymbol.IsAbstract;
         var configureMethodDetails = GetConfigureMethodDetails(classSymbol, cancellationToken);
         var classConfiguration = EndpointConfigurationFactory.Create(classSymbol);
+        var interfaceName = GetImplementedInterface(classSymbol, methodSymbol)?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         var requestHandlerClass = new RequestHandlerClass
         {
@@ -30,6 +31,7 @@ internal static class RequestHandlerClassHelper
             HasConfigureMethod = configureMethodDetails.HasConfigureMethod,
             ConfigureMethodAcceptsServiceProvider = configureMethodDetails.ConfigureMethodAcceptsServiceProvider,
             Configuration = classConfiguration,
+            InterfaceName = interfaceName,
         };
 
         return requestHandlerClass;
@@ -100,5 +102,23 @@ internal static class RequestHandlerClassHelper
             return false;
 
         return true;
+    }
+
+    private static INamedTypeSymbol? GetImplementedInterface(
+        INamedTypeSymbol classSymbol,
+        IMethodSymbol methodSymbol)
+    {
+        foreach (var candidate in classSymbol.AllInterfaces)
+        {
+            foreach (var member in candidate.GetMembers().OfType<IMethodSymbol>())
+            {
+                var implementation = classSymbol.FindImplementationForInterfaceMember(member);
+
+                if (SymbolEqualityComparer.Default.Equals(implementation, methodSymbol))
+                    return candidate;
+            }
+        }
+
+        return null;
     }
 }

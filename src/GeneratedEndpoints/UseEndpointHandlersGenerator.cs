@@ -229,7 +229,7 @@ internal static class UseEndpointHandlersGenerator
             if (!requestHandler.Method.IsStatic)
             {
                 source.Append("[FromServices] ");
-                source.Append(requestHandler.Class.Name);
+                source.Append(requestHandler.Class.InterfaceName ?? requestHandler.Class.Name);
                 source.Append(" handler");
                 hasParameter = true;
             }
